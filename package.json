@@ -25,7 +25,7 @@
     "docs:check": "node tooling/validate/docs.ts",
     "agents:check": "node tooling/validate/agent-instructions.ts",
     "agents:test": "node --test tooling/validate/agent-instructions.test.ts",
-    "env:example:check": "node tooling/validate/env-example.ts",
+    "env:example:check": "pnpm -C apps/api exec tsx ../../tooling/validate/env-example.ts",
     "release:check": "node tooling/validate/release-history.ts",
     "release:checksums": "node tooling/validate/release-history.ts --print-checksums",
     "release:test": "node --test tooling/validate/release-history.test.ts",
