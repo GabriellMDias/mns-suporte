@@ -37,6 +37,10 @@ jobs:
         env:
           ORION_RELEASE_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
         run: pnpm validate
+      - name: Rehearse the Compose deployment and database recovery
+        env:
+          ORION_RELEASE_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+        run: pnpm ops:rehearse
 
   dependency-review:
     name: Dependency review

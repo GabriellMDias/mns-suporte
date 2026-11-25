@@ -4,15 +4,6 @@
     "title": "Tracing",
     "group": "Reliability",
     "kind": "repository",
-    "heading": "Asynchronous causality and trace links",
-    "anchor": "asynchronous-causality-and-trace-links",
-    "text": "Asynchronous causality and trace links\nUse parent-child relationships for actual nested work and links where multiple parents, delayed execution, fan-in, fan-out, or independent stages make a tree misleading. Queue telemetry should separate waiting delay from execution time where supported and identify safe message type, consumer, and attempt. Scheduled work without a causal parent starts a new trace.\nImmediate retries may remain child spans; delayed attempts may use new linked traces with stable job/event/workflow IDs. Make retry attempts/reasons distinguishable. Duplicate deliveries are independent executions and need not share one trace. Long workflows lasting hours/days should use stages, links, and workflow IDs rather than an unbounded trace. Large batches/fan-out should use counts and selective significant/failed item spans rather than thousands of IDs or descendants.\nThe current exporter removes links; implementing these semantics requires explicit export-boundary changes and tests, not merely adding link calls.\n"
-  },
-  {
-    "id": "repository/docs/reliability/tracing",
-    "title": "Tracing",
-    "group": "Reliability",
-    "kind": "repository",
     "heading": "Outcomes and cross-signal correlation",
     "anchor": "outcomes-and-cross-signal-correlation",
     "text": "Outcomes and cross-signal correlation\nSpan status follows operational semantics. Expected domain rejection or inbound `4xx` is not automatically an infrastructure error; an unexpected outbound `401` may be a credential/configuration failure. Record a bounded result/error code when useful. Associate unexpected failures with the responsible operation; do not repeat exception events on every ancestor unless distinct operations failed.\nA failed attempt can remain an error child of a successful parent after retry. Preserve meaningful partial failures, timeout distinctions, cancellation, fallback, and circuit-breaker states where applicable. Do not hide degradation simply because eventual completion succeeded.\nLogs and error reports should inherit active trace/span correlation centrally where practical. Span events explain one execution; independent searchable semantic events may belong in logs. Do not duplicate both automatically. Metrics answer frequency/distribution questions, not the cause of one trace. Sampled tracing is never the sole required audit/security record.\n"
@@ -141,7 +132,7 @@
     "kind": "repository",
     "heading": "Runbooks",
     "anchor": "runbooks",
-    "text": "Runbooks\nNo operational runbooks exist yet. This directory contains the [authoring policy](authoring.md), [template](template.md), and [local instructions](AGENTS.md). Add index entries only for real procedures when the corresponding runtime and operational tooling exist.\nExisting contributor procedures have narrower owners: [local setup](../setup.md), [validation](../validation.md), and [database release/evolution](../database/release-evolution.md). No production environment is selected; authoring guidance does not activate deployment-specific work.\nRunbooks describe current repeatable operations, not hypothetical systems or historical incident narratives. A procedure does not grant authority: [production access](../security/production-access.md) and [incident response](../security/incident-response.md) continue to apply.\n"
+    "text": "Runbooks\nThe [V1 deployment and recovery runbook](v1-deployment.md) covers the Compose release, encrypted backups, retention, alert diagnosis and rollback. This directory also contains the [authoring policy](authoring.md), [template](template.md), and [local instructions](AGENTS.md).\nExisting contributor procedures have narrower owners: [local setup](../setup.md), [validation](../validation.md), and [database release/evolution](../database/release-evolution.md). No production environment is selected; authoring guidance does not activate deployment-specific work.\nRunbooks describe current repeatable operations, not hypothetical systems or historical incident narratives. A procedure does not grant authority: [production access](../security/production-access.md) and [incident response](../security/incident-response.md) continue to apply.\n"
   },
   {
     "id": "repository/docs/runbooks/README",
@@ -259,6 +250,78 @@
     "heading": "Follow-Up",
     "anchor": "follow-up",
     "text": "Follow-Up\nRecord needed permanent correction, regression tests, alert/observability changes, automation, temporary-measure removal, runbook update, ADR, or post-incident review. Give follow-up work an owner; keep incident history outside this current procedure.\n"
+  },
+  {
+    "id": "repository/docs/runbooks/v1-deployment",
+    "title": "V1 Deployment and Recovery",
+    "group": "Runbooks",
+    "kind": "repository",
+    "heading": "V1 Deployment and Recovery",
+    "anchor": "v1-deployment-and-recovery",
+    "text": "V1 Deployment and Recovery\nThe operator authorized for the MNS Suporte Compose project owns these procedures. They apply to the packaged API, migration job, PostgreSQL, maintenance worker and encrypted backup job. Company ingress, log routing and secret-store access are pilot prerequisites. Follow the [production access policy](../security/production-access.md) and [incident response policy](../security/incident-response.md).\n"
+  },
+  {
+    "id": "repository/docs/runbooks/v1-deployment",
+    "title": "V1 Deployment and Recovery",
+    "group": "Runbooks",
+    "kind": "repository",
+    "heading": "Disposable rehearsal",
+    "anchor": "disposable-rehearsal",
+    "text": "Disposable rehearsal\nRun `pnpm ops:rehearse` from the repository root with Docker Compose and `tar` available. The command builds the current images and the preceding Git revision as an API image. Use `MNS_REHEARSAL_PREVIOUS` to select a tested compatible revision when the immediate parent is unsuitable. CI uses its comparison base.\nThe rehearsal uses two generated project names, isolated database volumes, temporary synthetic credentials and ephemeral loopback ports. It checks API readiness, production startup with missing settings, database grants, retention, sanitized alerts, encrypted backup integrity, a restore into a fresh volume and a rollback to the previous image with the original volume intact. It removes only its generated projects and temporary artifacts.\n"
+  },
+  {
+    "id": "repository/docs/runbooks/v1-deployment",
+    "title": "V1 Deployment and Recovery",
+    "group": "Runbooks",
+    "kind": "repository",
+    "heading": "Deploy",
+    "anchor": "deploy",
+    "text": "Deploy\nVerify authorization, image references, backup destination, expected migration history and reverse-proxy access. Record the last known good API image and release ID. Build or pull the release images and preserve their digests. Use a distinct tag for each release.\nUse the [Compose settings example](../../infra/compose.env.example) as the path and image contract. Project the following files into restricted host paths from the approved secret store. The directory must prevent other host users from traversing it. Give the explicitly mounted files read access to their container service users. Use independently generated passwords and keep the backup passphrase apart from archives and database credentials.\nFile\nPurpose\n`admin.password`\nPostgreSQL initialization and authorized database administration\n`migration.password`\nSchema owner used by the migration and backup jobs\n`runtime.password`\nRestricted API login with the schema's declared grants\n`maintenance.password`\nLogin that executes the two restricted maintenance functions\n`api.env`\n[API integration settings](../generated/configuration/api.md) for Meta, GLPI and corporate email\n`MNS_BACKUP_KEY_FILE`\nSeparate secret-store file containing the GnuPG passphrase\nSet the backup directory owner to the configured backup container UID and GID. PostgreSQL passwords are read during initialization and by the role-specific services. A later password rotation needs an authorized PostgreSQL role change and a coordinated secret replacement.\nRun the Compose commands from an approved checkout. Set `MNS_COMPOSE_ENV` to the path of the environment file for this deployment.\nmns() { docker compose -p mns-suporte -f infra/compose.yaml --env-file \"$MNS_COMPOSE_ENV\" \"$@\"; }\nmns config --quiet\nmns --profile tools build api migrate backup\nmns up -d --no-build --wait api maintenance\nmns ps -a\n\nTake a pre-change backup of any existing database before starting a new migration image. Compose waits for PostgreSQL and a successful migration and grants job. The API refuses production startup when WhatsApp dispatch, GLPI or email settings are incomplete. If startup fails, check the authorized settings and the migration job's exit status. Stop before repeating a migration whose result is unclear.\nVerify `/health/ready` on the API loopback port and confirm the running image digest. The company reverse proxy must terminate TLS and forward the Meta callback path `/webhooks/whatsapp` while preserving its raw request body. Keep PostgreSQL and health diagnostics private. Check the callback challenge and a synthetic end-to-end conversation during the pilot.\n"
+  },
+  {
+    "id": "repository/docs/runbooks/v1-deployment",
+    "title": "V1 Deployment and Recovery",
+    "group": "Runbooks",
+    "kind": "repository",
+    "heading": "Back up",
+    "anchor": "back-up",
+    "text": "Back up\nRun the backup job before migrations and via the approved host scheduler once daily after pilot setup. Use a new name for each archive. Collect failed job exits in the operational alert sink. Use the approved encrypted off-host storage with an initial archive expiry of 30 days. Confirm the restore time and capacity during the pilot.\nmns run --rm --no-deps backup create \"mns-$(date -u +%Y%m%dT%H%M%SZ).dump.gpg\"\n\nThe job streams a PostgreSQL custom-format dump into GnuPG AES-256 encryption. It publishes the encrypted file only after both commands succeed. A duplicate archive name fails. The published file resides in `MNS_BACKUP_DIR`. Check for a successful exit and a nonempty archive, then verify recovery with the restore procedure.\n"
+  },
+  {
+    "id": "repository/docs/runbooks/v1-deployment",
+    "title": "V1 Deployment and Recovery",
+    "group": "Runbooks",
+    "kind": "repository",
+    "heading": "Restore into a fresh database",
+    "anchor": "restore-into-a-fresh-database",
+    "text": "Restore into a fresh database\nSelect an authorized backup, its matching GnuPG secret and an isolated Compose project. Set its own fresh database secret files, the backup path and `MNS_ENVIRONMENT=test` in a separate environment file. Use an empty `api.env` to keep Meta and GLPI workers disabled during recovery checks.\nStart PostgreSQL alone and run the restore. The database must be freshly initialized and free of application schema. The job authenticates the encrypted dump before applying it in a single PostgreSQL transaction. GnuPG plaintext stays in the backup container's temporary memory filesystem. Size `MNS_RESTORE_TMPFS_BYTES` above the decrypted archive size and within the available recovery host memory. Its default is 512 MiB.\nmns_restore() { docker compose -p mns-suporte-restore -f infra/compose.yaml --env-file \"$MNS_RESTORE_ENV\" \"$@\"; }\nmns_restore up -d --no-build --wait db\nmns_restore run --rm --no-deps backup restore \"$MNS_ARCHIVE\"\nmns_restore up -d --no-build --wait api\n\nVerify API readiness, the expected migration records, least-privilege role permissions and representative data in the recovered volume. A failed authentication or restore stops the procedure. Inspect the target before retrying.\nBefore switching real ingress or enabling delivery, reconcile outstanding ticket and message states against GLPI and Meta. An older snapshot can omit effects the providers already accepted. If the original database is available, preserve it until recovery is accepted.\n"
+  },
+  {
+    "id": "repository/docs/runbooks/v1-deployment",
+    "title": "V1 Deployment and Recovery",
+    "group": "Runbooks",
+    "kind": "repository",
+    "heading": "Inspect operations",
+    "anchor": "inspect-operations",
+    "text": "Inspect operations\nReview the API and maintenance services with `mns ps -a` and `mns logs --since 15m api maintenance`. The maintenance process samples readiness and aggregate queue conditions once per minute. It emits `operational_alert` with a condition, firing or resolved state, environment and release. Route these events through the company log collector. A stopped maintenance process or absent logs require a host health check.\nCondition\nDiagnosis and response\n`api_readiness`, `maintenance_database`\nCheck container status, the migration job, PostgreSQL readiness and projected secrets. Confirm the API responds and maintenance resumes.\n`conversation_backlog`, `ticket_submission_backlog`, `whatsapp_delivery_backlog`\nCheck worker warnings and provider availability. Verify a new synthetic input drains.\n`ticket_submission_uncertain`\nLocate the GLPI ticket using the exact MNS draft reference before any repeat. Follow the [ticket submission recovery procedure](../../apps/api/README.md#glpi-ticket-submission).\n`whatsapp_delivery_uncertain`\nCheck signed Meta delivery evidence. A lost acknowledgement can hide an accepted message. Keep uncertain intents available for reconciliation.\n"
+  },
+  {
+    "id": "repository/docs/runbooks/v1-deployment",
+    "title": "V1 Deployment and Recovery",
+    "group": "Runbooks",
+    "kind": "repository",
+    "heading": "Retention",
+    "anchor": "retention",
+    "text": "Retention\nProduction maintenance runs one pruning pass per hour, with up to 250 rows per category and one active pass per database. It skips rows locked by workers. Monitor the aggregate `retention_completed` event. Run an authorized extra bounded pass with `mns run --rm --no-deps maintenance node ops/maintenance.mjs --once` when a backlog persists.\nData\nAction\nReceived WhatsApp content\nRedact processed bodies and media references after two days. Keep sender and event identifiers for service-window checks and redelivery deduplication for 30 days from receipt.\nIdentity challenges\nDelete after two days from issuance.\nIdentity links and closure preferences\nKeep expired links for 30 days after expiry. Purge withdrawn grants after 30 days and aged grants without a matching current or grace-period link.\nConversation drafts\nDelete after 30 days of inactivity. An unfinished submission keeps its draft. An uncertain submission keeps its draft for its 180-day reconciliation period.\nOutbound intents and troubleshooting feedback\nRemove expired outbound records after 90 days from the dispatch deadline and troubleshooting feedback 90 days after recording.\nTicket submissions\nRemove terminal records after 180 days when their closure watch has ended. Keep unfinished submissions and active watches. GLPI holds the authoritative support records.\nRetention applies to the application PostgreSQL database. Provider records remain subject to their own lifecycle. Older backup copies follow the backup archive expiry.\n"
+  },
+  {
+    "id": "repository/docs/runbooks/v1-deployment",
+    "title": "V1 Deployment and Recovery",
+    "group": "Runbooks",
+    "kind": "repository",
+    "heading": "Roll back the API",
+    "anchor": "roll-back-the-api",
+    "text": "Roll back the API\nUse the last verified image and matching release ID after checking that it can run against the currently migrated schema. Leave the database volume attached. Recreate only the API with the selected image and `mns up -d --no-build --no-deps --force-recreate --wait api`. Verify the actual running digest, readiness and a synthetic conversation. Reconcile any active work before accepting recovery.\nFor incompatible migrations, stop the rollout and choose a forward correction or restore into a separate volume. Escalate to the authorized MNS infrastructure or data owner if access, provider outcomes, or the database state cannot be verified.\n"
   },
   {
     "id": "repository/docs/security/authentication",
@@ -898,86 +961,5 @@
     "heading": "Use, diagnostics, and backups",
     "anchor": "use-diagnostics-and-backups",
     "text": "Use, diagnostics, and backups\nDo not serialize secret-bearing objects into logs, traces, metrics, errors, breadcrumbs, audit, profiling, caches, or responses. Review provider exceptions and automatic SDK capture of headers, locals, environment, configuration, and requests. Dedicated secret wrappers may help when practical, but their default string/serialization representation must not reveal values. [Redaction policy](telemetry-redaction.md) remains authoritative.\nProduction debugger access is privileged. Full memory dumps are restricted artifacts needing exceptional justified collection and tightly controlled access. Support tools must not expose secrets or inherit infrastructure credentials. Administrative UIs should show configured state or rotation metadata; generated credentials may use one-time display when necessary instead of repeated retrieval.\nSecret-store backups require equivalent or stronger controls. Application backups must not accidentally include secret files; database backups containing hashes, sessions, or provider tokens retain their classification. [Retention](data-retention.md) governs their lifecycle.\n"
-  },
-  {
-    "id": "repository/docs/security/secrets-management",
-    "title": "Secrets Management",
-    "group": "Security",
-    "kind": "repository",
-    "heading": "Accidental source-control exposure",
-    "anchor": "accidental-source-control-exposure",
-    "text": "Accidental source-control exposure\nTreat a committed or otherwise disclosed credential as potentially compromised, even in a private repository. Identify it without redisplaying it, revoke/rotate, stop future exposure, assess copies/history/destinations and access, investigate use as needed, and add prevention. History rewriting or deleting a file/log can reduce continued exposure but never restores secrecy.\nFor telemetry exposure, stop collection, identify affected logs/traces/errors/exports/backups/providers, remove stored copies where possible, review access, and add regression coverage. Follow [incident response](incident-response.md); do not wait for natural retention expiry. Ordinary chats, issues, pull requests, reviews, AI prompts, and support tickets are not secret-delivery channels; any exception requires an explicitly approved secure workflow.\nAI repository access does not imply raw credential access. Prefer names, schemas, safe errors, and sanitized evidence. When authorized operational actions require credentials, prefer delegated secure tools that keep values outside agent context. Human operators likewise should receive authorized capabilities under their own identity without routinely retrieving long-lived production secrets.\n"
-  },
-  {
-    "id": "repository/docs/security/secrets-management",
-    "title": "Secrets Management",
-    "group": "Security",
-    "kind": "repository",
-    "heading": "Removal, audit, and enforcement",
-    "anchor": "removal-audit-and-enforcement",
-    "text": "Removal, audit, and enforcement\nWhen a secret is retired, remove usage and deployment references, verify active consumers, revoke, delete from the store, and update access permissions and documentation. Investigate orphaned credentials rather than retaining unknown capabilities indefinitely. Audit creation, access, permission changes, rotation, revocation, and deletion where supported without recording values.\nUse available secret scanning and consider historical scans because working-tree checks cannot see all exposure. Keep false-positive exceptions narrow and documented; do not disable scanning broadly. Configuration metadata, client/server boundaries, redaction tests, unsafe-default checks, and artifact inspection complement scanning. Credential-handling SDKs and cryptographic dependencies warrant extra scrutiny. Choose any future secret provider through an ADR considering security, availability, audit/access, rotation, platform integration, developer experience, cost, and migration.\n"
-  },
-  {
-    "id": "repository/docs/security/secrets-management",
-    "title": "Secrets Management",
-    "group": "Security",
-    "kind": "repository",
-    "heading": "New secret checklist",
-    "anchor": "new-secret-checklist",
-    "text": "New secret checklist\nBefore introduction, identify the capability, why a secret is needed instead of workload identity, owner, source, consumers/environment, least privilege, storage/delivery, rotation/revocation, exposure detection, possible telemetry/build/client paths, and eventual removal. Record metadata through canonical configuration sources where practical. A credential without an owner and workable lifecycle is an incomplete design.\n"
-  },
-  {
-    "id": "repository/docs/security/telemetry-redaction",
-    "title": "Telemetry Redaction",
-    "group": "Security",
-    "kind": "repository",
-    "heading": "Telemetry Redaction",
-    "anchor": "telemetry-redaction",
-    "text": "Telemetry Redaction\nThis policy owns safe data selection and sanitization for logs, traces, metrics, errors, breadcrumbs, audit/security records, profiling, diagnostics, and support artifacts across applications, tooling, SDKs, and infrastructure. [Data classification](data-classification.md) determines sensitivity. When diagnostic usefulness conflicts with data protection, protection takes priority.\n"
-  },
-  {
-    "id": "repository/docs/security/telemetry-redaction",
-    "title": "Telemetry Redaction",
-    "group": "Security",
-    "kind": "repository",
-    "heading": "Current implementation and ownership",
-    "anchor": "current-implementation-and-ownership",
-    "text": "Current implementation and ownership\n[ADR-0010](../adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy.md) governs the selected foundation. The API has [Pino field redaction](../../apps/api/src/logging.ts), [allowlisted trace/metric export](../../apps/api/src/telemetry.ts), and [safe HTTP/error diagnostics](../../apps/api/src/app.ts). These local controls do not establish a universal schema-driven redaction engine or prove that every future SDK/platform default is safe. The API runtime documentation and [validation inventory](../validation.md) identify current implementation and checks.\n"
-  },
-  {
-    "id": "repository/docs/security/telemetry-redaction",
-    "title": "Telemetry Redaction",
-    "group": "Security",
-    "kind": "repository",
-    "heading": "Default deny for payload capture",
-    "anchor": "default-deny-for-payload-capture",
-    "text": "Default deny for payload capture\nCapture only fields needed to answer an operational question. Prefer explicit safe projections over capturing whole objects and attempting cleanup afterward. Request/response bodies, event/job/RPC/WebSocket payloads, ORM/domain entities, free-form metadata, environment dumps, and complete configuration must not be captured by default.\n`RESTRICTED` data must never be intentionally captured, including passwords/hashes, access/session/refresh tokens, API/private/signing keys, database/payment credentials, recovery codes, and credential-bearing headers/cookies. Encryption, restricted provider access, development mode, incidents, and provider-side filtering do not exempt this rule.\nConfidential fields require concrete diagnostic need, minimized representation, and controlled access/retention. Prefer justified opaque identifiers to names, email, phone, or complete records. Public/internal data may be captured when operationally useful; the destination never lowers classification. User-generated strings and arbitrary exceptions remain untrusted and potentially sensitive.\n"
-  },
-  {
-    "id": "repository/docs/security/telemetry-redaction",
-    "title": "Telemetry Redaction",
-    "group": "Security",
-    "kind": "repository",
-    "heading": "Redaction strategies",
-    "anchor": "redaction-strategies",
-    "text": "Redaction strategies\nUse source allowlists first, centralized application filtering as defense in depth, and collector/provider scrubbing as additional layers. Restricted data must be removed or replaced with a constant marker before export. Partial masking requires a justified safe remainder; it is not adequate for authentication secrets. Pseudonymization or hashing may permit correlation but does not establish anonymity, especially for predictable values.\nRecognize common secret-bearing field names and locations, including authorization, cookies, query/form fields, provider metadata, exceptions, and environment variables. Name-based blocklists are a safety net, not the primary policy: schemas evolve. Use clear field names, safe structured projections, and canonical classification metadata where practical. Local rules may be stricter but must not conflict with shared policy.\nIf safe sanitization cannot be completed, drop unsafe telemetry and emit only a bounded safe failure signal. Never include the rejected payload in that signal or recurse through the failing serializer. Review getters, `toJSON`, custom serializers, recursion, arrays, and nesting; deterministic telemetry-specific serialization must not expose extra fields. Bound string length, depth, array size, breadcrumb count, and exception metadata. Truncation is not redaction and must not misrepresent meaning.\n"
-  },
-  {
-    "id": "repository/docs/security/telemetry-redaction",
-    "title": "Telemetry Redaction",
-    "group": "Security",
-    "kind": "repository",
-    "heading": "HTTP request telemetry",
-    "anchor": "http-request-telemetry",
-    "text": "HTTP request telemetry\nUseful safe metadata includes method, normalized route template, status, duration, service, environment, release, and request/trace IDs. Full URLs, query strings, headers, and bodies are not default telemetry. Allowlist justified parameters/headers individually and remove credential-bearing `Authorization`, `Proxy-Authorization`, `Cookie`, and `Set-Cookie` values. File content, binary buffers, document text, image metadata, and archive contents must never be captured automatically; filenames can also disclose sensitive data.\nApply the same rule to other transports. Prefer event/job type, safe ID, consumer, attempt, result, and duration over payloads. Normalize routes rather than embedding resource IDs. Public support references must be opaque and contain no personal information, secret state, or key material; preserve safe correlation during redaction.\n"
-  },
-  {
-    "id": "repository/docs/security/telemetry-redaction",
-    "title": "Telemetry Redaction",
-    "group": "Security",
-    "kind": "repository",
-    "heading": "Database and provider instrumentation",
-    "anchor": "database-and-provider-instrumentation",
-    "text": "Database and provider instrumentation\nDatabase telemetry may describe operation, logical entity, system, duration, and result. Raw SQL can contain literals; use normalized/parameterized representations when query telemetry is required. Do not automatically capture bind values, rows, connection strings, or raw ORM objects. Any exceptional parameter diagnostics still require explicit classification/access controls and cannot capture restricted data.\nReview driver/ORM error metadata before export: errors may contain SQL, values, hostnames, and connection information. Never expose raw database/provider exceptions to users. Review SDK requests, responses, headers, breadcrumbs, and debug modes independently. Prefer safe provider result codes and references; payment and authentication credentials remain prohibited. Provider-specific codes need sensitivity and cardinality review and do not replace the API's public error contract.\n"
   }
 ]

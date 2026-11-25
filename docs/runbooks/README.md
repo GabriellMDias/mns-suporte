@@ -1,6 +1,6 @@
 # Runbooks
 
-No operational runbooks exist yet. This directory contains the [authoring policy](authoring.md), [template](template.md), and [local instructions](AGENTS.md). Add index entries only for real procedures when the corresponding runtime and operational tooling exist.
+The [V1 deployment and recovery runbook](v1-deployment.md) covers the Compose release, encrypted backups, retention, alert diagnosis and rollback. This directory also contains the [authoring policy](authoring.md), [template](template.md), and [local instructions](AGENTS.md).
 
 Existing contributor procedures have narrower owners: [local setup](../setup.md), [validation](../validation.md), and [database release/evolution](../database/release-evolution.md). No production environment is selected; authoring guidance does not activate deployment-specific work.
 

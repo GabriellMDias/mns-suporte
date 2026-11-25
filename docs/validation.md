@@ -32,6 +32,8 @@ pnpm validate
 | `pnpm smoke` | Starts the emitted API to check invalid configuration, trace propagation, failed OTLP export, and health, then runs each module process smoke in `apps/api/scripts/smoke/` against the same build. |
 | `pnpm test:e2e` | Runs Playwright Test in Chromium against the emitted API and the actual Vite web app: the application shell, local documentation navigation/search, safe API exploration, responsive/keyboard behavior, and axe accessibility scans. Module journeys in `apps/web/test/e2e/<module>/` add their own fresh migrated Testcontainers PostgreSQL with a separate restricted runtime role and signed synthetic identities. |
 
+Run `pnpm ops:rehearse` separately to verify the [deployment and recovery procedure](runbooks/v1-deployment.md). The required CI job runs this Docker Compose rehearsal after `pnpm validate`. The rehearsal uses disposable volumes, synthetic records, and a previous Git revision.
+
 Use `pnpm format` only when an intentional formatting edit is needed; it writes files and is separate from `pnpm validate`. A formatting failure names the file; type, lint, architecture, and documentation failures report the relevant source location or import/link. Repair the canonical source and rerun the failing script, then the aggregate command.
 
 Tracked text uses LF through `.gitattributes`; reference comparisons normalize checkout line endings. Preserve content when correcting line endings, and do not hide drift by regenerating tracked references.

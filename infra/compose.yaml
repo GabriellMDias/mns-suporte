@@ -1,0 +1,164 @@
+x-safe-logs: &safe-logs
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+x-runtime: &runtime
+  init: true
+  read_only: true
+  tmpfs: ["/tmp"]
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  logging: *safe-logs
+
+services:
+  db:
+    image: postgres:16@sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mns_suporte
+      POSTGRES_USER: mns_admin
+      POSTGRES_PASSWORD_FILE: /run/secrets/admin_password
+    secrets:
+      [
+        admin_password,
+        migration_password,
+        runtime_password,
+        maintenance_password,
+      ]
+    volumes:
+      - postgres:/var/lib/postgresql/data
+      - ./container/bootstrap.sh:/docker-entrypoint-initdb.d/10-mns.sh:ro
+    networks: [data]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "pg_isready",
+          "-h",
+          "127.0.0.1",
+          "-U",
+          "mns_admin",
+          "-d",
+          "mns_suporte",
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    logging: *safe-logs
+
+  migrate:
+    <<: *runtime
+    image: ${MNS_MIGRATION_IMAGE:?set the migration image}
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+      target: migration
+    secrets:
+      - source: migration_password
+        target: database_password
+    networks: [data]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *runtime
+    image: ${MNS_API_IMAGE:?set the API image}
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+      target: api
+      args:
+        MNS_IMAGE_RELEASE: ${MNS_RELEASE_ID:?set the deployed release}
+    restart: unless-stopped
+    stop_grace_period: 35s
+    environment:
+      ORION_ENV: ${MNS_ENVIRONMENT:-production}
+      ORION_RELEASE_ID: ${MNS_RELEASE_ID:?set the deployed release}
+      ORION_API_HOST: 0.0.0.0
+      ORION_API_PORT: "3000"
+    secrets:
+      - source: runtime_password
+        target: database_password
+      - api_env
+    networks: [data, egress]
+    ports:
+      - target: 3000
+        published: "${MNS_API_PORT:-3000}"
+        host_ip: 127.0.0.1
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/health/ready',{signal:AbortSignal.timeout(2000)}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  maintenance:
+    <<: *runtime
+    image: ${MNS_API_IMAGE:?set the API image}
+    restart: unless-stopped
+    command: ["node", "ops/maintenance.mjs"]
+    environment:
+      ORION_ENV: ${MNS_ENVIRONMENT:-production}
+      ORION_RELEASE_ID: ${MNS_RELEASE_ID:?set the deployed release}
+    secrets:
+      - source: maintenance_password
+        target: database_password
+    networks: [data]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      api:
+        condition: service_started
+
+  backup:
+    <<: *runtime
+    profiles: [tools]
+    image: ${MNS_BACKUP_IMAGE:?set the backup image}
+    user: "${MNS_BACKUP_UID:-1000}:${MNS_BACKUP_GID:-1000}"
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.backup
+    tmpfs:
+      - /scratch:size=${MNS_RESTORE_TMPFS_BYTES:-536870912},mode=0700,uid=${MNS_BACKUP_UID:-1000},gid=${MNS_BACKUP_GID:-1000}
+    secrets:
+      - source: migration_password
+        target: database_password
+      - backup_key
+    volumes:
+      - "${MNS_BACKUP_DIR:?set the backup directory}:/backups"
+    networks: [data]
+    depends_on:
+      db:
+        condition: service_healthy
+
+networks:
+  data:
+    internal: true
+  egress:
+
+volumes:
+  postgres:
+
+secrets:
+  admin_password:
+    file: ${MNS_SECRETS_DIR:?set the secrets directory}/admin.password
+  migration_password:
+    file: ${MNS_SECRETS_DIR:?set the secrets directory}/migration.password
+  runtime_password:
+    file: ${MNS_SECRETS_DIR:?set the secrets directory}/runtime.password
+  maintenance_password:
+    file: ${MNS_SECRETS_DIR:?set the secrets directory}/maintenance.password
+  api_env:
+    file: ${MNS_SECRETS_DIR:?set the secrets directory}/api.env
+  backup_key:
+    file: ${MNS_BACKUP_KEY_FILE:?set the backup key file}
