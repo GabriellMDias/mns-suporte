@@ -17,21 +17,27 @@ export const deliveryIdSchema = Type.String({
   pattern: "^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$",
 });
 
+const recipientSchema = Type.Union([
+  Type.Object(
+    {
+      kind: Type.Literal("phone"),
+      value: Type.String({ pattern: "^[1-9][0-9]{5,14}$" }),
+    },
+    { additionalProperties: false },
+  ),
+  Type.Object(
+    { kind: Type.Literal("business_id"), value: providerIdentifier },
+    { additionalProperties: false },
+  ),
+]);
+const glpiIdentifier = Type.Integer({
+  minimum: 1,
+  maximum: Number.MAX_SAFE_INTEGER,
+});
+
 const payloadSchema = Type.Object(
   {
-    recipient: Type.Union([
-      Type.Object(
-        {
-          kind: Type.Literal("phone"),
-          value: Type.String({ pattern: "^[1-9][0-9]{5,14}$" }),
-        },
-        { additionalProperties: false },
-      ),
-      Type.Object(
-        { kind: Type.Literal("business_id"), value: providerIdentifier },
-        { additionalProperties: false },
-      ),
-    ]),
+    recipient: recipientSchema,
     content: Type.Union([
       Type.Object(
         { type: Type.Literal("text"), body: replyText },
@@ -46,19 +52,48 @@ const payloadSchema = Type.Object(
         { additionalProperties: false },
       ),
     ]),
-    requiredGlpiUserId: Type.Optional(
-      Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
+    requiredGlpiUserId: Type.Optional(glpiIdentifier),
+    closure: Type.Optional(
+      Type.Object(
+        {
+          consentId: deliveryIdSchema,
+          ticketId: glpiIdentifier,
+        },
+        { additionalProperties: false },
+      ),
     ),
   },
   { additionalProperties: false },
 );
 
 export type OutboundPayload = Static<typeof payloadSchema>;
+export type WhatsAppRecipient = OutboundPayload["recipient"];
+
+export function readRecipient(value: unknown): WhatsAppRecipient | undefined {
+  return Value.Check(recipientSchema, value) ? value : undefined;
+}
+
+export function recipientIdentity(
+  businessPhoneId: string,
+  recipient: WhatsAppRecipient,
+) {
+  return {
+    businessPhoneId,
+    ...(recipient.kind === "business_id"
+      ? { senderBusinessId: recipient.value }
+      : { senderBusinessId: null, senderPhone: recipient.value }),
+  };
+}
 
 export function isOutboundPayload(
   payload: unknown,
 ): payload is OutboundPayload {
   if (!Value.Check(payloadSchema, payload)) return false;
+  if (
+    payload.closure &&
+    (!payload.requiredGlpiUserId || payload.content.type !== "text")
+  )
+    return false;
   const validText = (text: string) =>
     Boolean(text.trim()) && text.isWellFormed() && !text.includes("\u0000");
   if (!validText(payload.content.body)) return false;

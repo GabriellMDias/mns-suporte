@@ -5,6 +5,7 @@ import {
   type WhatsAppTicketSubmission,
 } from "../../generated/prisma/client.js";
 import type { createGlpiClient } from "../../integrations/glpi/client.js";
+import { closurePollIntervalMs } from "./closure-preferences.js";
 import {
   reopenTicketReview,
   uncertainTicket,
@@ -170,6 +171,11 @@ export function createTicketSubmissionWorker(
           updatedAt: now,
           state,
           ticketId,
+          ...(outcome.kind === "created" && claim.closureConsentId
+            ? {
+                closureCheckAt: new Date(now.getTime() + closurePollIntervalMs),
+              }
+            : {}),
           nextAttachment,
           attachedCount,
           uncertainAttachments,

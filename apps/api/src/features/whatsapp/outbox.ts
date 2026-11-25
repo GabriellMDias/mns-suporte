@@ -1,6 +1,7 @@
 import { isDeepStrictEqual } from "node:util";
 import { Value } from "typebox/value";
 import type { Database } from "../../database.js";
+import { readCustomerWindow } from "./closure-preferences.js";
 import type { WhatsAppOutboundState } from "../../generated/prisma/client.js";
 import type { SendReply } from "./graph-client.js";
 import { scopeOf } from "./identity-code.js";
@@ -8,6 +9,7 @@ import type { DeliveryStatus } from "./inbound.js";
 import {
   deliveryIdSchema,
   isOutboundPayload,
+  recipientIdentity,
   type OutboundPayload,
 } from "./outbound-contract.js";
 
@@ -49,7 +51,13 @@ export async function enqueueWhatsAppReply(
 }
 
 export async function dispatchNextWhatsAppReply(
-  store: OutboxStore & Pick<Database, "whatsAppVerifiedIdentity">,
+  store: OutboxStore &
+    Pick<
+      Database,
+      | "whatsAppVerifiedIdentity"
+      | "whatsAppClosurePreference"
+      | "whatsAppInboundMessage"
+    >,
   businessPhoneId: string,
   send: SendReply,
   signal: AbortSignal,
@@ -108,14 +116,17 @@ export async function dispatchNextWhatsAppReply(
     await queue.updateMany({ where: finalizable, data: { state: "EXPIRED" } });
     return true;
   }
+  let customerWindowEndsAt: Date | undefined;
   if (payload.requiredGlpiUserId !== undefined) {
     const { recipient } = payload;
-    const scopeKey = scopeOf({
-      businessPhoneId,
-      ...(recipient.kind === "business_id"
-        ? { senderBusinessId: recipient.value }
-        : { senderPhone: recipient.value }),
-    });
+    const scopeKey = scopeOf(recipientIdentity(businessPhoneId, recipient));
+    if (payload.closure)
+      customerWindowEndsAt = await readCustomerWindow(
+        store,
+        businessPhoneId,
+        recipient,
+        clock(),
+      );
     const valid =
       scopeKey &&
       (await store.whatsAppVerifiedIdentity.findUnique({
@@ -126,7 +137,19 @@ export async function dispatchNextWhatsAppReply(
         },
         select: { scopeKey: true },
       }));
-    if (!valid || expiresAt <= clock()) {
+    const consent =
+      payload.closure && scopeKey
+        ? await store.whatsAppClosurePreference.findUnique({
+            where: {
+              scopeKey,
+              glpiUserId: payload.requiredGlpiUserId,
+              grantId: payload.closure.consentId,
+              revokedAt: null,
+            },
+            select: { scopeKey: true },
+          })
+        : undefined;
+    if (!valid || (payload.closure && !consent) || expiresAt <= clock()) {
       await queue.updateMany({
         where: finalizable,
         data: { state: "EXPIRED" },
@@ -135,7 +158,9 @@ export async function dispatchNextWhatsAppReply(
     }
   }
 
-  const outcome = await send(id, payload, signal);
+  const outcome = payload.closure
+    ? await send(id, payload, signal, customerWindowEndsAt)
+    : await send(id, payload, signal);
   switch (outcome.kind) {
     case "accepted":
       await queue.updateMany({
@@ -153,6 +178,12 @@ export async function dispatchNextWhatsAppReply(
       await queue.updateMany({
         where: finalizable,
         data: { state: "FAILED", providerErrorCode: outcome.code },
+      });
+      break;
+    case "expired":
+      await queue.updateMany({
+        where: finalizable,
+        data: { state: "EXPIRED" },
       });
       break;
     case "throttled": {

@@ -7,6 +7,10 @@ import type {
 import type { createGlpiClient } from "../../integrations/glpi/client.js";
 import type { TicketQuery } from "../../integrations/glpi/ticket-lookup.js";
 import {
+  customerWindowMs,
+  saveClosurePreference,
+} from "./closure-preferences.js";
+import {
   finishVerification,
   readConversationInput,
   readConversationState,
@@ -28,6 +32,7 @@ type Transaction = Pick<
   | "whatsAppOutboundMessage"
   | "whatsAppTroubleshootingFeedback"
   | "whatsAppTicketSubmission"
+  | "whatsAppClosurePreference"
 >;
 type Identity = Pick<
   ReturnType<typeof createIdentityVerification>,
@@ -49,7 +54,6 @@ type Claim = {
 type ProcessResult = Claim | { kind: "idle" | "processed" };
 
 const claimLifetime = 45_000;
-const customerWindow = 24 * 60 * 60 * 1000;
 const lookupReplyLifetime = 60_000;
 const actions: Record<
   NonNullable<ConversationMove["action"]>,
@@ -79,7 +83,7 @@ function resolveAddress(
       : undefined;
   if (!recipient) return undefined;
   const expiresAt = new Date(
-    Math.min(message.occurredAt.getTime(), now.getTime()) + customerWindow,
+    Math.min(message.occurredAt.getTime(), now.getTime()) + customerWindowMs,
   );
   return expiresAt > now ? { scopeKey, recipient, expiresAt } : undefined;
 }
@@ -120,9 +124,25 @@ export async function applyMove(
     create: { scopeKey: address.scopeKey, ...next },
     update: next,
   });
+  if (move.closurePreference)
+    await saveClosurePreference(
+      tx,
+      address.scopeKey,
+      address.recipient,
+      move.closurePreference,
+      now,
+    );
   if (move.submission) {
     const { draftId, requesterId, title, description, mediaIds } =
       move.submission;
+    const consent = await tx.whatsAppClosurePreference.findUnique({
+      where: {
+        scopeKey: address.scopeKey,
+        glpiUserId: requesterId,
+        revokedAt: null,
+      },
+      select: { grantId: true },
+    });
     const payload = {
       recipient: address.recipient,
       replyExpiresAt: address.expiresAt,
@@ -132,6 +152,7 @@ export async function applyMove(
       attachmentCount: mediaIds.length,
       availableAt: now,
       updatedAt: now,
+      closureConsentId: consent?.grantId ?? null,
     };
     const inserted = await tx.whatsAppTicketSubmission.createMany({
       data: {

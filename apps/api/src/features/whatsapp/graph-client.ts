@@ -10,12 +10,14 @@ export type SendOutcome =
   | { kind: "accepted"; messageId: string }
   | { kind: "throttled"; code: number; retryAfterMs: number }
   | { kind: "rejected"; code: number }
+  | { kind: "expired" }
   | { kind: "uncertain" };
 
 export type SendReply = (
   id: string,
   payload: OutboundPayload,
   signal: AbortSignal,
+  customerWindowEndsAt?: Date,
 ) => Promise<SendOutcome>;
 
 const successSchema = Type.Object({
@@ -40,7 +42,11 @@ function retryAfter(header: string | null): number {
   return Number.isFinite(when) ? Math.max(0, when - Date.now()) : 0;
 }
 
-function messageRequest(id: string, payload: OutboundPayload) {
+function messageRequest(
+  id: string,
+  payload: OutboundPayload,
+  templateName?: string,
+) {
   const { recipient, content } = payload;
   const address =
     recipient.kind === "phone"
@@ -51,21 +57,37 @@ function messageRequest(id: string, payload: OutboundPayload) {
     recipient_type: "individual",
     ...address,
     biz_opaque_callback_data: id,
-    ...(content.type === "text"
-      ? { type: "text", text: { body: content.body, preview_url: false } }
-      : {
-          type: "interactive",
-          interactive: {
-            type: "button",
-            body: { text: content.body },
-            action: {
-              buttons: content.buttons.map((reply) => ({
-                type: "reply",
-                reply,
-              })),
-            },
+    ...(payload.closure && templateName
+      ? {
+          type: "template",
+          template: {
+            name: templateName,
+            language: { code: "pt_BR" },
+            components: [
+              {
+                type: "body",
+                parameters: [
+                  { type: "text", text: String(payload.closure.ticketId) },
+                ],
+              },
+            ],
           },
-        }),
+        }
+      : content.type === "text"
+        ? { type: "text", text: { body: content.body, preview_url: false } }
+        : {
+            type: "interactive",
+            interactive: {
+              type: "button",
+              body: { text: content.body },
+              action: {
+                buttons: content.buttons.map((reply) => ({
+                  type: "reply",
+                  reply,
+                })),
+              },
+            },
+          }),
   };
 }
 
@@ -80,7 +102,12 @@ export function createWhatsAppGraphSender(
     "/" +
     phoneNumberId +
     "/messages";
-  return async (id, payload, signal) => {
+  return async (id, payload, signal, customerWindowEndsAt) => {
+    const needsTemplate =
+      payload.closure &&
+      (!customerWindowEndsAt || customerWindowEndsAt.getTime() <= Date.now());
+    if (needsTemplate && !config.closureTemplateName)
+      return { kind: "expired" };
     try {
       const response = await fetchMessage(url, {
         method: "POST",
@@ -90,7 +117,13 @@ export function createWhatsAppGraphSender(
         },
         redirect: "error",
         signal: AbortSignal.any([signal, AbortSignal.timeout(4000)]),
-        body: JSON.stringify(messageRequest(id, payload)),
+        body: JSON.stringify(
+          messageRequest(
+            id,
+            payload,
+            needsTemplate ? config.closureTemplateName : undefined,
+          ),
+        ),
       });
       const body: unknown = await response.json();
       if (response.status === 408) return { kind: "uncertain" };

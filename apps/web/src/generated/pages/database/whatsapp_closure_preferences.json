@@ -1,0 +1,82 @@
+{
+  "kind": "database",
+  "name": "whatsapp_closure_preferences",
+  "description": "Most recent explicit closure notice consent per WhatsApp sender scope and verified GLPI requester.",
+  "owner": "WhatsApp closure notifications",
+  "classification": "RESTRICTED",
+  "lifecycle": "An employee opts in or withdraws through WhatsApp. Withdrawal clears the delivery address. Re-enabling issues a new grant that cannot revive jobs under the previous grant.",
+  "columns": [
+    {
+      "Column": "scope_key",
+      "PostgreSQL type": "text",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Stable hash binding the Meta business number and the sender scope.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "glpi_user_id",
+      "PostgreSQL type": "bigint",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Verified GLPI requester who opted in.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "grant_id",
+      "PostgreSQL type": "uuid",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Unique consent epoch bound to eligible ticket watches and queued closure replies.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "recipient",
+      "PostgreSQL type": "jsonb",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Validated WhatsApp address for opted-in closure delivery.",
+      "Null meaning": "The employee withdrew the grant and the address was cleared.",
+      "Unit": "—"
+    },
+    {
+      "Column": "granted_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Time at which WhatsApp recorded the active or most recently withdrawn grant.",
+      "Null meaning": "—",
+      "Unit": "UTC instant"
+    },
+    {
+      "Column": "revoked_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Time at which the employee withdrew the grant.",
+      "Null meaning": "The grant remains active.",
+      "Unit": "UTC instant"
+    }
+  ],
+  "constraints": [
+    {
+      "Object": "whatsapp_closure_preferences_active_recipient",
+      "Physical definition": "CHECK (((glpi_user_id > 0) AND ((revoked_at IS NULL) = (recipient IS NOT NULL))))",
+      "Purpose": "Requires a verified positive GLPI ID and limits stored recipients to active grants."
+    },
+    {
+      "Object": "whatsapp_closure_preferences_pkey",
+      "Physical definition": "PRIMARY KEY (scope_key)",
+      "Purpose": "Keeps a single latest grant per sender scope."
+    }
+  ]
+}

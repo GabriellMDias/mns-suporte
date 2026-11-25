@@ -110,6 +110,60 @@ it("retries only an explicit throttle and preserves ambiguous outcomes", async (
     expect(await send(intent, payload, signal)).toEqual({ kind: "uncertain" });
 });
 
+it("uses the approved positional utility template when a closure is sent outside the window", async () => {
+  const fetchMessage = vi
+    .fn<typeof fetch>()
+    .mockImplementation(() =>
+      Promise.resolve(Response.json({ messages: [{ id: "wamid.closure" }] })),
+    );
+  const closure = {
+    ...payload,
+    recipient: { kind: "business_id", value: "BR.synthetic" },
+    requiredGlpiUserId: 37,
+    closure: {
+      ticketId: 123,
+      consentId: "c740e27e-a93b-4da4-a9a3-29e267b1dc04",
+    },
+  } as const;
+  expect(isOutboundPayload({ ...closure, requiredGlpiUserId: undefined })).toBe(
+    false,
+  );
+  const withoutTemplate = createWhatsAppGraphSender(
+    phoneId,
+    outboundConfig,
+    fetchMessage,
+  );
+  expect(await withoutTemplate(intent, closure, signal)).toEqual({
+    kind: "expired",
+  });
+  expect(fetchMessage).not.toHaveBeenCalled();
+  const send = createWhatsAppGraphSender(
+    phoneId,
+    { ...outboundConfig, closureTemplateName: "mns_chamado_encerrado_v1" },
+    fetchMessage,
+  );
+  await send(intent, closure, signal, new Date(Date.now() + 60_000));
+  await send(intent, closure, signal, new Date(Date.now() - 60_000));
+  expect(parseRequestBody(fetchMessage.mock.calls[0][1])).toMatchObject({
+    type: "text",
+    recipient: "BR.synthetic",
+  });
+  expect(parseRequestBody(fetchMessage.mock.calls[1][1])).toEqual({
+    messaging_product: "whatsapp",
+    recipient_type: "individual",
+    recipient: "BR.synthetic",
+    biz_opaque_callback_data: intent,
+    type: "template",
+    template: {
+      name: "mns_chamado_encerrado_v1",
+      language: { code: "pt_BR" },
+      components: [
+        { type: "body", parameters: [{ type: "text", text: "123" }] },
+      ],
+    },
+  });
+});
+
 it("rejects malformed destinations and invalid interactive replies before they can queue", () => {
   expect(isOutboundPayload(payload)).toBe(true);
   expect(

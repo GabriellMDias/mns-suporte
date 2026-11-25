@@ -6,6 +6,7 @@ export function registerWhatsAppDispatchWorker(
   failureEvent:
     | "whatsapp_dispatch_unavailable"
     | "whatsapp_conversation_unavailable"
+    | "whatsapp_closure_unavailable"
     | "whatsapp_ticket_submission_unavailable" = "whatsapp_dispatch_unavailable",
 ): void {
   const controller = new AbortController();

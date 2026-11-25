@@ -62,6 +62,7 @@ it("enables guided processing only with its real integration settings and direct
   const configured = parseServerConfig({
     ...env,
     WHATSAPP_SUPPORT_CONTACT: supportContact,
+    WHATSAPP_CLOSURE_TEMPLATE_NAME: "mns_chamado_encerrado_v1",
   });
   expect(whatsappConversationFrom(configured)?.supportContact).toBe(
     supportContact,
@@ -69,6 +70,22 @@ it("enables guided processing only with its real integration settings and direct
   expect(whatsappWebhookFrom(configured)?.outbound?.accessToken).toBe(
     env.WHATSAPP_ACCESS_TOKEN,
   );
+  expect(whatsappWebhookFrom(configured)?.outbound?.closureTemplateName).toBe(
+    "mns_chamado_encerrado_v1",
+  );
+  expect(() =>
+    parseServerConfig({
+      ...env,
+      WHATSAPP_CLOSURE_TEMPLATE_NAME: "Invalid Name",
+    }),
+  ).toThrow("Invalid API configuration");
+  expect(() =>
+    parseServerConfig({
+      ...env,
+      WHATSAPP_ACCESS_TOKEN: undefined,
+      WHATSAPP_CLOSURE_TEMPLATE_NAME: "mns_chamado_encerrado_v1",
+    }),
+  ).toThrow("closure template needs outbound");
   expect(() =>
     parseServerConfig({
       ...env,
@@ -386,12 +403,40 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
       expect(edited.body).toContain("após reiniciar");
       await send(metaButton(oldConfirm));
       expect((await draftState()).draft?.confirmedAt).toBeUndefined();
+      expect((await send(metaText("Avisos"))).reply.body).toContain(
+        "quando um chamado futuro for encerrado",
+      );
+      expect((await send(metaButton("closure:enable"))).reply.body).toContain(
+        "Avisos ativados",
+      );
+      const consentScope = scopeOf(sender)!;
+      const consent =
+        await database.whatsAppClosurePreference.findUniqueOrThrow({
+          where: { scopeKey: consentScope },
+        });
+      await send(metaText("Ativar avisos"));
+      expect(
+        await database.whatsAppClosurePreference.findUnique({
+          where: { scopeKey: consentScope },
+        }),
+      ).toMatchObject({
+        grantId: consent.grantId,
+        glpiUserId: 37n,
+        revokedAt: null,
+      });
       const confirmed = await send(metaText("Confirmar"));
       expect(confirmed.reply.body).toContain("Rascunho confirmado");
       expect((await app.inject(confirmed.request)).statusCode).toBe(200);
       await send(metaText("Confirmar"));
       expect(await database.whatsAppTicketSubmission.findMany()).toMatchObject([
-        { draftId, requesterId: 37n, mediaIds: ["10002"], state: "PENDING" },
+        {
+          draftId,
+          requesterId: 37n,
+          mediaIds: ["10002"],
+          state: "PENDING",
+          closureConsentId: consent.grantId,
+          closureCheckAt: null,
+        },
       ]);
       expect((await draftState()).draft).toMatchObject({
         ownerId: 37,
@@ -399,6 +444,18 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
         attachments: [{ type: "image", mediaId: "10002" }],
       });
       expect((await draftState()).draft?.confirmedAt).toBeDefined();
+      expect((await send(metaText("Parar avisos"))).reply.body).toContain(
+        "desativados",
+      );
+      expect(
+        await database.whatsAppClosurePreference.findUnique({
+          where: { scopeKey: consentScope },
+        }),
+      ).toMatchObject({
+        grantId: consent.grantId,
+        revokedAt: clock(),
+        recipient: null,
+      });
 
       const stale = delivery(
         now - 24 * 60 * 60 * 1000 - 1000,

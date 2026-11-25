@@ -1,5 +1,68 @@
 [
   {
+    "id": "repository/docs/security/telemetry-redaction",
+    "title": "Telemetry Redaction",
+    "group": "Security",
+    "kind": "repository",
+    "heading": "Errors, traces, metrics, and audit",
+    "anchor": "errors-traces-metrics-and-audit",
+    "text": "Errors, traces, metrics, and audit\nError SDK automatic capture must be reviewed before use: requests, queries, cookies, locals, environment, console output, user context, and breadcrumbs can leak data. Local-variable capture is disabled by default unless an explicitly acceptable environment and controls justify it. `captureException(error)` is not automatically safe. Internal stacks can help diagnosis but may expose implementation paths and must not reach untrusted users or intentionally contain secrets.\nUse safe minimal user context, preferring a justified internal identifier to profile data, and clear it on logout. Review navigation, console, database, HTTP, and interaction breadcrumbs. Trace attributes/events must use safe selected metadata, not objects or payloads.\nMetric labels must never contain secrets and should avoid personal/entity-specific values, arbitrary error messages, full URLs, and request/trace IDs. Any exceptional dimension requires explicit privacy and cardinality justification; prefer bounded error/result categories. Audit/security records may justify confidential actor/resource identifiers that routine diagnostics omit, but still exclude credentials and unnecessary payloads.\n"
+  },
+  {
+    "id": "repository/docs/security/telemetry-redaction",
+    "title": "Telemetry Redaction",
+    "group": "Security",
+    "kind": "repository",
+    "heading": "Clients, infrastructure, and special diagnostics",
+    "anchor": "clients-infrastructure-and-special-diagnostics",
+    "text": "Clients, infrastructure, and special diagnostics\nDo not automatically collect form values, clipboard, local storage, navigation state, screen contents, or user content. Session replay, screenshots, crash attachments, and full memory dumps are separate high-risk collection capabilities requiring explicit review; replay must mask/exclude sensitive areas. Memory dumps can contain arbitrary credentials and require justified collection and restricted access. Do not enable features merely because a vendor offers them.\nCollect IP, user-agent, device identifiers, file paths, and geolocation only for justified needs with suitable retention; normalized platform/version/device-class data is often sufficient. Precise location is not default telemetry. Feature-flag diagnostics should contain bounded state, not full targeting contexts.\nInspect reverse proxies, load balancers, database server logs, container stdout/stderr, CI, and SDK debug logging independently. Application redaction cannot stop another layer from recording URLs, failed SQL, or credentials. CI output must not echo secrets; use platform masking where available. Development follows the same secret rules. Tests should use isolated/disabled exporters and never send synthetic test telemetry into production systems.\nTemporary/emergency diagnostics must be explicit, minimized, reviewed, time-bounded, and removed afterward. They still cannot intentionally collect restricted data. Do not globally expand collection merely to investigate one issue.\n"
+  },
+  {
+    "id": "repository/docs/security/telemetry-redaction",
+    "title": "Telemetry Redaction",
+    "group": "Security",
+    "kind": "repository",
+    "heading": "Representative secret tests",
+    "anchor": "representative-secret-tests",
+    "text": "Representative secret tests\nImportant redaction behavior must have automated tests using obvious synthetic secrets. Assert both that safe correlation remains and that prohibited values appear nowhere in emitted logs, spans, breadcrumbs, or errors. Exercise headers, nested metadata, query strings, bodies, exception objects, and serialization failure where relevant. Inspect final export payloads for important flows; helper-level tests alone may miss SDK enrichment.\nTreat redaction regressions as security defects. Extend tests when instrumentation, schemas, SDKs, or destinations change. Static rules, runtime guards, schema validation, and secret scanning are complementary; consult [validation](../validation.md) before claiming any check exists.\n"
+  },
+  {
+    "id": "repository/docs/security/telemetry-redaction",
+    "title": "Telemetry Redaction",
+    "group": "Security",
+    "kind": "repository",
+    "heading": "Destinations, access, and leakage",
+    "anchor": "destinations-access-and-leakage",
+    "text": "Destinations, access, and leakage\nExport only to approved destinations. Each additional provider/copy creates independent access, retention, residency, and deletion responsibilities; significant changes may need an ADR and security/privacy review. Do not duplicate telemetry across vendors without concrete value. [Retention](data-retention.md) and [production access](production-access.md) govern storage and readers, including AI agents.\nProvide AI/support tooling with structured, sanitized, task-relevant evidence, never raw environment dumps, credential-bearing logs, or full customer/request objects by default. A future diagnostic bundle must exclude restricted data by construction and be introduced only for real need.\nFor leakage, follow [incident response](incident-response.md): stop further collection, identify data/classification/destinations/exposure, restrict access, remove data where possible, revoke/rotate exposed credentials, review usage, fix instrumentation, and add regression protection. Historical logs, traces, errors, exports, provider retention, and backups may still contain leaked values. Deleting an entry does not restore credential secrecy.\n"
+  },
+  {
+    "id": "repository/docs/security/telemetry-redaction",
+    "title": "Telemetry Redaction",
+    "group": "Security",
+    "kind": "repository",
+    "heading": "New telemetry checklist",
+    "anchor": "new-telemetry-checklist",
+    "text": "New telemetry checklist\nBefore adding telemetry, identify the question answered, required fields and classifications, safer representations, untrusted/credential-bearing inputs, size/cardinality bounds, approved destination, retention/access, and redaction tests. Do not ship unexplained collection. Derive structural redaction references from canonical sources where practical; provider deployment, retention durations, session replay, and a cross-application metadata engine remain separate decisions, not implied capabilities.\n"
+  },
+  {
+    "id": "repository/docs/setup",
+    "title": "Development Setup",
+    "group": "Project guides",
+    "kind": "repository",
+    "heading": "Development Setup",
+    "anchor": "development-setup",
+    "text": "Development Setup\n[Repository README](../README.md) · [Validation](validation.md) · [API runtime](../apps/api/README.md) · [Web workflow](../apps/web/README.md)\nThis is the canonical local setup and execution path. Tests use disposable PostgreSQL and synthetic identities; no production database, identity provider, telemetry vendor, or deployment account is needed. Commands address workspace packages by path (`pnpm -C apps/api …`), so they work unchanged whatever a project names its packages.\nGoal\nPrerequisites after installing pinned Node.js/pnpm\nStart here\nBrowse the documentation portal\nFrozen dependency install; no container, API, or test browser needed\n[Portal](#living-documentation-portal)\nRun the API and web application locally\nFrozen dependency install, generated Prisma client, and local configuration\n[Configuration](#load-local-configuration)\nUse a local PostgreSQL or access-token issuer\nA database or issuer you control for development\n[Local database and authentication](#local-database-and-authentication)\nRun the complete validation gate\nAll clean-checkout prerequisites, including containers and test browsers\n[Prepare a clean checkout](#prepare-a-clean-checkout), then [validate](#validate-regenerate-and-build)\nStart a new project from Orion or upgrade a project's Orion baseline\nA fresh full clone and frozen dependency install\n[Project derivation](project-derivation.md)\n"
+  },
+  {
+    "id": "repository/docs/setup",
+    "title": "Development Setup",
+    "group": "Project guides",
+    "kind": "repository",
+    "heading": "Prepare a clean checkout",
+    "anchor": "prepare-a-clean-checkout",
+    "text": "Prepare a clean checkout\nUse Node.js 24.13.0 and pnpm 11.25.0, as pinned by `.node-version` and `package.json`. For full validation, start Docker or another Testcontainers-compatible container runtime and verify that its daemon is reachable with `docker info`. From a fresh checkout, run:\npnpm install --frozen-lockfile\npnpm db:generate\npnpm -C apps/web exec playwright install chromium\n\nOn Linux, use `pnpm -C apps/web exec playwright install --with-deps chromium` if the browser's system libraries are absent. Windows browser component tests use the installed Edge channel; Playwright end-to-end tests use Chromium. Do not put credentials in tracked files.\n"
+  },
+  {
     "id": "repository/docs/setup",
     "title": "Development Setup",
     "group": "Project guides",
@@ -168,7 +231,7 @@
     "kind": "repository",
     "heading": "Current state",
     "anchor": "current-state",
-    "text": "Current state\nThis repository was initialized on 2026-11-25 from Orion commit `6fe8aa850d9fc3d8e78584c6f4af27d524e3ac75`. It contains the foundation's architecture, policies, accepted ADRs, tooling, validation gate, CI, generated references, and internal [Living Documentation Portal](apps/web/README.md#living-documentation-portal), and the neutral web shell. The API verifies official Meta WhatsApp webhooks, persists inbound messages and dispatches queued replies with delivery tracking. The GLPI adapter supports exact active-user lookup, guarded ticket creation, verified document upload and requester-scoped ticket consultation. The guided WhatsApp menu verifies employees, provides the IT contact and stores resumable ticket drafts. The complete portal remains available in local development; production builds exclude it and its generated assets by default. Product help and public API documentation require separately approved sources and application-owned presentation under [the documentation policy](docs/architecture/living-documentation.md#documentation-audiences-and-publication). The employee identity service verifies corporate mailbox control through short-lived codes. A durable worker submits confirmed drafts to GLPI. The product plan tracks closure notifications and the live pilot.\nThe [project plan](docs/project/implementation-plan.md) and [project human actions](docs/project/human-actions.md) own this repository's current work and external prerequisites. The [project manifest](.orion/project.json) records the project identity, the immutable initialization commit, and the Orion baseline currently integrated. [Project derivation](docs/project-derivation.md) explains how to inspect provenance and adopt newer Orion revisions through reviewed merges.\n"
+    "text": "Current state\nThis repository was initialized on 2026-11-25 from Orion commit `6fe8aa850d9fc3d8e78584c6f4af27d524e3ac75`. It contains the foundation's architecture, policies, accepted ADRs, tooling, validation gate, CI, generated references, and internal [Living Documentation Portal](apps/web/README.md#living-documentation-portal), and the neutral web shell. The API verifies official Meta WhatsApp webhooks, persists inbound messages and dispatches queued replies with delivery tracking. The GLPI adapter supports exact active-user lookup, guarded ticket creation, verified document upload and requester-scoped ticket consultation. The guided WhatsApp menu verifies employees, provides the IT contact and stores resumable ticket drafts. The complete portal remains available in local development; production builds exclude it and its generated assets by default. Product help and public API documentation require separately approved sources and application-owned presentation under [the documentation policy](docs/architecture/living-documentation.md#documentation-audiences-and-publication). The employee identity service verifies corporate mailbox control through short-lived codes. A durable worker submits confirmed drafts to GLPI. Opted-in employees can receive WhatsApp notices for ticket closure. The product plan tracks the live pilot and cutover.\nThe [project plan](docs/project/implementation-plan.md) and [project human actions](docs/project/human-actions.md) own this repository's current work and external prerequisites. The [project manifest](.orion/project.json) records the project identity, the immutable initialization commit, and the Orion baseline currently integrated. [Project derivation](docs/project-derivation.md) explains how to inspect provenance and adopt newer Orion revisions through reviewed merges.\n"
   },
   {
     "id": "repository/README",

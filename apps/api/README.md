@@ -42,7 +42,7 @@ The conversation flow can enqueue a text or up-to-three-button reply with a stab
 
 A timeout, disconnected response, malformed success, provider server error or abandoned claim can leave an unknown result. The row becomes `UNCERTAIN` and stays out of dispatch until reconciled by delivery evidence. The signed delivery callback identifies the local intent through the opaque ID or the known Meta message ID. Events can arrive before the send response. Later or repeated weaker events leave confirmed delivery or read status intact. The runtime can update dispatch evidence, and the stored intent stays immutable.
 
-The internal queue entry point is [outbox.ts](src/features/whatsapp/outbox.ts). The [guided conversation](#guided-whatsapp-conversation) creates reply intents. The closure template is tracked separately in the [V1 plan](../../docs/project/implementation-plan.md#v1-work). Use test traffic until the operational controls in the plan are in place.
+The internal queue entry point is [outbox.ts](src/features/whatsapp/outbox.ts). The [guided conversation](#guided-whatsapp-conversation) and [closure watcher](#whatsapp-closure-notices) create delivery intents. Use test traffic until the operational controls in the [V1 plan](../../docs/project/implementation-plan.md#v1-work) are in place.
 
 [Meta Messages API](https://developers.facebook.com/documentation/business-messaging/whatsapp/reference/whatsapp-business-phone-number/message-api) · [Reply buttons](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/interactive-reply-buttons-messages) · [Business-scoped recipients](https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids)
 
@@ -78,7 +78,7 @@ Set `WHATSAPP_SUPPORT_CONTACT` to the approved IT mailbox or HTTPS support page 
 
 The conversation offers ticket intake, ticket consultation, and the IT contact. Intake collects category, unit or department, description, impact, and up to five media references. An employee can review and edit fields, cancel an unconfirmed draft, or return to it via the menu after a restart. Review buttons carry the current draft revision. The stored draft belongs to its verified GLPI user, and a different verified user on the same sender scope does not inherit it.
 
-Confirmation enqueues [ticket submission](#glpi-ticket-submission). Verified employees can [consult their tickets](#glpi-ticket-consultation). The [V1 plan](../../docs/project/implementation-plan.md#v1-work) tracks status notices.
+Confirmation enqueues [ticket submission](#glpi-ticket-submission). Verified employees can [consult their tickets](#glpi-ticket-consultation) and opt in to [closure notices](#whatsapp-closure-notices).
 
 Inbound events and replies use PostgreSQL. A short transaction serializes the next inbox event for one business number and commits the conversation move and its outbound reply together. Email requests commit the neutral reply before querying GLPI or submitting mail. Deferred identity and consultation operations can be reclaimed after a 45-second lease. An old claim cannot finalize a newer one. The employee's verified link recovers a successful confirmation when a worker was interrupted after consuming the code. Inbound events outside the customer service window are completed without applying a move or sending a reply.
 
@@ -113,6 +113,22 @@ The adapter scopes each search to the verified GLPI user and confirms the corres
 Consultation runs outside the database transaction. A deferred request retains its original GLPI requester across a restart. The worker checks the verified sender binding at the start and again before committing a reply. Protected replies expire after one minute or at the end of the service window, whichever comes first. Dispatch checks the verified binding before each attempt.
 
 [Lookup adapter](src/integrations/glpi/ticket-lookup.ts) · [Signed conversation tests](test/whatsapp/conversation.test.ts) · [GLPI Ticket requester relation](https://github.com/glpi-project/glpi/blob/10.0/bugfixes/src/Ticket_User.php)
+
+### WhatsApp closure notices
+
+Verified employees can send **Avisos** and choose **Ativar avisos** for tickets they confirm after opting in. **Parar avisos** withdraws the grant for that WhatsApp sender, including when email verification has expired. Enabling again issues a new grant for subsequent tickets. Existing tickets first opened through the legacy system are covered by the cutover reconciliation in PJ-18.
+
+After GLPI confirms ticket creation, the worker checks the ticket and its requester every five minutes. GLPI status `6` triggers one notice per submitted draft. GLPI outages and expired identity bindings defer checks for fifteen minutes. The worker retires watches when the grant or ownership disappears. It commits the closure intent and retires the watch in one transaction. Dispatch checks the opt-in and verified binding again on each attempt, reuses the outbound throttle rules and tracks Meta delivery evidence.
+
+The notice uses text during the 24-hour window determined from signed incoming messages. For delivery outside that window, set `WHATSAPP_CLOSURE_TEMPLATE_NAME` after Meta approves the matching utility template. Without a configured template, the watcher defers a closed ticket until an eligible window or template is available. A notice queued with a template has a 48-hour dispatch lifetime. A text-only notice queued without one expires with its service window.
+
+Use the utility template `mns_chamado_encerrado_v1`, language `pt_BR`, a single positional body parameter with example `123`, and the following body.
+
+```text
+O chamado nº {{1}} foi encerrado pela equipe de TI. Digite Chamado seguido do número para consultar ou Parar avisos para cancelar os avisos.
+```
+
+[Worker lifecycle test](test/whatsapp/closure.test.ts) · [Meta template payload](https://www.postman.com/meta/whatsapp-business-platform/request/o65u5m5/send-message-template-text) · [Meta customer service window](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages#customer-service-windows)
 
 ## Local commands
 

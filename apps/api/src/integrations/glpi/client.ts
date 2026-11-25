@@ -354,14 +354,14 @@ export function createGlpiClient(config: GlpiConfig, fetchGlpi = fetch) {
             },
             budget,
           );
-          return (
-            reply.kind === "response" &&
-            (reply.status === 200 || reply.status === 206) &&
-            isTicketRequester(reply.body, id, requesterId)
-          );
+          if (reply.kind !== "response") return undefined;
+          if (reply.status === 404) return false;
+          if (reply.status !== 200 && reply.status !== 206) return undefined;
+          return isTicketRequester(reply.body, id, requesterId);
         }),
       );
-      if (!ownership.every(Boolean))
+      if (ownership.includes(undefined)) return { kind: "unavailable" };
+      if (ownership.includes(false))
         return query.kind === "detail"
           ? { kind: "ready", tickets: [] }
           : { kind: "unavailable" };

@@ -5,6 +5,7 @@ import {
   VerificationMailUnconfirmedError,
 } from "../../integrations/mail/verification.js";
 import { webhookErrors, webhookOperations } from "./contracts.js";
+import { createClosureWorker } from "./closure-worker.js";
 import { createConversationProcessor } from "./conversation-processor.js";
 import { registerWhatsAppDispatchWorker } from "./dispatch-worker.js";
 import { createWhatsAppGraphSender } from "./graph-client.js";
@@ -103,6 +104,18 @@ export const whatsAppModule: ApiModule = {
               createWhatsAppMediaReader(config.phoneNumberId, config.outbound),
             ),
             "whatsapp_ticket_submission_unavailable",
+          );
+          registerWhatsAppDispatchWorker(
+            app,
+            createClosureWorker(
+              store,
+              {
+                businessPhoneId: config.phoneNumberId,
+                templateConfigured: !!config.outbound.closureTemplateName,
+              },
+              glpi.readOwnedTickets,
+            ),
+            "whatsapp_closure_unavailable",
           );
         }
         if (config.outbound) {

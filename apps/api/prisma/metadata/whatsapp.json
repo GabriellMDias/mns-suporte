@@ -75,7 +75,7 @@
     "whatsapp_outbound_messages": {
       "owner": "WhatsApp dispatch",
       "classification": "RESTRICTED",
-      "description": "Durable intent and dispatch evidence for one free-form WhatsApp reply.",
+      "description": "Durable intent and dispatch evidence for one WhatsApp reply or closure notice.",
       "lifecycle": "Enqueued before dispatch. Retried only after an explicit provider throttle rejection and while the service window remains open. An unresolved attempt enters UNCERTAIN for reconciliation. Automated retention is release-plan work.",
       "columns": {
         "id": {
@@ -87,7 +87,7 @@
           "classification": "INTERNAL"
         },
         "payload": {
-          "description": "Immutable destination, validated text or interactive content and optional required GLPI recipient identity.",
+          "description": "Immutable destination, validated text or interactive content and optional verified identity and notice consent requirements.",
           "classification": "RESTRICTED"
         },
         "state": {
@@ -95,7 +95,7 @@
           "classification": "INTERNAL"
         },
         "expires_at": {
-          "description": "Last allowed dispatch deadline under the inbound customer service window and any shorter lifetime required by the reply.",
+          "description": "Last allowed dispatch deadline under the reply's service window or utility notice lifetime.",
           "classification": "INTERNAL",
           "unit": "UTC instant"
         },

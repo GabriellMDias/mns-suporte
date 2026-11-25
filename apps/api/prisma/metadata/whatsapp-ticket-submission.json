@@ -90,12 +90,24 @@
         "updated_at": {
           "description": "Instant of the latest claim or durable progress transition.",
           "classification": "INTERNAL"
+        },
+        "closure_consent_id": {
+          "description": "Active notice grant recorded when the employee confirmed the draft.",
+          "classification": "INTERNAL",
+          "nullMeaning": "There was no eligible notice grant when this submission was queued."
+        },
+        "closure_check_at": {
+          "description": "Time of the next GLPI closure check or the deadline of its active claim.",
+          "classification": "INTERNAL",
+          "nullMeaning": "The watch is unscheduled, retired or has created a closure reply."
         }
       },
       "objects": {
         "whatsapp_ticket_submissions_pkey": "Prevents two jobs for the same verified draft.",
         "whatsapp_ticket_submissions_dispatch_idx": "Finds eligible jobs for one Meta business phone number.",
-        "whatsapp_ticket_submissions_progress_check": "Enforces consistent progress, result and claim counts."
+        "whatsapp_ticket_submissions_progress_check": "Enforces consistent progress, result and claim counts.",
+        "whatsapp_ticket_submissions_closure_watch": "Requires a confirmed GLPI ticket and an explicit consent grant for any scheduled check.",
+        "whatsapp_ticket_submissions_closure_idx": "Finds due ticket closure checks within one business number."
       }
     }
   },
