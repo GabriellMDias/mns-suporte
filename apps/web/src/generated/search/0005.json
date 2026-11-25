@@ -1,5 +1,149 @@
 [
   {
+    "id": "repository/docs/architecture/living-documentation",
+    "title": "Living Documentation",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Change and verification workflow",
+    "anchor": "change-and-verification-workflow",
+    "text": "Change and verification workflow\nEdit the owning Markdown, contract, schema, or component metadata. Regenerate upstream API/database/SDK references when their sources change.\nRun `pnpm docs:references:write`, including after ordinary authored documentation changes. Review generated differences, links, sensitive content, and obsolete output removal.\nRun `pnpm docs:references:test`, `pnpm docs:check`, `pnpm docs:references:check`, relevant unit/browser checks, and the full `pnpm validate` gate. Generator tests protect publication boundaries; browser tests cover routes, search, exploration, synthetic previews, and automated accessibility checks plus keyboard/mobile behavior.\nFor substantial generation/build changes, verify frozen installation, regeneration with no diff, build, and a real browser in a clean checkout without a local environment file or existing generated cache. Remote CI runs the same full gate; record actual results separately from local evidence.\nSee [setup](../setup.md#living-documentation-portal) for commands and [validation](../validation.md) for available checks. The portal does not select providers or deploy infrastructure.\nThe [manual checklist](../validation.md#living-documentation-manual-browser-checks) is the guide for human-observed acceptance after material UI changes. Keep human-observed acceptance distinct from the automated browser suites in the normal repository gate.\n"
+  },
+  {
+    "id": "repository/docs/architecture/principles",
+    "title": "Architecture Principles",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Architecture Principles",
+    "anchor": "architecture-principles",
+    "text": "Architecture Principles\n[Documentation index](../README.md) · [Living documentation](living-documentation.md) · [Validation](../validation.md)\nThese are durable principles for humans and AI agents. Current policies own detailed rules; [ADRs](../adr/README.md) preserve significant choices and rationale. Make a conflict explicit and use the [decision priority](#decision-priority) and [exceptions](#exceptions) below rather than silently bypassing a principle.\n"
+  },
+  {
+    "id": "repository/docs/architecture/principles",
+    "title": "Architecture Principles",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Read for this change",
+    "anchor": "read-for-this-change",
+    "text": "Read for this change\n[Decision Priority](#decision-priority) and [Exceptions](#exceptions) govern tradeoffs.\n[6. Domain Rules Must Have a Clear Home](#6-domain-rules-must-have-a-clear-home), [8. Shared Code Must Represent Shared Meaning](#8-shared-code-must-represent-shared-meaning), and [13. Release History Must Be Intentional](#13-release-history-must-be-intentional) often determine placement and change scope.\n"
+  },
+  {
+    "id": "repository/docs/architecture/principles",
+    "title": "Architecture Principles",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "1. The Repository Is the Source of Truth",
+    "anchor": "1-the-repository-is-the-source-of-truth",
+    "text": "1. The Repository Is the Source of Truth\nThe repository must contain or link the source, contracts, schemas, tests, architecture, operations, security requirements, telemetry conventions, and decisions needed to understand, build, validate, operate, and evolve the system. Important knowledge must not live only in memory, private conversations, external tools, or undocumented habits. Change the repository when that knowledge changes.\n"
+  },
+  {
+    "id": "repository/docs/architecture/principles",
+    "title": "Architecture Principles",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "2. One Concept Should Have One Canonical Source",
+    "anchor": "2-one-concept-should-have-one-canonical-source",
+    "text": "2. One Concept Should Have One Canonical Source\nDo not maintain the same fact independently in multiple places. Derive API documentation and clients from executable contracts, database references from the migrated schema plus semantic metadata, configuration references from schemas, and component documentation from component-owned source/examples. Generated artifacts must be reproducible, never independent authorities. [Living documentation](living-documentation.md) defines the human and AI-readable representations.\n"
+  },
+  {
+    "id": "repository/docs/architecture/principles",
+    "title": "Architecture Principles",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "3. Architecture Must Be Explicit",
+    "anchor": "3-architecture-must-be-explicit",
+    "text": "3. Architecture Must Be Explicit\nSignificant applications, packages, modules, and layers need clear responsibility, dependencies, contracts, side effects, data source, and documentation. Boundaries should be understandable without reconstructing them from implementation details.\n"
+  },
+  {
+    "id": "repository/docs/architecture/principles",
+    "title": "Architecture Principles",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "4. Architecture Should Be Mechanically Enforced",
+    "anchor": "4-architecture-should-be-mechanically-enforced",
+    "text": "4. Architecture Should Be Mechanically Enforced\nEnforce important boundaries with types, schemas, package/import rules, static checks, tests, builds, and CI where practical. Prose and agent instructions explain rules but should not be their only protection.\n"
+  },
+  {
+    "id": "repository/docs/architecture/principles",
+    "title": "Architecture Principles",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "5. Prefer Explicit Contracts",
+    "anchor": "5-prefer-explicit-contracts",
+    "text": "5. Prefer Explicit Contracts\nCommunication across application, package, module, client/server, and asynchronous boundaries needs contracts clear enough that consumers do not depend on internals. Type, validate, version, document, test, and expose them in machine-readable form where appropriate; avoid independent consumer copies.\n"
+  },
+  {
+    "id": "repository/docs/architecture/principles",
+    "title": "Architecture Principles",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "6. Domain Rules Must Have a Clear Home",
+    "anchor": "6-domain-rules-must-have-a-clear-home",
+    "text": "6. Domain Rules Must Have a Clear Home\nBusiness behavior needs an identifiable canonical implementation and documentation when meaning is not evident from code. Do not scatter rules across controllers, UI, persistence adapters, triggers, jobs, and integrations. Keep platform concerns out of domain behavior when the separation has real value.\n"
+  },
+  {
+    "id": "repository/docs/architecture/principles",
+    "title": "Architecture Principles",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "7. Dependencies Must Point Toward Stable Responsibilities",
+    "anchor": "7-dependencies-must-point-toward-stable-responsibilities",
+    "text": "7. Dependencies Must Point Toward Stable Responsibilities\nInfrastructure and volatile details should depend on stable contracts and domain concepts, not define core business behavior. Protect meaningful replacement boundaries without adding abstraction for its own sake.\n"
+  },
+  {
+    "id": "repository/docs/architecture/principles",
+    "title": "Architecture Principles",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "8. Shared Code Must Represent Shared Meaning",
+    "anchor": "8-shared-code-must-represent-shared-meaning",
+    "text": "8. Shared Code Must Represent Shared Meaning\nShare contracts, schemas, behavior, clients, primitives, or utilities only when consumers actually share their meaning and responsibility. Similar-looking implementations alone do not justify coupling; some duplication is cheaper than a speculative common package.\n"
+  },
+  {
+    "id": "repository/docs/architecture/principles",
+    "title": "Architecture Principles",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "9. Applications Must Remain Independently Understandable",
+    "anchor": "9-applications-must-remain-independently-understandable",
+    "text": "9. Applications Must Remain Independently Understandable\nEach application's purpose, entry points, dependencies, configuration, integrations, operational behavior, and documentation should be discoverable locally. Shared packages should improve consistency without hiding ownership.\n"
+  },
+  {
+    "id": "repository/docs/architecture/principles",
+    "title": "Architecture Principles",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "10. Prefer Vertical Completeness",
+    "anchor": "10-prefer-vertical-completeness",
+    "text": "10. Prefer Vertical Completeness\nImplement and validate a feature across every layer it actually touches—data, application/domain behavior, contract, API, client, UI, tests, telemetry, and documentation—as one coherent behavior. Not every feature needs every layer.\n"
+  },
+  {
+    "id": "repository/docs/architecture/principles",
+    "title": "Architecture Principles",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "11. Documentation Is Part of the System",
+    "anchor": "11-documentation-is-part-of-the-system",
+    "text": "11. Documentation Is Part of the System\nDocument intent, business rules, rationale, invariants, constraints, side effects, failures, procedures, integrations, and security behavior that code cannot safely explain alone. Do not restate obvious code. Code and documentation evolve together; incorrect documentation makes a change incomplete.\n"
+  },
+  {
+    "id": "repository/docs/architecture/principles",
+    "title": "Architecture Principles",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "12. Current Documentation Describes Current Truth",
+    "anchor": "12-current-documentation-describes-current-truth",
+    "text": "12. Current Documentation Describes Current Truth\nCurrent policy describes current behavior and direction, without obsolete development states. Git owns development history; migrations own released database transitions; a changelog owns externally relevant released changes; ADRs own significant decision history.\n"
+  },
+  {
+    "id": "repository/docs/architecture/principles",
+    "title": "Architecture Principles",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "13. Release History Must Be Intentional",
+    "anchor": "13-release-history-must-be-intentional",
+    "text": "13. Release History Must Be Intentional\nUnreleased experiments may be refined; released artifacts describe meaningful transitions and must not be rewritten when doing so could invalidate deployed systems or persistent environments. This applies especially to migrations, compatibility guarantees, changelogs, and generated release artifacts. Safety outranks migration-count elegance.\n"
+  },
+  {
     "id": "repository/docs/architecture/principles",
     "title": "Architecture Principles",
     "group": "Architecture",
@@ -952,41 +1096,5 @@
     "heading": "Schema Evolution",
     "anchor": "schema-evolution",
     "text": "Schema Evolution\nUse [migrations](migrations.md) for every durable schema transition and verify release status before editing history. Released or uncertain history is immutable until verified; schema diffs alone cannot establish migration intent. Keep current schema/metadata/reference coherent without requiring readers to reconstruct current meaning from old migrations.\nChoose descriptive, consistent table/column/relationship/constraint/index names using the current schema as the local pattern. Deprecated objects and temporary compatibility fields need explicit purpose and removal conditions. Manual production schema drift is a defect; emergency changes must be recorded and reconciled. Reviewed, scoped, auditable data fixes may use controlled scripts rather than permanent migration history when they repair only one environment.\n"
-  },
-  {
-    "id": "repository/docs/database/principles",
-    "title": "Database Principles",
-    "group": "Database guides",
-    "kind": "repository",
-    "heading": "New Table Checklist",
-    "anchor": "new-table-checklist",
-    "text": "New Table Checklist\nBefore creating or changing durable structures:\nInspect current schema, metadata, owning domain, access boundaries, migrations/release status, consumers, and tests. Do not guess missing non-obvious semantics.\nIdentify the persisted concept, canonical versus derived status, reader/writer authority, identifiers, lifecycle/retention, classification, and required columns.\nFor each field, define type, null/default/unit meaning, source, public-contract impact, existing-row population, constraints, and index needs.\nFor each constraint/index/native feature, explain its invariant/query purpose, existing-data compatibility, concurrency, locking/write cost, failure mapping, and discovery route.\nDesign migration, rollback or forward recovery, transaction/concurrency boundaries, and operational evidence proportional to risk. Data being unused by current code does not prove it is disposable.\nUpdate [canonical schema documentation](schema-documentation.md) and generate references. Test important constraints, atomic failure, concurrent races, and migrations against real PostgreSQL. Mocks or sequential tests alone cannot prove those guarantees.\nCurrent [validation](../validation.md) covers fresh migrations, PostgreSQL integration, reference completeness/freshness for supported object types, release-history integrity, and import boundaries. Real released upgrade paths and deployment-specific drift/recovery checks require actual supported environments; do not claim them from a fresh-install test.\n"
-  },
-  {
-    "id": "repository/docs/database/release-evolution",
-    "title": "Release and Evolution Workflow",
-    "group": "Database guides",
-    "kind": "repository",
-    "heading": "Release and Evolution Workflow",
-    "anchor": "release-and-evolution-workflow",
-    "text": "Release and Evolution Workflow\n[Migration policy](migrations.md) · [Compatibility policy](../architecture/versioning-and-compatibility.md) · [API versioning](../api/versioning.md)\nThis is the current contributor workflow for deciding whether a database or API change needs historical compatibility protection. It implements the policies above without declaring a deployment, a released contract, or a supported rollback window. The repository currently has no recorded durable release in [`release-history.json`](../../apps/api/prisma/release-history.json). An empty registry means **no release has been recorded here**; it is not proof that an unlisted persistent database does not exist. Do not edit existing migration history while its release status is uncertain.\n"
-  },
-  {
-    "id": "repository/docs/database/release-evolution",
-    "title": "Release and Evolution Workflow",
-    "group": "Database guides",
-    "kind": "repository",
-    "heading": "Record the first durable migration boundary",
-    "anchor": "record-the-first-durable-migration-boundary",
-    "text": "Record the first durable migration boundary\nBefore the first persistent release, record a human action in the repository's human-action checklist (linked from the README's [Current state](../../README.md#current-state)) to identify the actual durable environment, the deployed Git commit, and which migrations have completed there. Disposable Testcontainers or local databases are not durable release evidence. Inspect the target database's Prisma `_prisma_migrations` records with read-only access and correlate successful, non-rolled-back migration names with the migration deployment record. Investigate missing, failed, or manually changed migrations before recording a release. Do not put credentials or connection strings in the registry or issue evidence.\nOnce a release actually exists, run `pnpm release:checksums <full-deployed-commit-sha>` to print the complete migration set and normalized source SHA-256 values from that commit. Verify the deployed migration set against the database record and deployment artifact, then append an entry to [`release-history.json`](../../apps/api/prisma/release-history.json) containing a stable release ID, non-secret environment identifier, deployed commit SHA, and every migration directory/checksum printed for that commit. The registry's checksum is for the Git source with normalized line endings; Prisma's database checksum is evidence about the actual deployed file and may differ if checkout line endings differed. Do not substitute one for the other without verifying the deployed artifact. A release entry must follow the real durable application of the migrations, not a planned deployment.\n`pnpm release:check` verifies recorded commits, their complete migration sets, current SQL hashes, and append-only registry history against a Git base. CI fetches full Git history and supplies the PR base, merge-group base, or push's preceding commit through `ORION_RELEASE_BASE_REF`; `pnpm validate` runs the same check locally. GitHub supplies exactly forty zeroes for a first push with no previous commit. The validator treats that sentinel as an absent comparison base, without falling back to local ancestry: an empty registry is valid, while a nonempty registry still fails because a real Git base is required to verify append-only history. Every other supplied base must be a full SHA resolving to an existing commit; malformed or unavailable bases fail rather than bypass comparison.\nThe validator deliberately leaves migrations absent from recorded durable releases refinable, subject to the policy requirement to verify that they are genuinely unreleased before editing them. Corrections to released migrations require a new reviewed forward migration. Deleting or rewriting an old release entry does not turn a released migration back into an unreleased one.\n"
-  },
-  {
-    "id": "repository/docs/database/release-evolution",
-    "title": "Release and Evolution Workflow",
-    "group": "Database guides",
-    "kind": "repository",
-    "heading": "Validate schema changes",
-    "anchor": "validate-schema-changes",
-    "text": "Validate schema changes\nFor every migration change, review authored Prisma schema and SQL together, including custom PostgreSQL objects and data impact. `pnpm references:check` applies the committed migrations to a fresh disposable PostgreSQL and checks the generated physical database reference and adjacent semantic metadata. It compares generated text after normalizing checkout line endings, so Windows CRLF is not mistaken for content drift. `pnpm validate` also runs the real-database tests and emitted application smoke. These are fresh-install checks; they do not prove an upgrade from a released state.\nWhen a real supported release baseline exists, add an upgrade test from that exact baseline: initialize a disposable database with the released migrations, preserve representative data permitted by the test policy, apply the new committed migrations, and verify data, constraints, and the supported application/database combinations. Record the actual supported versions and rollout order from that human action. Do not synthesize a historical state or require arbitrary old/new combinations before support obligations exist.\nApplication rollback means running earlier application code against the **current** schema only if that combination has been verified compatible. It does not rewind PostgreSQL or recover data dropped by a migration. If a released migration needs correction, prefer a reviewed forward migration; data loss may require a separate backup/restore decision and procedure for the actual environment. No production rollback command, deployment window, or recovery objective is selected here.\n"
   }
 ]

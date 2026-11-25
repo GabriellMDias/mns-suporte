@@ -86,7 +86,7 @@ describe("WhatsApp webhook", () => {
   it("verifies the challenge and authenticates the exact UTF-8 bytes before parsing", async () => {
     let received = 0;
     const { app } = createApp(logger);
-    registerWhatsAppWebhook(app, config, (messages) => {
+    registerWhatsAppWebhook(app, config, ({ messages }) => {
       received += messages.length;
       return Promise.resolve();
     });

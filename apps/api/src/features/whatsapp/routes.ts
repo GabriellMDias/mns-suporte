@@ -9,10 +9,9 @@ import {
   webhookOperations,
   webhookVerificationQuery,
 } from "./contracts.js";
-import type { InboundMessage } from "./inbound.js";
-import { readInboundMessages } from "./inbound.js";
+import { readWebhookEvents, type WebhookEvents } from "./inbound.js";
 
-type Enqueue = (messages: InboundMessage[]) => Promise<void>;
+type PersistEvents = (events: WebhookEvents) => Promise<void>;
 const [verification, delivery] = webhookOperations;
 const respond = errorResponder({ ...coreErrors, ...webhookErrors });
 const maxWebhookBytes = 3 * 1024 * 1024;
@@ -20,7 +19,7 @@ const maxWebhookBytes = 3 * 1024 * 1024;
 export function registerWhatsAppWebhook(
   app: AppInstance,
   config: WhatsAppWebhookConfig,
-  enqueue: Enqueue,
+  persist: PersistEvents,
 ): void {
   const verificationTokenHash = createHash("sha256")
     .update(config.verifyToken)
@@ -114,8 +113,8 @@ export function registerWhatsAppWebhook(
           );
           return reply.code(400).send(failure.body);
         }
-        const messages = readInboundMessages(payload, config.phoneNumberId);
-        if (!messages) {
+        const events = readWebhookEvents(payload, config.phoneNumberId);
+        if (!events) {
           const failure = respond(
             "VALIDATION_FAILED",
             request.id,
@@ -124,7 +123,8 @@ export function registerWhatsAppWebhook(
           return reply.code(400).send(failure.body);
         }
 
-        if (messages.length > 0) await enqueue(messages);
+        if (events.messages.length > 0 || events.statuses.length > 0)
+          await persist(events);
         return reply.type("text/plain").send("EVENT_RECEIVED");
       },
     );

@@ -65,7 +65,7 @@ export interface paths {
         /** @description Echo the Meta subscription challenge after verifying the callback token. */
         get: operations["verifyWhatsAppWebhook"];
         put?: never;
-        /** @description Verify Meta's HMAC over the original request bytes. Acknowledge after the supported incoming messages commit to the inbox. */
+        /** @description Verify Meta's HMAC over the original request bytes. Acknowledge after supported incoming messages and tracked outbound delivery updates commit. */
         post: operations["receiveWhatsAppWebhook"];
         delete?: never;
         options?: never;

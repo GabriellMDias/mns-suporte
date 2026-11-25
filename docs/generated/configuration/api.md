@@ -23,3 +23,5 @@ No values are eligible for client exposure. `ORION_ENV` is always required. The 
 | `WHATSAPP_APP_SECRET` | secret string | no | — | server | RESTRICTED | yes | Meta app secret used to verify incoming webhook signatures. |
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | secret string | no | — | server | RESTRICTED | yes | Application-generated secret used to verify the Meta callback. |
 | `WHATSAPP_PHONE_NUMBER_ID` | Meta asset identifier | no | — | server | INTERNAL | no | Meta business phone number ID accepted by the webhook. |
+| `WHATSAPP_ACCESS_TOKEN` | secret string | no | — | server | RESTRICTED | yes | Meta system user token that enables WhatsApp outbound dispatch. |
+| `WHATSAPP_GRAPH_API_VERSION` | Graph API version | no | `v27.0` | server | INTERNAL | no | Graph API version used by WhatsApp outbound dispatch. |

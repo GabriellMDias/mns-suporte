@@ -9,3 +9,34 @@ model WhatsAppInboundMessage {
 
   @@map("whatsapp_inbound_messages")
 }
+
+enum WhatsAppOutboundState {
+  PENDING
+  SENDING
+  ACCEPTED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  UNCERTAIN
+  EXPIRED
+}
+
+model WhatsAppOutboundMessage {
+  id                String                @id(map: "whatsapp_outbound_messages_pkey") @db.Uuid
+  businessPhoneId   String                @map("business_phone_id")
+  payload           Json
+  state             WhatsAppOutboundState @default(PENDING)
+  expiresAt         DateTime              @map("expires_at") @db.Timestamptz(3)
+  availableAt       DateTime              @default(now()) @map("available_at") @db.Timestamptz(3)
+  attemptStartedAt  DateTime?             @map("attempt_started_at") @db.Timestamptz(3)
+  attempts          Int                   @default(0)
+  providerMessageId String?               @map("provider_message_id")
+  providerErrorCode Int?                  @map("provider_error_code")
+  deliveryStatusAt  DateTime?             @map("delivery_status_at") @db.Timestamptz(3)
+  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([businessPhoneId, providerMessageId], map: "whatsapp_outbound_messages_provider_key")
+  @@index([businessPhoneId, state, availableAt], map: "whatsapp_outbound_messages_dispatch_idx")
+  @@map("whatsapp_outbound_messages")
+}

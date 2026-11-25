@@ -43,6 +43,81 @@
         "whatsapp_inbound_messages_pkey": "Keeps one accepted event per Meta message ID across retries and concurrent delivery.",
         "whatsapp_inbound_messages_sender_required": "Requires at least one sender identifier so a message can be associated with a conversation."
       }
+    },
+    "whatsapp_outbound_messages": {
+      "owner": "WhatsApp dispatch",
+      "classification": "RESTRICTED",
+      "description": "Durable intent and dispatch evidence for one free-form WhatsApp reply.",
+      "lifecycle": "Enqueued before dispatch. Retried only after an explicit provider throttle rejection and while the service window remains open. An unresolved attempt enters UNCERTAIN for reconciliation. Automated retention is release-plan work.",
+      "columns": {
+        "id": {
+          "description": "Caller-assigned immutable UUID for one reply intent and the opaque identifier echoed by Meta on delivery callbacks.",
+          "classification": "INTERNAL"
+        },
+        "business_phone_id": {
+          "description": "Meta business phone number ID that owns and sends the reply.",
+          "classification": "INTERNAL"
+        },
+        "payload": {
+          "description": "Immutable destination and validated text or interactive reply content.",
+          "classification": "RESTRICTED"
+        },
+        "state": {
+          "description": "Current queue, provider acceptance or delivery evidence state.",
+          "classification": "INTERNAL"
+        },
+        "expires_at": {
+          "description": "Last allowed dispatch deadline from the current inbound customer service window.",
+          "classification": "INTERNAL",
+          "unit": "UTC instant"
+        },
+        "available_at": {
+          "description": "Earliest eligible time for the next dispatch attempt.",
+          "classification": "INTERNAL",
+          "unit": "UTC instant"
+        },
+        "attempt_started_at": {
+          "description": "Most recent claim time used to detect an abandoned dispatch.",
+          "classification": "INTERNAL",
+          "unit": "UTC instant",
+          "nullMeaning": "The queue has not claimed this reply."
+        },
+        "attempts": {
+          "description": "Number of claims recorded before making a provider request.",
+          "classification": "INTERNAL",
+          "unit": "claims"
+        },
+        "provider_message_id": {
+          "description": "Meta message identifier returned on acceptance or on a correlated delivery callback.",
+          "classification": "RESTRICTED",
+          "nullMeaning": "Provider acceptance or delivery has not supplied an identifier."
+        },
+        "provider_error_code": {
+          "description": "Integer Graph error code from an explicit rejection or delivery failure.",
+          "classification": "INTERNAL",
+          "nullMeaning": "The current evidence has no provider error code."
+        },
+        "delivery_status_at": {
+          "description": "Provider timestamp of the accepted delivery status update.",
+          "classification": "INTERNAL",
+          "unit": "UTC instant",
+          "nullMeaning": "No delivery callback has advanced this reply."
+        },
+        "created_at": {
+          "description": "Database timestamp when the reply intent was first enqueued.",
+          "classification": "INTERNAL",
+          "unit": "UTC instant"
+        }
+      },
+      "objects": {
+        "whatsapp_outbound_messages_pkey": "Prevents another reply intent with the same durable identifier.",
+        "whatsapp_outbound_messages_attempts_nonnegative": "Rejects invalid negative dispatch attempt counts.",
+        "whatsapp_outbound_messages_provider_key": "Correlates delivery by provider message ID within one business phone number and prevents conflicting associations.",
+        "whatsapp_outbound_messages_dispatch_idx": "Supports finding due messages for a configured sender and tracking current states."
+      }
     }
+  },
+  "enums": {
+    "WhatsAppOutboundState": "Tracks work from pending and claimed through acceptance, delivery, read, known failure, uncertainty, or service-window expiry."
   }
 }
