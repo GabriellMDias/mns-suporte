@@ -4,6 +4,15 @@
     "title": "Tracing",
     "group": "Reliability",
     "kind": "repository",
+    "heading": "Asynchronous causality and trace links",
+    "anchor": "asynchronous-causality-and-trace-links",
+    "text": "Asynchronous causality and trace links\nUse parent-child relationships for actual nested work and links where multiple parents, delayed execution, fan-in, fan-out, or independent stages make a tree misleading. Queue telemetry should separate waiting delay from execution time where supported and identify safe message type, consumer, and attempt. Scheduled work without a causal parent starts a new trace.\nImmediate retries may remain child spans; delayed attempts may use new linked traces with stable job/event/workflow IDs. Make retry attempts/reasons distinguishable. Duplicate deliveries are independent executions and need not share one trace. Long workflows lasting hours/days should use stages, links, and workflow IDs rather than an unbounded trace. Large batches/fan-out should use counts and selective significant/failed item spans rather than thousands of IDs or descendants.\nThe current exporter removes links; implementing these semantics requires explicit export-boundary changes and tests, not merely adding link calls.\n"
+  },
+  {
+    "id": "repository/docs/reliability/tracing",
+    "title": "Tracing",
+    "group": "Reliability",
+    "kind": "repository",
     "heading": "Outcomes and cross-signal correlation",
     "anchor": "outcomes-and-cross-signal-correlation",
     "text": "Outcomes and cross-signal correlation\nSpan status follows operational semantics. Expected domain rejection or inbound `4xx` is not automatically an infrastructure error; an unexpected outbound `401` may be a credential/configuration failure. Record a bounded result/error code when useful. Associate unexpected failures with the responsible operation; do not repeat exception events on every ancestor unless distinct operations failed.\nA failed attempt can remain an error child of a successful parent after retry. Preserve meaningful partial failures, timeout distinctions, cancellation, fallback, and circuit-breaker states where applicable. Do not hide degradation simply because eventual completion succeeded.\nLogs and error reports should inherit active trace/span correlation centrally where practical. Span events explain one execution; independent searchable semantic events may belong in logs. Do not duplicate both automatically. Metrics answer frequency/distribution questions, not the cause of one trace. Sampled tracing is never the sole required audit/security record.\n"
@@ -952,14 +961,5 @@
     "heading": "Secret rotation",
     "anchor": "secret-rotation",
     "text": "Secret rotation\nImportant secrets must be rotatable, and revocable where supported. Define who rotates, how a new credential is distributed, how consumers are verified, and how the old credential is revoked. Scheduled, provider-, personnel-, policy-, and incident-driven rotation have different triggers; do not invent a universal cadence.\nWhere supported, create the new credential, update consumers, verify use, then revoke the previous credential with a bounded overlap. A replacement alone does not neutralize a still-valid compromised value. Exposure or suspected compromise requires prompt rotation/revocation according to capability and impact. Webhook secrets need environment isolation, protocol-correct secure comparison, and rotation as well.\nKeep code deployment and credential rotation separable where practical. Account for multi-version rollout, credential-format changes, and rollback compatibility: an old binary may fail after its credential is revoked. Automated rotation must preserve authorization, auditability, safe rollout/recovery, and retirement of prior credentials without creating unmanaged copies. Exercise critical rotation and recovery in suitable non-production environments before emergencies where practical.\nRecovery must address lost credentials/store access, incorrect rotation, provider failure, deleted credentials, or compromised administrators without creating permanent weaker backdoors. [Production access](production-access.md) governs time-limited, exceptional break-glass access. Separation of creation/access/rotation/approval duties should match actual risk and organizational maturity.\n"
-  },
-  {
-    "id": "repository/docs/security/secrets-management",
-    "title": "Secrets Management",
-    "group": "Security",
-    "kind": "repository",
-    "heading": "Use, diagnostics, and backups",
-    "anchor": "use-diagnostics-and-backups",
-    "text": "Use, diagnostics, and backups\nDo not serialize secret-bearing objects into logs, traces, metrics, errors, breadcrumbs, audit, profiling, caches, or responses. Review provider exceptions and automatic SDK capture of headers, locals, environment, configuration, and requests. Dedicated secret wrappers may help when practical, but their default string/serialization representation must not reveal values. [Redaction policy](telemetry-redaction.md) remains authoritative.\nProduction debugger access is privileged. Full memory dumps are restricted artifacts needing exceptional justified collection and tightly controlled access. Support tools must not expose secrets or inherit infrastructure credentials. Administrative UIs should show configured state or rotation metadata; generated credentials may use one-time display when necessary instead of repeated retrieval.\nSecret-store backups require equivalent or stronger controls. Application backups must not accidentally include secret files; database backups containing hashes, sessions, or provider tokens retain their classification. [Retention](data-retention.md) governs their lifecycle.\n"
   }
 ]
