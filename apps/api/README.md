@@ -54,7 +54,7 @@ The user token is sent only to `initSession`. Requests with an established sessi
 
 Directory lookup pages through `search/User`, verifies the entire normalized email against returned addresses, and checks the active flag. It accepts exactly one active GLPI user ID. Multiple matching users, incomplete or inconsistent pagination, and provider errors return distinct internal outcomes. The employee identity workflow will use neutral replies and verify mailbox ownership before linking an account.
 
-Ticket creation uses the supplied GLPI requester ID and escapes the plain-text description for GLPI's HTML field. A confirmed creation includes the positive ticket ID from GLPI. A known denial can be distinguished from a timeout, lost response or malformed success after dispatch. The client sends each write only once. The ticket workflow will persist the creation intent and reconcile uncertain outcomes before any further attempt.
+Ticket creation uses the verified GLPI requester ID and escapes the plain-text description for GLPI's HTML field. A confirmed creation includes the positive ticket ID from GLPI. The GLPI adapter uploads documents via multipart form data, then reads the ticket to confirm that it contains the returned document ID. An explicit denial is distinguishable from a timeout, lost response or malformed success after dispatch. Each adapter call sends at most one write.
 
 The adapter is covered by [synthetic contract and transport tests](test/glpi/client.test.ts). The employee verification and ticket workflows are tracked in the [V1 plan](../../docs/project/implementation-plan.md#v1-work). Live testing requires the scoped service account in [PH-08](../../docs/project/human-actions.md#ph-08).
 
@@ -78,7 +78,7 @@ Set `WHATSAPP_SUPPORT_CONTACT` to the approved IT mailbox or HTTPS support page 
 
 The conversation offers ticket intake, ticket consultation, and the IT contact. Intake collects category, unit or department, description, impact, and up to five media references. An employee can review and edit fields, cancel an unconfirmed draft, or return to it via the menu after a restart. Review buttons carry the current draft revision. The stored draft belongs to its verified GLPI user, and a different verified user on the same sender scope does not inherit it.
 
-A confirmed draft is saved for ticket submission. The [V1 plan](../../docs/project/implementation-plan.md#v1-work) tracks registering that draft in GLPI, listing owned tickets and sending status notices. The interim WhatsApp replies make the current availability of those actions clear.
+Confirmation enqueues [ticket submission](#glpi-ticket-submission). The [V1 plan](../../docs/project/implementation-plan.md#v1-work) tracks listing owned tickets and sending status notices.
 
 Inbound events and replies use PostgreSQL. A short transaction serializes the next inbox event for one business number and commits the conversation move and its outbound reply together. Email requests commit the neutral reply before querying GLPI or submitting mail. Identity operations are reclaimed after a 45-second lease. An old claim cannot finalize a newer one. The employee's verified link recovers a successful confirmation when a worker was interrupted after consuming the code. Inbound events outside the customer service window are completed without applying a move or sending a reply.
 
@@ -91,6 +91,18 @@ Before review, a single clear symptom match can show a short instruction for an 
 The conversation commits at most one feedback record per draft together with the selected transition. A resolved report closes the draft. The other choices preserve all entered fields and media references for ticket review. The feedback table stores the opaque draft ID, versioned guide ID, choice and timestamp. Keep earlier guide versions readable when changing the catalogue, because in-progress conversations can still reference them.
 
 [Guide catalogue](src/features/whatsapp/troubleshooting.ts) · [Feedback schema](prisma/schema/whatsapp-troubleshooting.prisma)
+
+### GLPI ticket submission
+
+The conversation transaction saves the confirmed fields, draft and queue entry together. The draft UUID identifies one submission and appears in the GLPI description as the MNS reference. Drafts confirmed before submission was available return to review for a fresh confirmation. The worker creates the ticket before downloading any attachments.
+
+The media reader requests Meta metadata scoped to the configured phone number and accepts only the HTTPS WhatsApp attachment path on Meta's download host. It rejects redirects and enforces type, length and the supplied checksum. The worker sends up to five JPEG, PNG, OGG, MP3, AAC, MP4 audio, AMR or PDF documents, up to 10 MB each. Media bytes stay in memory and are sent to the configured GLPI endpoint. The final reply gives the confirmed ticket number and distinguishes verified, failed and unconfirmed attachments.
+
+Each stage has a 45-second lease. Transient download failures, a GLPI failure before sending the write, and explicit session expiry may retry up to a total of three attempts with delays of two and eight seconds. After a definite creation failure, the employee can reopen the saved draft and confirm again. A lost response or expired claim for a possibly sent write is recorded as uncertain. The worker does not replay that write. It continues remaining attachments for an already confirmed ticket.
+
+For an uncertain creation, IT can search the GLPI description for the exact MNS reference from the conversation and confirm whether the ticket exists before recreating it manually. For an uncertain document, inspect the known ticket's documents for the filename beginning with `mns-<draft ID>-<attachment number>`. The employee can use the ticket number to send missing files to IT. The queue stores outcome and counts. It releases the copied description after creation and clears the reply address and media references at termination. The reply uses the confirmation's service window and requires the requester to still own the verified sender link at completion.
+
+[Submission worker](src/features/whatsapp/ticket-submission-worker.ts) · [Recovery tests](test/whatsapp/ticket-submission.test.ts) · [Meta media retrieval](https://www.postman.com/meta/whatsapp-business-platform/request/ptjyi84/retrieve-media-url) · [GLPI upload contract](https://github.com/glpi-project/glpi/blob/10.0/bugfixes/apirest.md#upload-a-document-file)
 
 ## Local commands
 

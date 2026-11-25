@@ -8,6 +8,7 @@ import { webhookErrors, webhookOperations } from "./contracts.js";
 import { createConversationProcessor } from "./conversation-processor.js";
 import { registerWhatsAppDispatchWorker } from "./dispatch-worker.js";
 import { createWhatsAppGraphSender } from "./graph-client.js";
+import { createWhatsAppMediaReader } from "./graph-media.js";
 import { protectIdentityCode } from "./identity-code.js";
 import { createPostgresIdentityRepository } from "./identity-repository.js";
 import { createIdentityVerification } from "./identity-service.js";
@@ -16,6 +17,7 @@ import {
   dispatchNextWhatsAppReply,
 } from "./outbox.js";
 import { registerWhatsAppWebhook } from "./routes.js";
+import { createTicketSubmissionWorker } from "./ticket-submission-worker.js";
 
 export const whatsAppModule: ApiModule = {
   name: "whatsapp",
@@ -58,14 +60,14 @@ export const whatsAppModule: ApiModule = {
           });
         });
         if (whatsappConversation && config.outbound) {
-          const directory = createGlpiClient(whatsappConversation.glpi);
+          const glpi = createGlpiClient(whatsappConversation.glpi);
           const sendCode = createVerificationMailer(
             whatsappConversation.identity.smtp,
           );
           const identity = createIdentityVerification(
             createPostgresIdentityRepository(store),
             whatsappConversation.identity,
-            (email) => directory.findActiveUserByEmail(email),
+            (email) => glpi.findActiveUserByEmail(email),
             async (recipient, code) => {
               try {
                 await sendCode(recipient, code);
@@ -76,17 +78,24 @@ export const whatsAppModule: ApiModule = {
               }
             },
           );
+          const conversationOptions = {
+            businessPhoneId: config.phoneNumberId,
+            supportContact: whatsappConversation.supportContact,
+          };
           registerWhatsAppDispatchWorker(
             app,
-            createConversationProcessor(
-              store,
-              {
-                businessPhoneId: config.phoneNumberId,
-                supportContact: whatsappConversation.supportContact,
-              },
-              identity,
-            ),
+            createConversationProcessor(store, conversationOptions, identity),
             "whatsapp_conversation_unavailable",
+          );
+          registerWhatsAppDispatchWorker(
+            app,
+            createTicketSubmissionWorker(
+              store,
+              conversationOptions,
+              glpi,
+              createWhatsAppMediaReader(config.phoneNumberId, config.outbound),
+            ),
+            "whatsapp_ticket_submission_unavailable",
           );
         }
         if (config.outbound) {

@@ -1,12 +1,129 @@
 [
   {
+    "id": "repository/docs/project-derivation",
+    "title": "Start and Upgrade a Project from Orion",
+    "group": "Project guides",
+    "kind": "repository",
+    "heading": "Remote rules",
+    "anchor": "remote-rules",
+    "text": "Remote rules\nGit remotes are local configuration, so other clones of the project do not receive `orion-upstream`. Configure it in any clone with:\npnpm orion:upstream\ngit fetch orion-upstream\n\nRemote\nRule\nEnforced by\n`origin`\nMust not identify the Orion foundation through its fetch or push URL, so product work never has the foundation as its normal push target. It need not equal the project's `repository.url`: contributors may work through a fork or mirror.\n`pnpm orion:upstream` refuses; `pnpm orion:check` fails\n`orion-upstream`, when present\nIts fetch URL must identify the foundation repository recorded in the manifest.\n`pnpm orion:upstream` refuses; `pnpm orion:check` fails\n`orion-upstream`, when present\nIts only push URL must be the disabled `orion-upstream-is-fetch-only`.\n`pnpm orion:check` fails and directs you to rerun `pnpm orion:upstream`\n`orion-upstream`, when absent\nValid; a normal clone has no foundation remote until a developer configures it.\n—\nLocal branches\nNo local branch may track `orion-upstream`; an argument-free `git pull` would otherwise merge foundation changes outside a reviewed upgrade.\n`pnpm orion:check` fails and directs you to rerun `pnpm orion:upstream`\n`pnpm orion:upstream` adds `orion-upstream` from the manifest when absent, replaces every push URL of it with the disabled one, disables its tags, and removes upstream tracking of it from every local branch. It is safe to rerun.\nRepository identities compare as normalized HTTPS URLs, so HTTPS, SSH, and scp-like forms of the same repository match. Host names are case-insensitive, but repository path case is significant because self-hosted servers may treat `acme/Ledger` and `acme/ledger` as different repositories: accepting a URL as a given repository, as for `orion-upstream` or the `origin` checked before initialization, requires the exact path. Refusing a URL because it could reach the foundation, as for `origin` or a new project's repository, ignores path case, because hosts such as GitHub resolve differently cased paths to the same repository. An explicit non-default HTTPS port is part of the identity: `https://git.example.com:8443/acme/ledger` differs from `https://git.example.com/acme/ledger`, while `:443` is the same endpoint as no port. A non-default SSH port only selects the SSH transport and does not identify the HTTPS endpoint, so such a URL is refused as a project repository and never matches the foundation; supply the repository's HTTPS URL instead.\n"
+  },
+  {
+    "id": "repository/docs/project-derivation",
+    "title": "Start and Upgrade a Project from Orion",
+    "group": "Project guides",
+    "kind": "repository",
+    "heading": "Upgrade to a newer Orion revision",
+    "anchor": "upgrade-to-a-newer-orion-revision",
+    "text": "Upgrade to a newer Orion revision\nAn upgrade is a normal reviewable engineering change on a branch. Nothing is applied automatically, and semantic conflicts are resolved by people or agents under review. Tags help humans choose a known release point but do not change this workflow. Ordinary conflicts in project-modified shared files do not by themselves indicate a MAJOR Orion release.\nRun `git fetch orion-upstream` and `pnpm orion:status`. Review upstream changes with `git log --oneline <baseline>..orion-upstream/main` and `git diff <baseline> orion-upstream/main`, including ADRs, policies, migrations, tooling, and `.orion/derivation.json`.\nChoose the candidate commit; it must be on `orion-upstream/main`. Create a branch, for example `git switch -c codex/orion-upgrade/<short-commit>`, and run `git merge --no-ff --no-commit <commit>` so even a conflict-free merge remains available for inspection and regeneration before committing.\nResolve conflicts in `.orion/project.json`, `.orion/derivation.json`, the release registry, and `package.json` first if they prevent the command from loading. Run `pnpm orion:prune` while other merge conflicts remain. It deletes foundation-only paths the merge changed or added (resolving their modify/delete conflicts), renames foundation package-scope references in resolved shared files, and stages those changes. It leaves unresolved shared files and project-owned files untouched, reports the unresolved paths, and refuses to delete a recorded durable migration or follow linked paths outside the checkout. Resolve and stage reported conflicts, then rerun it.\nResolve remaining conflicts according to [content ownership](#content-ownership): keep the project's version of project-owned files and merge shared files. Git may also change project-owned files automatically without a conflict: inspect every `projectFiles` path in `.orion/derivation.json`, restore existing project-owned files from the pre-merge project commit (for example `git restore --source=<project-commit> --staged --worktree -- README.md`), and deliberately port any needed upstream facts. Do not blindly restore paths absent from that commit; new composition seams in a schema version 1 migration need product behavior ported into them. Never hand-merge generated output: run the generators from step 5, then stage their results (for example `git add -A apps/web/src/generated docs/generated packages/sdk/src/generated`), which resolves conflicts in generated files, including ones the project's output no longer contains. Rerun `pnpm orion:prune` until it reports no unresolved files. Review semantic interactions with product code even where Git reports no conflict.\nRun `pnpm install --frozen-lockfile`, `pnpm db:generate`, `pnpm -C apps/api references:write`, `pnpm -C packages/sdk generate`, `pnpm docs:references:write`, and `pnpm validate`. Commit the merge.\nRun `pnpm orion:record-baseline <commit>`. It refuses unless the worktree is clean and `orion-upstream` exists and satisfies the [remote rules](#remote-rules). It then fetches `main` from that verified foundation, so refs fetched earlier from another repository cannot vouch for the commit. Finally it requires the commit to be on `orion-upstream/main`, descend from the recorded baseline, and already be an ancestor of `HEAD`. Commit the manifest change, rerun `pnpm validate`, and open the pull request against the project's `main`.\nMerge the pull request with a merge commit. Squash or rebase merges discard Orion's commit identities, and `pnpm orion:check` then fails because the recorded baseline is not an ancestor of `HEAD`. The project repository must therefore keep merge commits enabled (project human action PH-02). This applies only to Orion upgrade pull requests.\nIf the project's default branch requires pull requests, as PH-02 establishes, the merge and baseline update reach `main` together through that pull request. Record the upgrade and any project-specific follow-up in the project plan.\n"
+  },
+  {
+    "id": "repository/docs/project-derivation",
+    "title": "Start and Upgrade a Project from Orion",
+    "group": "Project guides",
+    "kind": "repository",
+    "heading": "Migrate a project from schema version 1",
+    "anchor": "migrate-a-project-from-schema-version-1",
+    "text": "Migrate a project from schema version 1\nProjects initialized before the clean-baseline contract have a schema version 1 manifest with `referenceImplementations`, Orion's plan, human actions, and acceptance report, and usually the Approval Request implementation and `@orion/*` packages. After merging an Orion revision that contains this contract, `pnpm orion:check` refuses the old manifest. Migrate in the upgrade branch:\nIf the project adopted Approval Request as product behavior, move its code, schema, metadata, grants, and tests out of the foundation-only paths first (for example to `src/features/<product-module>/` and matching paths under the module's own name). Preserve every released migration at its original path and remove that path from the project's `foundationOnly` list in `.orion/derivation.json`; never rename or delete it. Verify uncertain release status under [migration policy](database/migrations.md) before classifying a migration as removable. Only genuinely unreleased reference migrations may be removed or renamed. `orion:prune` refuses removal of recorded durable migrations.\nEdit `.orion/project.json`: set `schemaVersion` to `2`, remove `referenceImplementations`, and add `\"packageScope\": \"@<scope>\"`.\nRun `pnpm orion:prune` to remove foundation-only paths and rename package-scope references.\nReplace the project-owned files that still carry Orion's content: render `README.md`, `apps/api/src/modules.ts`, `apps/web/src/modules.tsx`, and the brand assets from the [templates](../.orion/derivation.json) (substituting each `{{PLACEHOLDER}}`), keeping existing project-specific text. Keep `docs/project/`; remove its references to Orion's plan, human actions, acceptance report, and reference implementation, and port the maintenance rules from the plan and human-action templates.\nRegenerate as in [upgrade step 5](#upgrade-to-a-newer-orion-revision), run `pnpm validate`, and continue with baseline recording.\n"
+  },
+  {
+    "id": "repository/docs/project-derivation",
+    "title": "Start and Upgrade a Project from Orion",
+    "group": "Project guides",
+    "kind": "repository",
+    "heading": "Contributing improvements back to Orion",
+    "anchor": "contributing-improvements-back-to-orion",
+    "text": "Contributing improvements back to Orion\nProduct work never goes to `orion-upstream`; its push URL is disabled. To improve the foundation itself, make the change in a separate clone of Orion and submit it there under Orion's own review, then adopt it in projects through the upgrade workflow. Do not move product code, requirements, or history into Orion. In Orion, keep new shared content independent of foundation-only content; extend `.orion/derivation.json` when adding foundation-only or project-owned files.\n"
+  },
+  {
+    "id": "repository/docs/project-derivation",
+    "title": "Start and Upgrade a Project from Orion",
+    "group": "Project guides",
+    "kind": "repository",
+    "heading": "Limits",
+    "anchor": "limits",
+    "text": "Limits\nProvenance proves which Orion commits are ancestors of the project; it does not prove that the project still follows every inherited policy. Validation and review remain the enforcement.\n`pnpm orion:check` can verify that the recorded baseline is integrated, but only `pnpm orion:status` with a fetched upstream can report newer integrated commits that were not yet recorded.\nUpgrades that change foundation-only or project-owned files conflict in projects; projects that diverge heavily from shared files should expect more conflicts there.\nThe isolation check matches links, imports, path names, and listed terms; it cannot judge whether shared prose implicitly assumes the reference implementation. Review remains necessary.\nThe immutable Git commit remains the exact foundation revision and provenance identity. [Foundation versioning](versioning.md) assigns human-readable tags only to deliberate stable release points; commits between tags remain usable by SHA.\n"
+  },
+  {
+    "id": "repository/docs/project/human-actions",
+    "title": "MNS Suporte Human Actions",
+    "group": "Project guides",
+    "kind": "repository",
+    "heading": "MNS Suporte Human Actions",
+    "anchor": "mns-suporte-human-actions",
+    "text": "MNS Suporte Human Actions\n[Implementation plan](implementation-plan.md) · [Secrets policy](../security/secrets-management.md)\nThe entries below cover access held outside this workspace. Implementation, technical decisions, GitHub configuration and generating application-owned secrets are tracked in the implementation plan. Supply externally issued credentials in the designated secret store or ignored local configuration.\n"
+  },
+  {
+    "id": "repository/docs/project/human-actions",
+    "title": "MNS Suporte Human Actions",
+    "group": "Project guides",
+    "kind": "repository",
+    "heading": "PH-07",
+    "anchor": "ph-07",
+    "text": "PH-07\n[ ] **Authorize access to the MNS Meta Business account and support number.**\n**Status** Pending for live testing and cutover. **Owner** MNS Meta Business account administrator.\nThe Meta MCP can access the supplied pilot sender. On 2026-11-25, Meta accepted one direct test message through that connection. The sender account subscription was present, and callback setup and app publishing remained pending in the onboarding check. The pilot runtime still needs a scoped service token in its secret store and access to the Meta app secret. The Meta business administrator can grant access to the relevant app and assets or provision those credentials where only they have permission. If the live sender belongs to a separate portfolio, grant equivalent access there. Verify the service with a signed incoming webhook, an observed reply and the approved closure template. Affects PJ-15, PJ-17 and PJ-18.\n"
+  },
+  {
+    "id": "repository/docs/project/human-actions",
+    "title": "MNS Suporte Human Actions",
+    "group": "Project guides",
+    "kind": "repository",
+    "heading": "PH-08",
+    "anchor": "ph-08",
+    "text": "PH-08\n[ ] **Grant scoped access to the company GLPI environments.**\n**Status** Pending for live testing and cutover. **Owner** MNS GLPI administrator.\nThe workspace has only the legacy integration copy. Issue a dedicated test service credential with directory lookup, ticket creation and read access for the pilot, and permission to create and verify ticket attachments. Grant equivalent restricted production access for deployment. Supply the endpoint and credential securely. Verify by creating, consulting and attaching media to a synthetic ticket in test GLPI. This access affects the live pilot and cutover under PJ-17 and PJ-18.\n"
+  },
+  {
+    "id": "repository/docs/project/human-actions",
+    "title": "MNS Suporte Human Actions",
+    "group": "Project guides",
+    "kind": "repository",
+    "heading": "PH-09",
+    "anchor": "ph-09",
+    "text": "PH-09\n[ ] **Authorize an approved corporate mail sender.**\n**Status** Pending for live testing. **Owner** MNS mail administrator.\nGrant relay access or provide a service credential and verified From address for employee verification email. The workspace has no delegated corporate mail service. Verify delivery of a synthetic challenge to an approved test mailbox. Local employee verification has a synthetic transport. The real relay is required for the external pilot under PJ-17.\n"
+  },
+  {
+    "id": "repository/docs/project/human-actions",
+    "title": "MNS Suporte Human Actions",
+    "group": "Project guides",
+    "kind": "repository",
+    "heading": "PH-10",
+    "anchor": "ph-10",
+    "text": "PH-10\n[ ] **Grant access to the company hosting and ingress.**\n**Status** Pending for external pilot and cutover. **Owner** MNS infrastructure administrator.\nGrant deployment access and permissions for a company HTTPS endpoint, database and secret storage. The local Docker environment supports development and verification. The external webhook and production deployment require access to company infrastructure. Verify reachability over TLS, restricted database access and backup restore before moving the corporate number. Affects PJ-16 and PJ-18.\n"
+  },
+  {
+    "id": "repository/docs/project/human-actions",
+    "title": "MNS Suporte Human Actions",
+    "group": "Project guides",
+    "kind": "repository",
+    "heading": "PH-11",
+    "anchor": "ph-11",
+    "text": "PH-11\n[ ] **Grant GitHub plan eligibility for branch protection on the private repository.**\n**Status** Blocked. **Owner** GitHub account or organization administrator.\nOn 2026-11-25, GitHub returned HTTP 403 for branch protection and rulesets on the private project and required a plan that supports those controls. Keep the repository private. Use an eligible organization or grant the existing owner the required plan when available. Verify by requiring the `Orion required gate` check through GitHub CLI and reading back the effective rule. CI and the pull-request workflow are available under the current plan. Affects PJ-01.\n"
+  },
+  {
+    "id": "repository/docs/project/implementation-plan",
+    "title": "MNS Suporte Implementation Plan",
+    "group": "Project guides",
+    "kind": "repository",
+    "heading": "MNS Suporte Implementation Plan",
+    "anchor": "mns-suporte-implementation-plan",
+    "text": "MNS Suporte Implementation Plan\n[Product scope](product-scope.md) · [Human actions](human-actions.md) · [Validation](../validation.md)\nMNS Suporte was initialized from Orion on 2026-11-25. The [manifest](../../.orion/project.json) records its foundation ancestry.\n"
+  },
+  {
+    "id": "repository/docs/project/implementation-plan",
+    "title": "MNS Suporte Implementation Plan",
+    "group": "Project guides",
+    "kind": "repository",
+    "heading": "Tracking",
+    "anchor": "tracking",
+    "text": "Tracking\nThe V1 denominator is the number of rows in [V1 work](#v1-work). Count a row as complete only after its acceptance criteria pass with recorded evidence. Report completed, in-progress, pending, and blocked counts on each handoff. Project decisions stay in the product scope or relevant ADR. Access that requires a human stays in the [human-action checklist](human-actions.md). Preserve task IDs and record scope changes here.\n"
+  },
+  {
     "id": "repository/docs/project/implementation-plan",
     "title": "MNS Suporte Implementation Plan",
     "group": "Project guides",
     "kind": "repository",
     "heading": "V1 work",
     "anchor": "v1-work",
-    "text": "V1 work\nTask\nDeliverable and acceptance\nStatus\nEvidence or dependency\nPJ-01\nEstablish a private GitHub repository. Verify the initial default branch, security settings and enforced CI gate.\nblocked\nPrivate repository and vulnerability alerts verified. [Initial CI passed](https://github.com/GabriellMDias/mns-suporte/actions/runs/45622724328). Required branch protection depends on [PH-11](human-actions.md#ph-11).\nPJ-02\nRecord actors, scope, data ownership, first-release acceptance and the future AI boundary.\ncompleted\n[Approved scope and acceptance](product-scope.md).\nPJ-06\nImplement Meta callback verification and signed webhook ingestion. Verify the challenge, exact-byte HMAC, incoming identity fields and recipient scope with synthetic requests.\ncompleted\n[Webhook tests](../../apps/api/test/whatsapp/webhook.test.ts) passed. The [API guide](../../apps/api/README.md#whatsapp-webhook) documents configuration.\nPJ-07\nPersist incoming messages before acknowledgement and deduplicate replays, including concurrent delivery, using the restricted database role.\ncompleted\n[Webhook integration tests](../../apps/api/test/whatsapp/webhook.test.ts) verified concurrent replays, PostgreSQL grants and failure acknowledgement.\nPJ-08\nImplement the Meta outbound adapter and durable sends. Test text and interactive replies, safe retries and delivery status handling.\ncompleted\n[Adapter](../../apps/api/test/whatsapp/graph-client.test.ts), [outbox and delivery](../../apps/api/test/whatsapp/outbox.test.ts), and [worker lifecycle](../../apps/api/test/whatsapp/dispatch-worker.test.ts) verified with a synthetic Meta transport and migrated PostgreSQL. Live pilot remains under PJ-17.\nPJ-09\nImplement the GLPI adapter and exact directory lookup. Test scoped credentials, timeouts, session renewal and explicit outcomes for mutations.\ncompleted\n[Seven contract and transport tests](../../apps/api/test/glpi/client.test.ts) passed. Company GLPI testing remains under [PH-08](human-actions.md#ph-08) and PJ-17.\nPJ-10\nVerify and persist employee identity with short-lived, rate-limited email challenges. Test invalid, replayed and expired codes, and access isolation between employees.\ncompleted\n[Identity integration](../../apps/api/test/whatsapp/identity.test.ts) and [SMTP TLS checks](../../apps/api/test/whatsapp/verification-mail.test.ts) passed. PJ-11 connects these operations to the signed conversation. The live relay remains under [PH-09](human-actions.md#ph-09) and PJ-17.\nPJ-11\nImplement the menu, guided intake, resumable drafts, confirmation, editing, cancel and the direct path to IT. Test ordinary navigation and restart recovery.\ncompleted\n[Signed conversation integration](../../apps/api/test/whatsapp/conversation.test.ts) covers runtime wiring, code recovery, draft restart, stale review buttons and sender isolation. Submission and listing remain under PJ-13 and PJ-14.\nPJ-12\nProvide approved static troubleshooting with a direct path to open a ticket. Record whether it helped.\ncompleted\n[Guidance tests](../../apps/api/test/whatsapp/troubleshooting.test.ts) cover selection, resolution and bypass. The [conversation integration](../../apps/api/test/whatsapp/conversation.test.ts) verifies restart and durable feedback for signed input.\nPJ-13\nCreate GLPI tickets with attachments and confirmed summaries. Test duplicates, ambiguous creation outcomes and recoverable attachment failures.\npending\nDepends on PJ-09 and PJ-11.\nPJ-14\nList the employee's open GLPI tickets and show authorized ticket details. Test ownership before disclosure and preserve existing ticket access through verified identity.\npending\nDepends on PJ-09 and PJ-10.\nPJ-15\nNotify on closure, capture permission to receive updates and use the approved utility template when required. Verify retries and delivery tracking.\npending\nDepends on PJ-08, PJ-13 and PJ-14. Live template under [PH-07](human-actions.md#ph-07).\nPJ-16\nPackage and document operation with a container, production configuration, restricted database access, retention, backup and restore, sanitized diagnostics, alerts and recovery procedures. Verify local deployment and rollback rehearsal.\npending\nStarts after stable local flows. Company ingress and deployment access under [PH-10](human-actions.md#ph-10).\nPJ-19\nTriage GitHub dependency alerts and upgrade affected dependencies or document verified non-applicability. Revalidate the lockfile and runtime boundaries before the pilot.\npending\nGitHub reported eight alerts on the inherited baseline on 2026-11-25, four high and four moderate. [Dependabot alerts](https://github.com/GabriellMDias/mns-suporte/security/dependabot).\nPJ-17\nRun the release acceptance suite against disposable infrastructure, then run a pilot with the test Meta number, company test GLPI and mail relay. Verify real end-to-end delivery and failure recovery.\npending\nDepends on PJ-08 through PJ-16, PJ-19 and external test access.\nPJ-18\nReconcile active legacy notifications and onboard verified employees. Deploy, verify smoke checks and supervise the switch to the corporate support number.\npending\nDepends on PJ-17. Production access and the support number under [PH-07](human-actions.md#ph-07), [PH-08](human-actions.md#ph-08) and [PH-10](human-actions.md#ph-10).\n"
+    "text": "V1 work\nTask\nDeliverable and acceptance\nStatus\nEvidence or dependency\nPJ-01\nEstablish a private GitHub repository. Verify the initial default branch, security settings and enforced CI gate.\nblocked\nPrivate repository and vulnerability alerts verified. [Initial CI passed](https://github.com/GabriellMDias/mns-suporte/actions/runs/45622724328). Required branch protection depends on [PH-11](human-actions.md#ph-11).\nPJ-02\nRecord actors, scope, data ownership, first-release acceptance and the future AI boundary.\ncompleted\n[Approved scope and acceptance](product-scope.md).\nPJ-06\nImplement Meta callback verification and signed webhook ingestion. Verify the challenge, exact-byte HMAC, incoming identity fields and recipient scope with synthetic requests.\ncompleted\n[Webhook tests](../../apps/api/test/whatsapp/webhook.test.ts) passed. The [API guide](../../apps/api/README.md#whatsapp-webhook) documents configuration.\nPJ-07\nPersist incoming messages before acknowledgement and deduplicate replays, including concurrent delivery, using the restricted database role.\ncompleted\n[Webhook integration tests](../../apps/api/test/whatsapp/webhook.test.ts) verified concurrent replays, PostgreSQL grants and failure acknowledgement.\nPJ-08\nImplement the Meta outbound adapter and durable sends. Test text and interactive replies, safe retries and delivery status handling.\ncompleted\n[Adapter](../../apps/api/test/whatsapp/graph-client.test.ts), [outbox and delivery](../../apps/api/test/whatsapp/outbox.test.ts), and [worker lifecycle](../../apps/api/test/whatsapp/dispatch-worker.test.ts) verified with a synthetic Meta transport and migrated PostgreSQL. Live pilot remains under PJ-17.\nPJ-09\nImplement the GLPI adapter and exact directory lookup. Test scoped credentials, timeouts, session renewal and explicit outcomes for mutations.\ncompleted\n[Seven contract and transport tests](../../apps/api/test/glpi/client.test.ts) passed. Company GLPI testing remains under [PH-08](human-actions.md#ph-08) and PJ-17.\nPJ-10\nVerify and persist employee identity with short-lived, rate-limited email challenges. Test invalid, replayed and expired codes, and access isolation between employees.\ncompleted\n[Identity integration](../../apps/api/test/whatsapp/identity.test.ts) and [SMTP TLS checks](../../apps/api/test/whatsapp/verification-mail.test.ts) passed. PJ-11 connects these operations to the signed conversation. The live relay remains under [PH-09](human-actions.md#ph-09) and PJ-17.\nPJ-11\nImplement the menu, guided intake, resumable drafts, confirmation, editing, cancel and the direct path to IT. Test ordinary navigation and restart recovery.\ncompleted\n[Signed conversation integration](../../apps/api/test/whatsapp/conversation.test.ts) covers runtime wiring, code recovery, draft restart, stale review buttons and sender isolation. Submission and listing remain under PJ-13 and PJ-14.\nPJ-12\nProvide approved static troubleshooting with a direct path to open a ticket. Record whether it helped.\ncompleted\n[Guidance tests](../../apps/api/test/whatsapp/troubleshooting.test.ts) cover selection, resolution and bypass. The [conversation integration](../../apps/api/test/whatsapp/conversation.test.ts) verifies restart and durable feedback for signed input.\nPJ-13\nCreate GLPI tickets with attachments and confirmed summaries. Test duplicates, ambiguous creation outcomes and recoverable attachment failures.\ncompleted\n[Signed conversation integration](../../apps/api/test/whatsapp/conversation.test.ts) covers confirmed fields and media upload with provider fixtures. [Worker recovery tests](../../apps/api/test/whatsapp/ticket-submission.test.ts) cover concurrent claims, ambiguous creation and attachment recovery. Live acceptance remains under PJ-17.\nPJ-14\nList the employee's open GLPI tickets and show authorized ticket details. Test ownership before disclosure and preserve existing ticket access through verified identity.\npending\nDepends on PJ-09 and PJ-10.\nPJ-15\nNotify on closure, capture permission to receive updates and use the approved utility template when required. Verify retries and delivery tracking.\npending\nDepends on PJ-08, PJ-13 and PJ-14. Live template under [PH-07](human-actions.md#ph-07).\nPJ-16\nPackage and document operation with a container, production configuration, restricted database access, retention, backup and restore, sanitized diagnostics, alerts and recovery procedures. Verify local deployment and rollback rehearsal.\npending\nStarts after stable local flows. Company ingress and deployment access under [PH-10](human-actions.md#ph-10).\nPJ-19\nTriage GitHub dependency alerts and upgrade affected dependencies or document verified non-applicability. Revalidate the lockfile and runtime boundaries before the pilot.\npending\nGitHub reported eight alerts on the inherited baseline on 2026-11-25, four high and four moderate. [Dependabot alerts](https://github.com/GabriellMDias/mns-suporte/security/dependabot).\nPJ-17\nRun the release acceptance suite against disposable infrastructure, then run a pilot with the test Meta number, company test GLPI and mail relay. Verify real end-to-end delivery and failure recovery.\npending\nDepends on PJ-08 through PJ-16, PJ-19 and external test access.\nPJ-18\nReconcile active legacy notifications and onboard verified employees. Deploy, verify smoke checks and supervise the switch to the corporate support number.\npending\nDepends on PJ-17. Production access and the support number under [PH-07](human-actions.md#ph-07), [PH-08](human-actions.md#ph-08) and [PH-10](human-actions.md#ph-10).\n"
   },
   {
     "id": "repository/docs/project/implementation-plan",
@@ -718,194 +835,5 @@
     "heading": "Diagnosis and command safety",
     "anchor": "diagnosis-and-command-safety",
     "text": "Diagnosis and command safety\nPrefer low-risk observability before invasive production access: metrics, alerts, logs, traces, error reports, safe read-only inspection, then privileged diagnostics where appropriate. Avoid premature mutation while the failure is poorly understood unless active harm requires immediate containment.\nCommands must be specific, bounded, copyable, and current when tooling exists. Do not invent provider-specific commands or placeholders and present them as executable procedure. Describe expected output and its meaning; include explicit branches when actions depend on evidence. Keep decision trees simple enough to use under pressure.\nPrefer read-only, timeout-limited, bounded database queries, using known indexes where applicable. Explain production impact. Avoid embedding secrets in commands, shell history, process arguments, or documentation. Use credential references and secret-management procedures. Do not reuse service credentials or shared administrator accounts to bypass access policy.\nMark destructive, irreversible, and high-risk actions before execution with the concrete affected scope and consequences, not a generic warning. Verify authorization, scope, reversibility, and the verification method, and use the appropriate approval mechanism. A runbook is guidance, not unconditional permission or additional delegated capability.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/authoring",
-    "title": "Authoring and Using Runbooks",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "Mitigation, recovery, and verification",
-    "anchor": "mitigation-recovery-and-verification",
-    "text": "Mitigation, recovery, and verification\nMitigation reduces impact without necessarily correcting the cause. Explain what each important mitigation restores, disables, or puts at risk. Mark temporary measures and their follow-up/removal needs. Recovery restores safe normal operation; verify its prerequisites and restore progressively where risk warrants it.\nEvery state-changing procedure should define outcome verification. Command success or a cleared alert alone is not proof. Use relevant health, error-rate, latency, progress, data-integrity, or credential-revocation evidence. Where needed, prove that the previous unsafe behavior is no longer possible. Specify post-recovery observation signals and justified observation periods rather than arbitrary delays.\nDocument rollback only when real and safe; identify compatibility prerequisites. If rollback is unsafe or impossible, state that and provide the forward-recovery direction. Explicitly identify irreversible actions before execution.\nStop when evidence no longer matches the procedure, preconditions or required access cannot be verified, scope exceeds documented bounds, destructive effects are unknown, recovery fails, or corruption/security compromise is suspected. Preserve useful evidence and escalate rather than improvising outside the known safe scope. Identify actual escalation targets when organizational structure exists.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/authoring",
-    "title": "Authoring and Using Runbooks",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "Integration with policy and operational evidence",
-    "anchor": "integration-with-policy-and-operational-evidence",
-    "text": "Integration with policy and operational evidence\n[Production access](../security/production-access.md) governs least privilege, authorization, elevated roles, and break-glass. Break-glass is for genuine emergencies where normal access is unavailable or insufficient, not a default first step.\n[Incident response](../security/incident-response.md) governs incident declaration, severity, communication, recovery evidence, and follow-up. Incident urgency does not expand an agent's authority.\n[Observability](../reliability/observability.md) and [health checks](../reliability/health-checks.md) govern investigation signals. Reference stable events, fields, metrics, operations, error codes, and relevant spans rather than fragile message strings or vague “check logs” instructions.\n[Alerting](../reliability/alerting.md) connects alerts to runbooks; reference the canonical alert name where possible. Add real provider queries and links only when the tooling exists.\n[Data classification](../security/data-classification.md), [redaction](../security/telemetry-redaction.md), [secrets](../security/secrets-management.md), and [retention](../security/data-retention.md) govern sensitive outputs. Temporary exports need a storage location, access scope, retention, and deletion method.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/authoring",
-    "title": "Authoring and Using Runbooks",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "State-changing and long-running operations",
-    "anchor": "state-changing-and-long-running-operations",
-    "text": "State-changing and long-running operations\nData repair must identify the invariant, affected scope, desired canonical state, repair, verification, and recovery. Prefer reviewed repository-controlled scripts over inline copies of complex code. Identify the relevant script revision/release when version-sensitive. Use dry runs before destructive execution where valuable and explain preview results.\nState whether an operation is safe to repeat. Resolve unknown outcomes by inspecting actual state before retrying. For batch or long-running operations, document batch size, progress, monitoring, failure handling, safe pause, and resume behavior where supported. Say explicitly when concurrent execution is unsafe; tooling should eventually enforce that restriction where practical.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/authoring",
-    "title": "Authoring and Using Runbooks",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "Exercise, maintenance, and automation",
-    "anchor": "exercise-maintenance-and-automation",
-    "text": "Exercise, maintenance, and automation\nImportant procedures should eventually be exercised through controlled staging, synthetic failures, tabletop exercises, restore tests, or game days. Do not test destructive instructions against real production data merely to prove documentation works. Backups require real restore tests; successful backup creation alone is insufficient. Exercise credential rotation before an emergency where possible.\nReview after architecture, tooling, permissions, dependencies, or incident evidence changes. After significant use, assess accuracy, missing steps, confusion, and opportunities for automation. Treat drift as an operational defect. Calendar review can be added when operational maturity justifies it.\nRepeated deterministic procedures are candidates for scripts, purpose-built tools, and safe automatic recovery. Runbooks can remain orchestration and verification guides. Where safe self-healing exists, alert on failed recovery or recurring instability rather than keeping humans as the primary mechanism.\n`pnpm docs:check` already checks local links, headings, and reachability. Runbook ownership, command applicability, safety, and recovery semantics still require review. Future focused checks may cover metadata, known command wrappers, scripts, or supported arguments; avoid rigid parsing that makes simple procedures difficult to maintain. Runbook files remain canonical if an index is later generated.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/authoring",
-    "title": "Authoring and Using Runbooks",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "Creation and follow-up",
-    "anchor": "creation-and-follow-up",
-    "text": "Creation and follow-up\nConfirm a real repeatable condition, copy the template, identify ownership/access, write triggers and preconditions, then diagnosis, action, verification, recovery, warnings, and escalation. Review security and operational safety and exercise the procedure where practical.\nAfter recovery, consider permanent correction, regression tests, alert/observability changes, automation, revised warnings or verification, a runbook update, an ADR, and post-incident review based on observed evidence. Incident tooling, provider queries, command wrappers, metadata format, index generation, and review cadence remain dependent on actual operational needs and tooling.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/README",
-    "title": "Runbooks",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "Runbooks",
-    "anchor": "runbooks",
-    "text": "Runbooks\nNo operational runbooks exist yet. This directory contains the [authoring policy](authoring.md), [template](template.md), and [local instructions](AGENTS.md). Add index entries only for real procedures when the corresponding runtime and operational tooling exist.\nExisting contributor procedures have narrower owners: [local setup](../setup.md), [validation](../validation.md), and [database release/evolution](../database/release-evolution.md). No production environment is selected; authoring guidance does not activate deployment-specific work.\nRunbooks describe current repeatable operations, not hypothetical systems or historical incident narratives. A procedure does not grant authority: [production access](../security/production-access.md) and [incident response](../security/incident-response.md) continue to apply.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/README",
-    "title": "Runbooks",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "Create a procedure",
-    "anchor": "create-a-procedure",
-    "text": "Create a procedure\nRead the [authoring policy](authoring.md#creation-and-follow-up), choose one real condition, and copy the template. Identify ownership, triggers, required access, verifiable preconditions, bounded diagnosis/actions, recovery verification, and stop/escalation conditions. Do not invent provider commands.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/README",
-    "title": "Runbooks",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "Find related policy",
-    "anchor": "find-related-policy",
-    "text": "Find related policy\n[Health checks](../reliability/health-checks.md) and [observability](../reliability/observability.md) for diagnostic evidence.\n[Alerting](../reliability/alerting.md) for actionable signals and runbook references.\n[Secrets](../security/secrets-management.md), [classification](../security/data-classification.md), and [retention](../security/data-retention.md) for safe handling of credentials, evidence, and temporary exports.\n[Documentation task index](../README.md) for other current policies.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/template",
-    "title": "Runbook: Procedure Title",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "Runbook: Procedure Title",
-    "anchor": "runbook-procedure-title",
-    "text": "Runbook: Procedure Title\n**Owner:** actual responsible owner\n**Status:** active only after the procedure exists and is verified\n**Environment / applicability:**\n**Related alerts:**\n**Required access:**\nFollow [authoring policy](authoring.md), [production access](../security/production-access.md), [incident response](../security/incident-response.md), and [redaction](../security/telemetry-redaction.md). Replace prompts with current, verified details; this template is not an executable procedure or an authorization grant.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/template",
-    "title": "Runbook: Procedure Title",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "Purpose",
-    "anchor": "purpose",
-    "text": "Purpose\nState the one operational condition or task handled by this procedure.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/template",
-    "title": "Runbook: Procedure Title",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "Trigger / Symptoms",
-    "anchor": "trigger--symptoms",
-    "text": "Trigger / Symptoms\nIdentify observable alerts, errors, or symptoms that activate the procedure, and cases where it must not be used.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/template",
-    "title": "Runbook: Procedure Title",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "Impact",
-    "anchor": "impact",
-    "text": "Impact\nDescribe affected capabilities, scope, urgency, and data/security risk, including any known limit on impact.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/template",
-    "title": "Runbook: Procedure Title",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "Preconditions",
-    "anchor": "preconditions",
-    "text": "Preconditions\nVerify the target environment and observed condition.\nVerify required access and authorization for the planned actions.\nVerify procedure-specific safety conditions and current state.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/template",
-    "title": "Runbook: Procedure Title",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "Diagnosis",
-    "anchor": "diagnosis",
-    "text": "Diagnosis\nOrder low-risk inspection before mutation: relevant metrics, alerts, logs, traces, errors, and bounded read-only checks. Establish affected scope and whether deployment, migration, configuration, or dependency changes contributed. Include expected results and evidence-based branches. Add provider commands only when tooling exists; continue only while evidence matches the procedure.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/template",
-    "title": "Runbook: Procedure Title",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "Mitigation / Procedure",
-    "anchor": "mitigation--procedure",
-    "text": "Mitigation / Procedure\nWrite ordered, bounded, copyable actions with consequences, expected output, decision points, and temporary-measure removal needs. Before a destructive, irreversible, or high-risk action, explain the exact affected scope and consequences. Stop when observed state differs from the documented scope.\nState whether actions are safe to repeat and how to inspect an unknown outcome before retrying. For long-running work, specify supported batch size, progress, monitoring, pause/resume, failure recovery, and concurrent-execution limits.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/template",
-    "title": "Runbook: Procedure Title",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "Verification",
-    "anchor": "verification",
-    "text": "Verification\nProve the intended service, security, or data state through relevant health, errors, latency, progress, integrity, authorization, revocation, or application behavior. A successful command or cleared alert alone is insufficient. Name any justified post-recovery observation period and signals.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/template",
-    "title": "Runbook: Procedure Title",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "Rollback / Recovery",
-    "anchor": "rollback--recovery",
-    "text": "Rollback / Recovery\nDescribe safe reversal and its compatibility prerequisites, or the actual forward-recovery path when rollback is unsafe/impossible. Identify irreversible effects. Remove this section only when it does not apply.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/template",
-    "title": "Runbook: Procedure Title",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "Escalation",
-    "anchor": "escalation",
-    "text": "Escalation\nStop when evidence does not match, scope exceeds bounds, access/preconditions cannot be verified, destructive impact is unknown, corruption/compromise is suspected, recovery fails, or postconditions cannot be verified. Preserve safe evidence and identify the real escalation owner when one exists.\n"
-  },
-  {
-    "id": "repository/docs/runbooks/template",
-    "title": "Runbook: Procedure Title",
-    "group": "Runbooks",
-    "kind": "repository",
-    "heading": "Follow-Up",
-    "anchor": "follow-up",
-    "text": "Follow-Up\nRecord needed permanent correction, regression tests, alert/observability changes, automation, temporary-measure removal, runbook update, ADR, or post-incident review. Give follow-up work an owner; keep incident history outside this current procedure.\n"
-  },
-  {
-    "id": "repository/docs/security/authentication",
-    "title": "Authentication",
-    "group": "Security",
-    "kind": "repository",
-    "heading": "Authentication",
-    "anchor": "authentication",
-    "text": "Authentication\nThis policy owns trusted identity, credential, and session requirements. [Authorization](authorization.md) owns permission decisions; [secrets management](secrets-management.md) owns credential lifecycle and [redaction](telemetry-redaction.md) owns telemetry handling. Start with the [task index](../README.md) for other concerns.\n"
-  },
-  {
-    "id": "repository/docs/security/authentication",
-    "title": "Authentication",
-    "group": "Security",
-    "kind": "repository",
-    "heading": "Current implementation and scope",
-    "anchor": "current-implementation-and-scope",
-    "text": "Current implementation and scope\nThe API verifies JWT bearer access tokens according to [ADR-0012](../adr/0012-verify-jwt-access-tokens-at-the-first-api-boundary.md) when token settings are configured. The shared [verifier](../../apps/api/src/authentication.ts) is the executable source for accepted claims and algorithms; it yields a principal ID and issuer scopes, and each module maps scopes to its own capabilities. The [API README](../../apps/api/README.md) describes configuration and the current token contract; the [web README](../../apps/web/README.md) describes the in-memory credential boundary.\nA concrete identity provider, login/recovery flows, persistent sessions, and authentication mechanisms for other applications have not been selected. Requirements below apply when those capabilities are introduced; they do not imply implementation. Do not reopen the accepted JWT decision by treating the first API's token format or verification library as undecided.\nThe current verifier rejects invalid credentials without disclosing token details. Key retrieval, malformed trusted JWKS data, and unexpected verifier failures raise a separate availability error; the API returns a safe 503 and records bounded diagnostics. This distinguishes an authentication infrastructure failure from a routine invalid token while still failing closed. Provider login, refresh, and revocation remain conditional on a provider decision recorded as a human action in the repository's human-action checklist (linked from the README's [Current state](../../README.md#current-state)).\n"
   }
 ]

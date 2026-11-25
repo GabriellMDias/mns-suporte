@@ -1,0 +1,105 @@
+{
+  "tables": {
+    "whatsapp_ticket_submissions": {
+      "owner": "WhatsApp ticket submission",
+      "classification": "RESTRICTED",
+      "description": "Durable work and outcome for one verified, confirmed WhatsApp draft submitted to GLPI.",
+      "lifecycle": "Starts when an employee confirms a draft. Confirmed ticket creation clears the work summary. Terminal results clear the active reply address and media references. Retain durable outcomes for reconciliation and deduplication under the project retention policy.",
+      "columns": {
+        "draft_id": {
+          "description": "Unique opaque identifier of the confirmed draft and GLPI reconciliation reference.",
+          "classification": "INTERNAL"
+        },
+        "business_phone_id": {
+          "description": "Meta business phone number ID owning the submission job.",
+          "classification": "INTERNAL"
+        },
+        "scope_key": {
+          "description": "Verified sender scope used to update the correct conversation.",
+          "classification": "RESTRICTED"
+        },
+        "requester_id": {
+          "description": "Verified GLPI requester chosen at confirmation.",
+          "classification": "RESTRICTED"
+        },
+        "recipient": {
+          "description": "WhatsApp address for the eventual response. Cleared at the terminal outcome.",
+          "classification": "RESTRICTED",
+          "nullMeaning": "The submission no longer needs its reply address."
+        },
+        "reply_expires_at": {
+          "description": "Deadline of the customer service window associated with confirmation.",
+          "classification": "INTERNAL"
+        },
+        "title": {
+          "description": "Ticket title derived from the confirmed category. Cleared after creation or terminal failure.",
+          "classification": "RESTRICTED",
+          "nullMeaning": "The title is no longer needed for creation."
+        },
+        "description": {
+          "description": "Confirmed ticket summary with its opaque reconciliation reference. Cleared after creation or terminal failure.",
+          "classification": "RESTRICTED",
+          "nullMeaning": "The summary is no longer needed for creation."
+        },
+        "media_ids": {
+          "description": "Ordered Meta media identifiers to resolve at delivery time. Cleared when processing ends.",
+          "classification": "RESTRICTED"
+        },
+        "attachment_count": {
+          "description": "Number of media references in the confirmed draft.",
+          "classification": "INTERNAL"
+        },
+        "next_attachment": {
+          "description": "Zero-based position of the next media reference to process.",
+          "classification": "INTERNAL"
+        },
+        "attached_count": {
+          "description": "Number of documents whose association to the ticket was confirmed.",
+          "classification": "INTERNAL"
+        },
+        "uncertain_attachments": {
+          "description": "Number of document writes whose association or outcome could not be confirmed.",
+          "classification": "INTERNAL"
+        },
+        "ticket_id": {
+          "description": "Authoritative GLPI ticket ID returned by successful creation.",
+          "classification": "RESTRICTED",
+          "nullMeaning": "GLPI has not confirmed a ticket for the draft."
+        },
+        "state": {
+          "description": "Current dispatch or terminal state for the confirmed draft.",
+          "classification": "INTERNAL"
+        },
+        "attempts": {
+          "description": "Number of worker claims for the current ticket or attachment step.",
+          "classification": "INTERNAL"
+        },
+        "available_at": {
+          "description": "Earliest retry instant or deadline of the active worker claim.",
+          "classification": "INTERNAL"
+        },
+        "claim_id": {
+          "description": "Temporary worker ownership token that fences stale writes.",
+          "classification": "INTERNAL",
+          "nullMeaning": "No worker holds a claim for the current step."
+        },
+        "mutating": {
+          "description": "Durable evidence that a non-idempotent GLPI mutation may have been started.",
+          "classification": "INTERNAL"
+        },
+        "updated_at": {
+          "description": "Instant of the latest claim or durable progress transition.",
+          "classification": "INTERNAL"
+        }
+      },
+      "objects": {
+        "whatsapp_ticket_submissions_pkey": "Prevents two jobs for the same verified draft.",
+        "whatsapp_ticket_submissions_dispatch_idx": "Finds eligible jobs for one Meta business phone number.",
+        "whatsapp_ticket_submissions_progress_check": "Enforces consistent progress, result and claim counts."
+      }
+    }
+  },
+  "enums": {
+    "WhatsAppTicketSubmissionState": "PENDING covers dispatch and bounded retries. COMPLETED confirms a ticket and records attachment outcomes. FAILED confirms no ticket was created. UNCERTAIN requires checking GLPI before a repeat."
+  }
+}
