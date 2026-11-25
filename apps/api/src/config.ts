@@ -1,5 +1,6 @@
 import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
+import { normalizeEmail } from "./email-address.js";
 
 // This is the only application module that interprets environment values.
 export const serverConfigSchema = Type.Object(
@@ -41,6 +42,23 @@ export const serverConfigSchema = Type.Object(
     glpiApiUrl: Type.Optional(Type.String({ pattern: "^\\S{1,2048}$" })),
     glpiAppToken: Type.Optional(Type.String({ pattern: "^[!-~]{16,512}$" })),
     glpiUserToken: Type.Optional(Type.String({ pattern: "^[!-~]{16,512}$" })),
+    identityCodeSecret: Type.Optional(
+      Type.String({ pattern: "^[a-f0-9]{64}$" }),
+    ),
+    identityAllowedEmailDomains: Type.Optional(
+      Type.String({ minLength: 1, maxLength: 2048 }),
+    ),
+    identitySmtpHost: Type.Optional(
+      Type.String({ pattern: "^[A-Za-z0-9.-]{1,253}$" }),
+    ),
+    identitySmtpPort: Type.Integer({ minimum: 1, maximum: 65535 }),
+    identitySmtpUser: Type.Optional(Type.String({ pattern: "^[ -~]{1,512}$" })),
+    identitySmtpPassword: Type.Optional(
+      Type.String({ pattern: "^[ -~]{1,512}$" }),
+    ),
+    identitySmtpFrom: Type.Optional(
+      Type.String({ minLength: 1, maxLength: 254 }),
+    ),
   },
   { additionalProperties: false },
 );
@@ -56,11 +74,24 @@ export type WhatsAppOutboundConfig = Readonly<{
   accessToken: string;
   graphVersion: string;
 }>;
+export type VerificationSmtpConfig = Readonly<{
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  from: string;
+}>;
+export type IdentityVerificationConfig = Readonly<{
+  codeSecret: string;
+  allowedEmailDomains: readonly string[];
+  smtp: VerificationSmtpConfig;
+}>;
 export type WhatsAppWebhookConfig = Readonly<{
   appSecret: string;
   verifyToken: string;
   phoneNumberId: string;
   outbound?: WhatsAppOutboundConfig;
+  verificationCodeSecret?: string;
 }>;
 
 type ConfigMetadata = {
@@ -299,12 +330,97 @@ export const configReference = Object.freeze([
     secret: true,
     purpose: "User token for the scoped GLPI service account.",
   },
+  {
+    key: "identityCodeSecret",
+    name: "IDENTITY_CODE_SECRET",
+    type: "secret string",
+    required: false,
+    default: "",
+    visibility: "server",
+    classification: "RESTRICTED",
+    secret: true,
+    purpose: "32-byte hex key for verification code and mailbox digests.",
+  },
+  {
+    key: "identityAllowedEmailDomains",
+    name: "IDENTITY_ALLOWED_EMAIL_DOMAINS",
+    type: "comma-separated domain names",
+    required: false,
+    default: "",
+    visibility: "server",
+    classification: "INTERNAL",
+    secret: false,
+    purpose:
+      "Exact corporate email domains eligible for employee verification.",
+  },
+  {
+    key: "identitySmtpHost",
+    name: "IDENTITY_SMTP_HOST",
+    type: "SMTP hostname",
+    required: false,
+    default: "",
+    visibility: "server",
+    classification: "INTERNAL",
+    secret: false,
+    purpose: "SMTP submission server used for employee verification email.",
+  },
+  {
+    key: "identitySmtpPort",
+    name: "IDENTITY_SMTP_PORT",
+    type: "integer 1..65535",
+    required: false,
+    default: "587",
+    visibility: "server",
+    classification: "INTERNAL",
+    secret: false,
+    purpose:
+      "SMTP submission port. Port 465 uses implicit TLS. Other ports require STARTTLS.",
+  },
+  {
+    key: "identitySmtpUser",
+    name: "IDENTITY_SMTP_USER",
+    type: "nonempty string",
+    required: false,
+    default: "",
+    visibility: "server",
+    classification: "RESTRICTED",
+    secret: true,
+    purpose: "SMTP service credential username for employee verification mail.",
+  },
+  {
+    key: "identitySmtpPassword",
+    name: "IDENTITY_SMTP_PASSWORD",
+    type: "secret string",
+    required: false,
+    default: "",
+    visibility: "server",
+    classification: "RESTRICTED",
+    secret: true,
+    purpose: "SMTP service credential password for employee verification mail.",
+  },
+  {
+    key: "identitySmtpFrom",
+    name: "IDENTITY_SMTP_FROM",
+    type: "email address",
+    required: false,
+    default: "",
+    visibility: "server",
+    classification: "INTERNAL",
+    secret: false,
+    purpose: "Authorized From mailbox for employee verification email.",
+  },
 ] as const satisfies readonly ConfigMetadata[]);
 
 function numberFromEnv(value: string | undefined, fallback: number): number {
   if (value === undefined) return fallback;
   if (value.trim() === "") return Number.NaN;
   return Number(value);
+}
+
+function readAllowedEmailDomains(value: string): string[] {
+  return [
+    ...new Set(value.split(",").map((domain) => domain.trim().toLowerCase())),
+  ];
 }
 
 export function parseServerConfig(
@@ -353,6 +469,25 @@ export function parseServerConfig(
     ...(env.GLPI_USER_TOKEN === undefined
       ? {}
       : { glpiUserToken: env.GLPI_USER_TOKEN }),
+    ...(env.IDENTITY_CODE_SECRET === undefined
+      ? {}
+      : { identityCodeSecret: env.IDENTITY_CODE_SECRET }),
+    ...(env.IDENTITY_ALLOWED_EMAIL_DOMAINS === undefined
+      ? {}
+      : { identityAllowedEmailDomains: env.IDENTITY_ALLOWED_EMAIL_DOMAINS }),
+    ...(env.IDENTITY_SMTP_HOST === undefined
+      ? {}
+      : { identitySmtpHost: env.IDENTITY_SMTP_HOST }),
+    ...(env.IDENTITY_SMTP_USER === undefined
+      ? {}
+      : { identitySmtpUser: env.IDENTITY_SMTP_USER }),
+    ...(env.IDENTITY_SMTP_PASSWORD === undefined
+      ? {}
+      : { identitySmtpPassword: env.IDENTITY_SMTP_PASSWORD }),
+    ...(env.IDENTITY_SMTP_FROM === undefined
+      ? {}
+      : { identitySmtpFrom: env.IDENTITY_SMTP_FROM }),
+    identitySmtpPort: numberFromEnv(env.IDENTITY_SMTP_PORT, 587),
   };
   if (!Value.Check(serverConfigSchema, candidate)) {
     throw new Error("Invalid API configuration");
@@ -460,6 +595,30 @@ export function parseServerConfig(
     )
       throw new Error("Invalid API configuration: GLPI URL");
   }
+  const identity = [
+    candidate.identityCodeSecret,
+    candidate.identityAllowedEmailDomains,
+    candidate.identitySmtpHost,
+    candidate.identitySmtpUser,
+    candidate.identitySmtpPassword,
+    candidate.identitySmtpFrom,
+  ];
+  if (
+    (identity.some(Boolean) || env.IDENTITY_SMTP_PORT !== undefined) &&
+    (identity.some((value) => !value?.trim()) || glpi.some((value) => !value))
+  )
+    throw new Error(
+      "Invalid API configuration: incomplete employee verification",
+    );
+  if (
+    candidate.identityAllowedEmailDomains &&
+    readAllowedEmailDomains(candidate.identityAllowedEmailDomains).some(
+      (domain) => !normalizeEmail("validation@" + domain),
+    )
+  )
+    throw new Error("Invalid API configuration: employee email domains");
+  if (candidate.identitySmtpFrom && !normalizeEmail(candidate.identitySmtpFrom))
+    throw new Error("Invalid API configuration: verification sender");
   return Object.freeze(candidate);
 }
 
@@ -473,6 +632,9 @@ export function whatsappWebhookFrom(
       appSecret: whatsappAppSecret,
       verifyToken: whatsappVerifyToken,
       phoneNumberId: whatsappPhoneNumberId,
+      ...(config.identityCodeSecret
+        ? { verificationCodeSecret: config.identityCodeSecret }
+        : {}),
       ...(config.whatsappAccessToken
         ? {
             outbound: Object.freeze({
@@ -492,6 +654,42 @@ export function glpiConfigFrom(config: ServerConfig): GlpiConfig | undefined {
       apiUrl: glpiApiUrl,
       appToken: glpiAppToken,
       userToken: glpiUserToken,
+    });
+  return undefined;
+}
+
+export function identityVerificationFrom(
+  config: ServerConfig,
+): IdentityVerificationConfig | undefined {
+  const {
+    identityCodeSecret,
+    identityAllowedEmailDomains,
+    identitySmtpHost,
+    identitySmtpPort,
+    identitySmtpUser,
+    identitySmtpPassword,
+    identitySmtpFrom,
+  } = config;
+  if (
+    identityCodeSecret &&
+    identityAllowedEmailDomains &&
+    identitySmtpHost &&
+    identitySmtpUser &&
+    identitySmtpPassword &&
+    identitySmtpFrom
+  )
+    return Object.freeze({
+      codeSecret: identityCodeSecret,
+      allowedEmailDomains: Object.freeze(
+        readAllowedEmailDomains(identityAllowedEmailDomains),
+      ),
+      smtp: Object.freeze({
+        host: identitySmtpHost,
+        port: identitySmtpPort,
+        user: identitySmtpUser,
+        password: identitySmtpPassword,
+        from: normalizeEmail(identitySmtpFrom)!,
+      }),
     });
   return undefined;
 }

@@ -101,6 +101,16 @@
       "file": "pages/api/verifyWhatsAppWebhook.json"
     },
     {
+      "id": "database/whatsapp_identity_events",
+      "kind": "database",
+      "title": "whatsapp_identity_events",
+      "group": "WhatsApp employee verification",
+      "source": "docs/generated/database/schema.md",
+      "summary": "Durable inbound identity receipts and short-lived challenge reservations scoped to a WhatsApp sender.",
+      "headings": [],
+      "file": "pages/database/whatsapp_identity_events.json"
+    },
+    {
       "id": "database/whatsapp_inbound_messages",
       "kind": "database",
       "title": "whatsapp_inbound_messages",
@@ -119,6 +129,16 @@
       "summary": "Durable intent and dispatch evidence for one free-form WhatsApp reply.",
       "headings": [],
       "file": "pages/database/whatsapp_outbound_messages.json"
+    },
+    {
+      "id": "database/whatsapp_verified_identities",
+      "kind": "database",
+      "title": "whatsapp_verified_identities",
+      "group": "WhatsApp employee verification",
+      "source": "docs/generated/database/schema.md",
+      "summary": "Current proof of corporate mailbox control for a WhatsApp sender and its GLPI identity.",
+      "headings": [],
+      "file": "pages/database/whatsapp_verified_identities.json"
     },
     {
       "id": "components/Button",
@@ -718,7 +738,7 @@
       "title": "Database Reference",
       "group": "Generated references",
       "source": "docs/generated/database/schema.md",
-      "summary": "Durable intake of supported and authenticated Meta messages for the configured business number.",
+      "summary": "Durable inbound identity receipts and short-lived challenge reservations scoped to a WhatsApp sender.",
       "headings": [],
       "file": "pages/repository/docs/generated/database/schema.json"
     },
@@ -1027,18 +1047,19 @@
     "shards": [
       {
         "file": "search/0000.json",
-        "count": 76,
+        "count": 71,
         "kinds": ["api", "component", "database", "repository"]
       },
-      { "file": "search/0001.json", "count": 110, "kinds": ["repository"] },
-      { "file": "search/0002.json", "count": 125, "kinds": ["repository"] },
-      { "file": "search/0003.json", "count": 155, "kinds": ["repository"] },
-      { "file": "search/0004.json", "count": 98, "kinds": ["repository"] },
-      { "file": "search/0005.json", "count": 121, "kinds": ["repository"] },
+      { "file": "search/0001.json", "count": 109, "kinds": ["repository"] },
+      { "file": "search/0002.json", "count": 122, "kinds": ["repository"] },
+      { "file": "search/0003.json", "count": 159, "kinds": ["repository"] },
+      { "file": "search/0004.json", "count": 103, "kinds": ["repository"] },
+      { "file": "search/0005.json", "count": 117, "kinds": ["repository"] },
       { "file": "search/0006.json", "count": 97, "kinds": ["repository"] },
       { "file": "search/0007.json", "count": 103, "kinds": ["repository"] },
-      { "file": "search/0008.json", "count": 83, "kinds": ["repository"] }
+      { "file": "search/0008.json", "count": 91, "kinds": ["repository"] },
+      { "file": "search/0009.json", "count": 3, "kinds": ["repository"] }
     ],
-    "count": 968
+    "count": 975
   }
 }

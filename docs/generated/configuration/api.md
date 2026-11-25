@@ -28,3 +28,10 @@ No values are eligible for client exposure. `ORION_ENV` is always required. The 
 | `GLPI_API_URL` | HTTPS URL | no | — | server | INTERNAL | no | Base URL of the GLPI REST v1 API, including its API path. |
 | `GLPI_APP_TOKEN` | secret string | no | — | server | RESTRICTED | yes | Application token for the configured GLPI API client. |
 | `GLPI_USER_TOKEN` | secret string | no | — | server | RESTRICTED | yes | User token for the scoped GLPI service account. |
+| `IDENTITY_CODE_SECRET` | secret string | no | — | server | RESTRICTED | yes | 32-byte hex key for verification code and mailbox digests. |
+| `IDENTITY_ALLOWED_EMAIL_DOMAINS` | comma-separated domain names | no | — | server | INTERNAL | no | Exact corporate email domains eligible for employee verification. |
+| `IDENTITY_SMTP_HOST` | SMTP hostname | no | — | server | INTERNAL | no | SMTP submission server used for employee verification email. |
+| `IDENTITY_SMTP_PORT` | integer 1..65535 | no | `587` | server | INTERNAL | no | SMTP submission port. Port 465 uses implicit TLS. Other ports require STARTTLS. |
+| `IDENTITY_SMTP_USER` | nonempty string | no | — | server | RESTRICTED | yes | SMTP service credential username for employee verification mail. |
+| `IDENTITY_SMTP_PASSWORD` | secret string | no | — | server | RESTRICTED | yes | SMTP service credential password for employee verification mail. |
+| `IDENTITY_SMTP_FROM` | email address | no | — | server | INTERNAL | no | Authorized From mailbox for employee verification email. |

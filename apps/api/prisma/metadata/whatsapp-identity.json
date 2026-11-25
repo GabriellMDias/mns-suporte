@@ -1,0 +1,90 @@
+{
+  "tables": {
+    "whatsapp_identity_events": {
+      "owner": "WhatsApp employee verification",
+      "classification": "RESTRICTED",
+      "description": "Durable inbound identity receipts and short-lived challenge reservations scoped to a WhatsApp sender.",
+      "lifecycle": "A reserved challenge stays active until it is replaced, consumed, expires or exhausts its attempts. Code digests are removed when the challenge is deactivated. Historical records support deduplication and hourly limits. Retention is release-plan work.",
+      "columns": {
+        "event_key": {
+          "description": "Hash of the business-scoped sender and provider message ID, used to recognize replay.",
+          "classification": "RESTRICTED"
+        },
+        "scope_key": {
+          "description": "Stable hash of the business phone ID and preferred sender identity.",
+          "classification": "RESTRICTED"
+        },
+        "mailbox_key": {
+          "description": "Keyed digest of the normalized corporate address for cross-sender limits.",
+          "classification": "RESTRICTED",
+          "nullMeaning": "The receipt carries no eligible mailbox."
+        },
+        "created_at": {
+          "description": "Clock instant when the event receipt was recorded.",
+          "classification": "INTERNAL"
+        },
+        "expires_at": {
+          "description": "Deadline for redemption of the reserved challenge.",
+          "classification": "INTERNAL",
+          "nullMeaning": "The receipt did not reserve a challenge."
+        },
+        "active": {
+          "description": "Whether the reservation is the most recent active challenge for this sender.",
+          "classification": "INTERNAL"
+        },
+        "attempts_left": {
+          "description": "Remaining comparisons allowed for this challenge.",
+          "classification": "INTERNAL"
+        },
+        "glpi_user_id": {
+          "description": "GLPI user identified by a unique active directory match.",
+          "classification": "RESTRICTED",
+          "nullMeaning": "The challenge has no verified directory candidate or has been deactivated."
+        },
+        "code_digest": {
+          "description": "Keyed digest of the short-lived verification code and sender scope.",
+          "classification": "RESTRICTED",
+          "nullMeaning": "The event has no prepared code or its challenge was cleared."
+        }
+      },
+      "objects": {
+        "whatsapp_identity_events_pkey": "Prevents one signed inbound message from starting or confirming verification twice for a sender.",
+        "whatsapp_identity_events_scope_idx": "Supports sender-scoped quotas and challenge selection.",
+        "whatsapp_identity_events_mailbox_idx": "Supports the rolling hourly quota shared by all senders targeting a mailbox.",
+        "whatsapp_identity_events_attempts": "Bounds challenge comparisons to the configured maximum of five.",
+        "whatsapp_identity_events_active": "Requires an expiration and an available attempt for an active challenge.",
+        "whatsapp_identity_events_code": "Requires a canonical digest and a valid directory candidate for a prepared active challenge."
+      }
+    },
+    "whatsapp_verified_identities": {
+      "owner": "WhatsApp employee verification",
+      "classification": "RESTRICTED",
+      "description": "Current proof of corporate mailbox control for a WhatsApp sender and its GLPI identity.",
+      "lifecycle": "Created or replaced only as a challenge is consumed. Proof expires after thirty days and requires a new challenge. Retention is release-plan work.",
+      "columns": {
+        "scope_key": {
+          "description": "Stable hash of the business phone ID and preferred sender identity.",
+          "classification": "RESTRICTED"
+        },
+        "glpi_user_id": {
+          "description": "GLPI directory identity established by mailbox verification.",
+          "classification": "RESTRICTED"
+        },
+        "verified_at": {
+          "description": "Time the matching challenge was consumed.",
+          "classification": "INTERNAL"
+        },
+        "expires_at": {
+          "description": "Time after which the link cannot authorize work.",
+          "classification": "INTERNAL"
+        }
+      },
+      "objects": {
+        "whatsapp_verified_identities_pkey": "Maintains one current verified GLPI identity for a WhatsApp sender scope.",
+        "whatsapp_verified_identities_user": "Requires a positive GLPI directory identity.",
+        "whatsapp_verified_identities_expiration": "Requires verification to precede expiration."
+      }
+    }
+  },
+  "enums": {}
+}

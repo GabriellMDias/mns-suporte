@@ -1,0 +1,67 @@
+{
+  "kind": "database",
+  "name": "whatsapp_verified_identities",
+  "description": "Current proof of corporate mailbox control for a WhatsApp sender and its GLPI identity.",
+  "owner": "WhatsApp employee verification",
+  "classification": "RESTRICTED",
+  "lifecycle": "Created or replaced only as a challenge is consumed. Proof expires after thirty days and requires a new challenge. Retention is release-plan work.",
+  "columns": [
+    {
+      "Column": "scope_key",
+      "PostgreSQL type": "text",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Stable hash of the business phone ID and preferred sender identity.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "glpi_user_id",
+      "PostgreSQL type": "bigint",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "GLPI directory identity established by mailbox verification.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "verified_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Time the matching challenge was consumed.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "expires_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Time after which the link cannot authorize work.",
+      "Null meaning": "—",
+      "Unit": "—"
+    }
+  ],
+  "constraints": [
+    {
+      "Object": "whatsapp_verified_identities_expiration",
+      "Physical definition": "CHECK ((expires_at > verified_at))",
+      "Purpose": "Requires verification to precede expiration."
+    },
+    {
+      "Object": "whatsapp_verified_identities_pkey",
+      "Physical definition": "PRIMARY KEY (scope_key)",
+      "Purpose": "Maintains one current verified GLPI identity for a WhatsApp sender scope."
+    },
+    {
+      "Object": "whatsapp_verified_identities_user",
+      "Physical definition": "CHECK ((glpi_user_id > 0))",
+      "Purpose": "Requires a positive GLPI directory identity."
+    }
+  ]
+}

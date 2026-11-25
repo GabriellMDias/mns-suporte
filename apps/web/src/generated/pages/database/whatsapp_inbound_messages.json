@@ -72,7 +72,7 @@
       "Nullable": "no",
       "Default": "—",
       "Classification": "RESTRICTED",
-      "Meaning": "Normalized text, action identifier or media reference consumed by the conversation flow.",
+      "Meaning": "Normalized text, action identifier, media reference or protected verification-code digest consumed by the conversation flow.",
       "Null meaning": "—",
       "Unit": "—"
     }
