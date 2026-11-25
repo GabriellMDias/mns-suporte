@@ -29,7 +29,7 @@ it("requests phone-scoped metadata and validates the downloaded length and diges
     throw new Error("Expected a downloaded file");
   expect(new Uint8Array(await result.file.arrayBuffer())).toEqual(bytes);
   expect(result.extension).toBe("pdf");
-  expect(fetchMedia.mock.calls.map(([url]) => String(url))).toEqual([
+  expect(fetchMedia.mock.calls.map(([url]) => new Request(url).url)).toEqual([
     "https://graph.facebook.com/v27.0/100001?phone_number_id=12345",
     metadata.url,
   ]);

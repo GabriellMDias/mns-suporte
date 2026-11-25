@@ -441,9 +441,10 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
       });
       const replies: string[] = [];
       const fakeFetch = vi.fn<typeof fetch>(async (input, init) => {
-        const url = new URL(String(input));
+        const request = new Request(input, init);
+        const url = new URL(request.url);
         if (url.pathname.endsWith("/messages")) {
-          const body = JSON.parse(String(init?.body)) as {
+          const body = (await request.json()) as {
             text: { body: string };
           };
           replies.push(body.text.body);
@@ -454,8 +455,8 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
         if (url.pathname.endsWith("/initSession"))
           return Response.json({ session_token: "synthetic-session" });
         if (url.pathname.endsWith("/Ticket")) {
-          expect(init?.method).toBe("POST");
-          expect(JSON.parse(String(init?.body))).toEqual({
+          expect(request.method).toBe("POST");
+          expect(await request.json()).toEqual({
             input: {
               name: "Suporte via WhatsApp — Equipamentos",
               content:
@@ -480,13 +481,12 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
             headers: { "content-type": "image/jpeg" },
           });
         if (url.pathname.endsWith("/Document")) {
-          const multipart = init?.body;
-          if (!(multipart instanceof FormData))
-            throw new Error("Expected GLPI multipart payload");
+          const multipart = await request.formData();
           const filename = "mns-" + wiredDraftId + "-1.jpg";
-          expect(
-            JSON.parse(String(multipart.get("uploadManifest"))),
-          ).toMatchObject({
+          const manifest = multipart.get("uploadManifest");
+          if (typeof manifest !== "string")
+            throw new Error("Expected GLPI upload manifest");
+          expect(JSON.parse(manifest)).toMatchObject({
             input: { _filename: [filename], itemtype: "Ticket", items_id: 112 },
           });
           const file = multipart.get("filename[0]");

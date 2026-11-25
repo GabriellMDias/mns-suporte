@@ -416,12 +416,10 @@ export function readConversationState(value: unknown): Conversation {
 }
 
 export function reopenTicketReview(draft: Draft): ConversationMove {
-  const {
-    confirmedAt: _confirmation,
-    submissionVersion: _version,
-    uncertainSubmission: _uncertain,
-    ...fields
-  } = draft;
+  const fields = { ...draft };
+  delete fields.confirmedAt;
+  delete fields.submissionVersion;
+  delete fields.uncertainSubmission;
   return intake({ ...fields, step: "review", revision: draft.revision + 1 });
 }
 
