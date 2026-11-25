@@ -20,3 +20,6 @@ No values are eligible for client exposure. `ORION_ENV` is always required. The 
 | `ORION_TOKEN_ISSUER` | issuer URL | no | — | server | INTERNAL | no | Expected access-token issuer; configure with audience and JWKS URL to enable bearer authentication. |
 | `ORION_TOKEN_AUDIENCE` | nonempty string | no | — | server | INTERNAL | no | Expected API access-token audience. |
 | `ORION_TOKEN_JWKS_URL` | http(s) URL | no | — | server | INTERNAL | no | Trusted issuer public-key endpoint. |
+| `WHATSAPP_APP_SECRET` | secret string | no | — | server | RESTRICTED | yes | Meta app secret used to verify incoming webhook signatures. |
+| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | secret string | no | — | server | RESTRICTED | yes | Application-generated secret used to verify the Meta callback. |
+| `WHATSAPP_PHONE_NUMBER_ID` | Meta asset identifier | no | — | server | INTERNAL | no | Meta business phone number ID accepted by the webhook. |

@@ -1,5 +1,113 @@
 [
   {
+    "id": "repository/docs/database/release-evolution",
+    "title": "Release and Evolution Workflow",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Review API and temporary compatibility",
+    "anchor": "review-api-and-temporary-compatibility",
+    "text": "Review API and temporary compatibility\nThe current API, generated OpenAPI, SDK, and web consumer evolve together in this repository. `pnpm references:check` regenerates API and SDK representations from current executable contracts without changing tracked files; it detects current-source drift, not compatibility with a released historical consumer. Before a change, review the executable operation IDs, requests/responses, [error registry](../generated/api/errors.md), authorization, list scope/order/cursor/defaults, state transitions, idempotency, and side effects against the owning module's business specification and implementation conventions. The module's server and browser tests protect those current semantics.\nUse these current sources when reviewing contract impact:\nConcern\nCurrent source and verification\nStructure and defaults\nA module's TypeBox operations own request/response shapes and stable operation IDs; its routes own defaults such as page sizes and list scopes. OpenAPI and SDK freshness checks keep current artifacts aligned.\nErrors\nThe [shared registry](../../apps/api/src/errors.ts) and each module's registered codes own stable codes and status mapping; HTTP integration tests cover the module's denials, validation, conflicts, and rate limiting. No historical status/code compatibility is asserted.\nAuthorization\nThe module's business specification owns actor and capability rules; synthetic-principal tests exercise the transport and persisted query scopes.\nOrdering and cursor\nThe module's implementation conventions own ordering, cursor behavior, and snapshot semantics; migrated-PostgreSQL tests verify authorization before pagination and cursor use.\nSide effects and retry semantics\nThe module's recovery contract records external effects, replay, and version conflicts; concurrency and process-interruption tests protect these facts.\nThis is a review of the **current** contract, not a released API baseline or a promise to support an older client. A future change can alter unreleased semantics deliberately, but must update the owning source, tests, and generated client together.\nIf an independently evolving consumer or published contract becomes real, record its released OpenAPI and supported consumer versions in a human action before introducing a baseline comparison. Mechanical comparisons can detect removed operations, required fields, types, and response shapes, while changes to authorization, errors, ordering, defaults, retry semantics, and side effects still need semantic review. No API version or deprecation window is created solely for unreleased development.\nThere is currently no temporary compatibility shim, dual-write path, deprecated endpoint, or retained old payload format to remove. If one is introduced for a real released boundary, record its consumers, migration path, support window, test coverage, and observable removal condition alongside that implementation. Remove it only after the actual dependent consumers and persisted data are safe, following [compatibility policy](../architecture/versioning-and-compatibility.md) and [API versioning](../api/versioning.md).\n"
+  },
+  {
+    "id": "repository/docs/database/schema-documentation",
+    "title": "Database Schema Documentation",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Database Schema Documentation",
+    "anchor": "database-schema-documentation",
+    "text": "Database Schema Documentation\n[Task index](../README.md) · [Database principles](principles.md) · [Generated reference](../generated/database/schema.md) · [Living documentation](../architecture/living-documentation.md)\nThis policy owns documentation of application-owned database structures. [ADR-0006](../adr/0006-select-prisma-orm-for-database-access-and-migrations.md) makes fully migrated PostgreSQL the complete physical authority, including custom SQL absent from Prisma Schema Language. Document meaning next to the schema and generate structure; readers should not reconstruct current semantics from migration history or reverse engineer queries.\n"
+  },
+  {
+    "id": "repository/docs/database/schema-documentation",
+    "title": "Database Schema Documentation",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Canonical sources and current tooling",
+    "anchor": "canonical-sources-and-current-tooling",
+    "text": "Canonical sources and current tooling\nInformation\nSource\nAuthored representable model\n[Prisma schema folder](../../apps/api/prisma/schema/schema.prisma)\nPhysical names, types, nullability, defaults, constraints, indexes, enum values\nPostgreSQL migrated from committed SQL\nMeaning, ownership, classification, lifecycle, null/unit semantics, object purpose\nSchema-adjacent metadata in `apps/api/prisma/metadata/<module>.json`; a table or enum belongs to exactly one file\nGenerated textual presentation\n[Database reference](../generated/database/schema.md), produced by the [catalog-backed generator](../../apps/api/scripts/database-reference.ts); with no application tables it states that explicitly\nCross-file domain behavior and rationale\nThe owning module's specification and implementation conventions, policies, and ADRs\nThe current metadata uses `tables` and `enums`; table metadata contains owner, description, classification, lifecycle, column metadata, and constraint/index purposes. Structural facts are introspected, not independently copied into JSON. Database-native comments, diagrams, broader manifests, and code-to-schema links remain optional future mechanisms, not alternative canonical sources already in use.\n"
+  },
+  {
+    "id": "repository/docs/database/schema-documentation",
+    "title": "Database Schema Documentation",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Database Documentation",
+    "anchor": "database-documentation",
+    "text": "Database Documentation\nEvery application-owned table and column requires canonical documentation, and each table requires an architectural domain owner. Document additional application-owned objects as they appear. Engine/ORM/extension/hosting internals need documentation only when material to application architecture or operations; architectural ownership is distinct from the database role that owns an object.\nKeep one source for each fact. Machine-readable policy must use structured metadata rather than parsing free-form comments. Use English, concise semantic descriptions, and synthetic examples. A name repeated as a sentence is insufficient when meaning is unclear; conventional fields may use short standardized descriptions when semantics truly match. Never invent descriptions solely to satisfy completeness checks.\nCurrent descriptions explain current truth. Migration-specific safety stages belong in migration comments or runbooks; significant rationale belongs in ADRs; complex business/authorization/retention policy belongs to its owner and is linked rather than copied into every column. Preserve deprecated-object purpose and replacement while it exists, and remove stale metadata when the object is removed. Ownership changes require metadata updates and may signal an ADR-level boundary change.\n"
+  },
+  {
+    "id": "repository/docs/database/schema-documentation",
+    "title": "Database Schema Documentation",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Table Documentation",
+    "anchor": "table-documentation",
+    "text": "Table Documentation\nExplain the durable concept, owning domain, allowed role in the architecture, and important lifecycle/relationships. Distinguish canonical domain state, relationships, projections, audit, integration, operational, and reference data. A derived table must identify its canonical source and regeneration/freshness expectations. Link broader lifecycle or domain rules when needed instead of writing a second policy in metadata.\n"
+  },
+  {
+    "id": "repository/docs/database/schema-documentation",
+    "title": "Database Schema Documentation",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Column Documentation",
+    "anchor": "column-documentation",
+    "text": "Column Documentation\nDocument meaning and classification for every column, plus the following when relevant:\nConcern\nRequired meaning\nNull/default\nWhether null means absent, unknown, unassigned, inapplicable, or removed; explain non-obvious defaults without duplicating structural facts\nQuantity/money\nUnit, precision/rounding expectations, currency relationship; avoid ambiguous numeric values\nTime\nInstant versus local/calendar semantics, authoritative clock/update behavior, time zone where relevant, and whether it is informational or a concurrency token\nIdentity\nInternal/public/provider/business/idempotency purpose, scope, stability, public exposure; provider identifiers need provider ownership and lifecycle\nState/derived data\nNon-obvious state values, source, calculation/update behavior, immutability or lifecycle constraints\nSensitive content\nMachine-readable [classification](../security/data-classification.md), and category/control metadata only when useful and maintainable\nThe current generator requires `nullMeaning` for every nullable column. Additional telemetry metadata may be introduced only when consistently enforceable; classification does not itself authorize telemetry export.\n"
+  },
+  {
+    "id": "repository/docs/database/schema-documentation",
+    "title": "Database Schema Documentation",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Constraints, relationships, and indexes",
+    "anchor": "constraints-relationships-and-indexes",
+    "text": "Constraints, relationships, and indexes\nGenerate physical definitions and actual referential actions where covered. Explain the invariant protected by non-obvious checks/uniqueness, significant query/order patterns, and specialized/partial index maintenance implications. Relationships must distinguish owner, creator, approver, membership, assignment, or historical attribution when structure cannot explain the distinction. Cascading deletion and nulling deserve explicit lifecycle rationale.\nKeep constraint-to-public-error translation discoverable near persistence/error code without duplicating mappings across prose. Primary-key semantics still need explanation when non-obvious. Do not infer an API resource relation from a table name, or remove similar-looking indexes without workload evidence.\n"
+  },
+  {
+    "id": "repository/docs/database/schema-documentation",
+    "title": "Database Schema Documentation",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Other application-owned objects",
+    "anchor": "other-application-owned-objects",
+    "text": "Other application-owned objects\nThese requirements apply when the object exists; extend generation/validation with its introduction.\nObject\nDocumentation required\nView\nPurpose, owner, sources, derived/canonical role, consumers, and any stable reporting/integration contract\nMaterialized view\nView meaning plus refresh mechanism/frequency, staleness, failure and recovery behavior\nFunction/procedure\nPurpose, input/output meaning, units, read/write effects, modified data, transaction/security assumptions, and significant failures\nTrigger\nActivation event/table, timing, effects, reason for database placement, recursive/cascading behavior, and tests; hidden effects are prohibited\nGenerated column\nSemantic purpose and expression where safe/useful\nEnum/domain/custom type\nSemantic values, purpose, constraints, units, ownership; migration constraints belong in evolution guidance\nSequence\nPurpose and allocation meaning; ordinary sequences do not promise gapless numbering\nPartition/inheritance\nKey/relationship, purpose, query/retention consequences, and operational owner\nRow-level security policy\nProtected table, actor/role scope, covered operations, and interaction with application authorization\nSignificant role/grant\nRuntime, migration, or operational privileges and responsible security/operations guidance\nExtension\nWhy required, dependent capabilities, setup and operational implications\n"
+  },
+  {
+    "id": "repository/docs/database/schema-documentation",
+    "title": "Database Schema Documentation",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Generated Reference",
+    "anchor": "generated-reference",
+    "text": "Generated Reference\n`pnpm -C apps/api references:write` intentionally regenerates current API/database/configuration/error references using a freshly migrated disposable PostgreSQL. `pnpm references:check` checks freshness without editing tracked files; `pnpm docs:references:check` checks the portal's derived representation. See [artifact workflow](../architecture/backend-execution-and-generated-artifacts.md) for the complete order and [validation](../validation.md) for requirements.\nThe current database generator covers ordinary application tables in `public`, their columns, primary and other constraints, indexes, and enums; it excludes Prisma's migration table. It compares Prisma-representable structure to the freshly migrated database and rejects unmodeled application-owned object kinds rather than silently omitting them. It is still not a universal PostgreSQL catalog export: new schemas, partitioned tables, views, triggers, functions, RLS, or other object kinds require deliberate generator coverage and metadata before adoption.\nFor covered objects it checks exact names, stale/missing entries, required owner/descriptions/lifecycle, valid table/column classifications, nullable-column meaning, object purposes, enum descriptions, and generated drift. Units and broader business semantics still require review. Schema drift in a deployed database and reference drift from repository sources are separate defects; this disposable-database check does not inspect deployments.\nGenerated files are read-only representations. Change schema/metadata or generator sources and regenerate; never patch output to hide drift. The portal adds human navigation without becoming another schema source. Keep structured text searchable by domain/object/field meaning for agents. Generated diagrams, if added, should reflect actual schema; authored simplified diagrams must be clearly explanatory rather than canonical. Reliable metadata, not guesses, should drive links to code, domain, or API.\n"
+  },
+  {
+    "id": "repository/docs/database/schema-documentation",
+    "title": "Database Schema Documentation",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Schema Documentation Requirements",
+    "anchor": "schema-documentation-requirements",
+    "text": "Schema Documentation Requirements\nBefore handing off a schema change:\nInspect the current physical/authored schema, metadata, ownership, classification, constraints, relationships, domain rules, and migration release status. Escalate uncertain non-obvious meaning as a documentation defect rather than guessing.\nUpdate object/column meaning, classification, null/unit/lifecycle semantics, native side effects, and ownership with the schema change. Give newly sensitive fields explicit review.\nExtend metadata and generator coverage for newly introduced object kinds; missing documentation must fail validation wherever that coverage exists.\nRegenerate the current reference and portal data. Review schema, SQL, metadata, and reference diffs together, especially nullability, constraints, relationships, and classification changes.\nVerify links/navigation, current terminology, test evidence, and that structural facts are derived rather than maintained independently. Generation proves covered consistency, not semantic correctness.\n"
+  },
+  {
+    "id": "repository/docs/database/transactions-and-concurrency",
+    "title": "Transactions and Concurrency",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Transactions and Concurrency",
+    "anchor": "transactions-and-concurrency",
+    "text": "Transactions and Concurrency\n[Task index](../README.md) · [Database principles](principles.md) · [Delivery and side effects](../architecture/delivery-and-side-effects.md) · [Testing](../architecture/testing-strategy.md)\nThis policy owns database atomicity, isolation, conditional writes, locks, and transaction retries. Cross-system delivery, idempotency, message claiming, retry ownership, and reconciliation belong to [delivery policy](../architecture/delivery-and-side-effects.md). [ADR-0006](../adr/0006-select-prisma-orm-for-database-access-and-migrations.md) permits appropriate Prisma or explicit SQL transaction mechanisms; [ADR-0009](../adr/0009-establish-testing-strategy-and-tooling.md) requires real-database verification where its semantics matter.\nEach module's implementation conventions record its concrete transaction choices, such as atomic PostgreSQL creation/conditional writes, durable create replay, and integer version preconditions. The shared runtime does not automatically retry writes. Do not infer that outboxes, distributed locks, or generic transaction infrastructure already exist.\n"
+  },
+  {
+    "id": "repository/docs/database/transactions-and-concurrency",
+    "title": "Transactions and Concurrency",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Transactions",
+    "anchor": "transactions",
+    "text": "Transactions\nAssume concurrent requests, processes, retries, workers, and deployment overlap unless the architecture proves exclusive ownership. Sequential code does not imply sequential execution across the system. Identify the durable invariant, which changes must become visible together, relevant competing actors, and failure/recovery semantics before choosing a mechanism.\nTransactions protect all-or-nothing state within their actual database boundary. They must remain as short as practical and should not automatically surround every HTTP request or every repository method. Splitting dependent writes into independently committed methods can destroy atomicity; wrapping remote work in a transaction can hold locks without providing distributed rollback.\n"
+  },
+  {
     "id": "repository/docs/database/transactions-and-concurrency",
     "title": "Transactions and Concurrency",
     "group": "Database guides",
@@ -105,7 +213,7 @@
     "kind": "repository",
     "heading": "API Error Registry",
     "anchor": "api-error-registry",
-    "text": "API Error Registry\n[Error contract](../../api/error-contract.md) · [API runtime](../../../apps/api/README.md)\nCode\nHTTP status\nCategory\nRetryable\nPublic message\n`AUTHENTICATION_REQUIRED`\n401\nauthentication\nno\nAuthentication is required.\n`VALIDATION_FAILED`\n400\nvalidation\nno\nThe request is invalid.\n`RESOURCE_NOT_FOUND`\n404\nnot_found\nno\nThe resource was not found.\n`RATE_LIMITED`\n429\nrate_limit\nyes\nToo many requests. Try again later.\n`INTERNAL_ERROR`\n500\ninternal\nno\nAn unexpected error occurred.\n`SERVICE_UNAVAILABLE`\n503\navailability\nyes\nThe service is unavailable.\n"
+    "text": "API Error Registry\n[Error contract](../../api/error-contract.md) · [API runtime](../../../apps/api/README.md)\nCode\nHTTP status\nCategory\nRetryable\nPublic message\n`AUTHENTICATION_REQUIRED`\n401\nauthentication\nno\nAuthentication is required.\n`VALIDATION_FAILED`\n400\nvalidation\nno\nThe request is invalid.\n`RESOURCE_NOT_FOUND`\n404\nnot_found\nno\nThe resource was not found.\n`RATE_LIMITED`\n429\nrate_limit\nyes\nToo many requests. Try again later.\n`INTERNAL_ERROR`\n500\ninternal\nno\nAn unexpected error occurred.\n`SERVICE_UNAVAILABLE`\n503\navailability\nyes\nThe service is unavailable.\n`WHATSAPP_WEBHOOK_UNVERIFIED`\n403\nauthentication\nno\nThe webhook request could not be verified.\n`WHATSAPP_WEBHOOK_TOO_LARGE`\n413\nvalidation\nno\nThe webhook payload is too large.\n`WHATSAPP_WEBHOOK_UNSUPPORTED_MEDIA_TYPE`\n415\nvalidation\nno\nThe webhook must use JSON.\n"
   },
   {
     "id": "repository/docs/generated/components/web",
@@ -231,7 +339,7 @@
     "kind": "repository",
     "heading": "API Configuration Reference",
     "anchor": "api-configuration-reference",
-    "text": "API Configuration Reference\n[Configuration policy](../../architecture/configuration.md) · [API runtime](../../../apps/api/README.md)\nNo values are eligible for client exposure. `ORION_ENV` is always required. The three token settings are configured together. API modules that require the database or bearer authentication stay unmounted until those settings exist, and production startup fails instead.\nEnvironment variable\nType\nRequired\nDefault\nVisibility\nClassification\nSecret\nPurpose\n`ORION_ENV`\ndevelopment | test | production\nyes\n—\nserver\nINTERNAL\nno\nRuntime environment.\n`ORION_RELEASE_ID`\nartifact identifier, 1..128 ASCII letters/digits/._-\nno\n`local`\nserver\nINTERNAL\nno\nActual artifact revision for correlated logs and traces; local for unversioned development.\n`ORION_API_HOST`\nnonempty string\nno\n`127.0.0.1`\nserver\nINTERNAL\nno\nListen address; loopback by default.\n`ORION_API_PORT`\ninteger 0..65535\nno\n`3000`\nserver\nINTERNAL\nno\nListen port; zero selects an ephemeral port.\n`ORION_LOG_LEVEL`\nPino level\nno\n`info`\nserver\nINTERNAL\nno\nStructured log threshold.\n`ORION_SHUTDOWN_TIMEOUT_MS`\ninteger 100..30000\nno\n`5000`\nserver\nINTERNAL\nno\nTotal graceful shutdown deadline.\n`ORION_OTLP_ENDPOINT`\nhttp(s) URL\nno\n—\nserver\nINTERNAL\nno\nOptional OTLP HTTP collector base URL.\n`ORION_TRACE_SAMPLE_RATIO`\nnumber 0..1\nno\n`1`\nserver\nINTERNAL\nno\nTrace sampling probability.\n`ORION_DATABASE_URL`\nPostgreSQL URL\nno\n—\nserver\nRESTRICTED\nyes\nRuntime PostgreSQL credential; enables the database for modules that require it and adds it to readiness.\n`ORION_TOKEN_ISSUER`\nissuer URL\nno\n—\nserver\nINTERNAL\nno\nExpected access-token issuer; configure with audience and JWKS URL to enable bearer authentication.\n`ORION_TOKEN_AUDIENCE`\nnonempty string\nno\n—\nserver\nINTERNAL\nno\nExpected API access-token audience.\n`ORION_TOKEN_JWKS_URL`\nhttp(s) URL\nno\n—\nserver\nINTERNAL\nno\nTrusted issuer public-key endpoint.\n"
+    "text": "API Configuration Reference\n[Configuration policy](../../architecture/configuration.md) · [API runtime](../../../apps/api/README.md)\nNo values are eligible for client exposure. `ORION_ENV` is always required. The three token settings are configured together. API modules that require the database or bearer authentication stay unmounted until those settings exist, and production startup fails instead.\nEnvironment variable\nType\nRequired\nDefault\nVisibility\nClassification\nSecret\nPurpose\n`ORION_ENV`\ndevelopment | test | production\nyes\n—\nserver\nINTERNAL\nno\nRuntime environment.\n`ORION_RELEASE_ID`\nartifact identifier, 1..128 ASCII letters/digits/._-\nno\n`local`\nserver\nINTERNAL\nno\nActual artifact revision for correlated logs and traces; local for unversioned development.\n`ORION_API_HOST`\nnonempty string\nno\n`127.0.0.1`\nserver\nINTERNAL\nno\nListen address; loopback by default.\n`ORION_API_PORT`\ninteger 0..65535\nno\n`3000`\nserver\nINTERNAL\nno\nListen port; zero selects an ephemeral port.\n`ORION_LOG_LEVEL`\nPino level\nno\n`info`\nserver\nINTERNAL\nno\nStructured log threshold.\n`ORION_SHUTDOWN_TIMEOUT_MS`\ninteger 100..30000\nno\n`5000`\nserver\nINTERNAL\nno\nTotal graceful shutdown deadline.\n`ORION_OTLP_ENDPOINT`\nhttp(s) URL\nno\n—\nserver\nINTERNAL\nno\nOptional OTLP HTTP collector base URL.\n`ORION_TRACE_SAMPLE_RATIO`\nnumber 0..1\nno\n`1`\nserver\nINTERNAL\nno\nTrace sampling probability.\n`ORION_DATABASE_URL`\nPostgreSQL URL\nno\n—\nserver\nRESTRICTED\nyes\nRuntime PostgreSQL credential; enables the database for modules that require it and adds it to readiness.\n`ORION_TOKEN_ISSUER`\nissuer URL\nno\n—\nserver\nINTERNAL\nno\nExpected access-token issuer; configure with audience and JWKS URL to enable bearer authentication.\n`ORION_TOKEN_AUDIENCE`\nnonempty string\nno\n—\nserver\nINTERNAL\nno\nExpected API access-token audience.\n`ORION_TOKEN_JWKS_URL`\nhttp(s) URL\nno\n—\nserver\nINTERNAL\nno\nTrusted issuer public-key endpoint.\n`WHATSAPP_APP_SECRET`\nsecret string\nno\n—\nserver\nRESTRICTED\nyes\nMeta app secret used to verify incoming webhook signatures.\n`WHATSAPP_WEBHOOK_VERIFY_TOKEN`\nsecret string\nno\n—\nserver\nRESTRICTED\nyes\nApplication-generated secret used to verify the Meta callback.\n`WHATSAPP_PHONE_NUMBER_ID`\nMeta asset identifier\nno\n—\nserver\nINTERNAL\nno\nMeta business phone number ID accepted by the webhook.\n"
   },
   {
     "id": "repository/docs/generated/database/schema",
@@ -240,7 +348,25 @@
     "kind": "repository",
     "heading": "Database Reference",
     "anchor": "database-reference",
-    "text": "Database Reference\n[Schema documentation policy](../../database/schema-documentation.md) · [Database principles](../../database/principles.md)\nNo application-owned tables exist yet. Add a module's Prisma model, reviewed migration, and metadata, then regenerate this reference.\n"
+    "text": "Database Reference\n[Schema documentation policy](../../database/schema-documentation.md) · [Database principles](../../database/principles.md)\n"
+  },
+  {
+    "id": "repository/docs/generated/database/schema",
+    "title": "Database Reference",
+    "group": "Generated references",
+    "kind": "repository",
+    "heading": "whatsapp_inbound_messages",
+    "anchor": "whatsapp_inbound_messages",
+    "text": "whatsapp_inbound_messages\nDurable intake of supported and authenticated Meta messages for the configured business number.\nOwner: WhatsApp webhook. Classification: RESTRICTED.\nLifecycle: Created before acknowledging the webhook. Redelivery preserves the original row. Processing and retention are release-plan work.\nColumn\nPostgreSQL type\nNullable\nDefault\nClassification\nMeaning\nNull meaning\nUnit\n`message_id`\n`text`\nno\n—\nRESTRICTED\nOpaque Meta message identifier used to deduplicate redelivery.\n—\n—\n`business_phone_id`\n`text`\nno\n—\nINTERNAL\nMeta asset identifier of the business number that received the event.\n—\n—\n`sender_business_id`\n`text`\nyes\n—\nRESTRICTED\nMeta sender identifier scoped to the business portfolio.\nMeta supplied only the sender phone number.\n—\n`sender_phone`\n`text`\nyes\n—\nRESTRICTED\nSender number supplied by Meta to support directory linking and routing.\nMeta supplied a business-scoped sender identifier without a phone number.\n—\n`occurred_at`\n`timestamp(3) with time zone`\nno\n—\nINTERNAL\nTimestamp reported by Meta as the message time.\n—\nUTC instant\n`received_at`\n`timestamp(3) with time zone`\nno\n`CURRENT_TIMESTAMP`\nINTERNAL\nDatabase timestamp of the first accepted delivery.\n—\nUTC instant\n`content`\n`jsonb`\nno\n—\nRESTRICTED\nNormalized text, action identifier or media reference consumed by the conversation flow.\n—\n—\n"
+  },
+  {
+    "id": "repository/docs/generated/database/schema",
+    "title": "Database Reference",
+    "group": "Generated references",
+    "kind": "repository",
+    "heading": "Constraints and indexes",
+    "anchor": "constraints-and-indexes",
+    "text": "Constraints and indexes\nObject\nPhysical definition\nPurpose\n`whatsapp_inbound_messages_pkey`\n`PRIMARY KEY (message_id)`\nKeeps one accepted event per Meta message ID across retries and concurrent delivery.\n`whatsapp_inbound_messages_sender_required`\n`CHECK (((sender_business_id IS NOT NULL) OR (sender_phone IS NOT NULL)))`\nRequires at least one sender identifier so a message can be associated with a conversation.\n"
   },
   {
     "id": "repository/docs/project-derivation",
@@ -411,97 +537,52 @@
     "kind": "repository",
     "heading": "MNS Suporte Human Actions",
     "anchor": "mns-suporte-human-actions",
-    "text": "MNS Suporte Human Actions\n[Project plan](implementation-plan.md) · [Project derivation](../project-derivation.md) · [Secrets policy](../security/secrets-management.md)\n"
+    "text": "MNS Suporte Human Actions\n[Implementation plan](implementation-plan.md) · [Secrets policy](../security/secrets-management.md)\nThe entries below cover access held outside this workspace. Implementation, technical decisions, GitHub configuration and generating application-owned secrets are tracked in the implementation plan. Supply externally issued credentials in the designated secret store or ignored local configuration.\n"
   },
   {
     "id": "repository/docs/project/human-actions",
     "title": "MNS Suporte Human Actions",
     "group": "Project guides",
     "kind": "repository",
-    "heading": "Purpose and current state",
-    "anchor": "purpose-and-current-state",
-    "text": "Purpose and current state\nThis checklist records MNS Suporte's prerequisites that require a project-owner decision, a human-controlled account action, an unavailable privilege, or securely supplied external configuration. Every contributor or coding agent performing implementation work must maintain it and must never silently skip work because human intervention is needed.\nMNS Suporte (https://github.com/GabriellMDias/mns-suporte) was initialized from Orion (https://github.com/GabriellMDias/Orion). Repository settings verified for Orion—Renovate, branch protection, and security controls—do not apply to this repository; the actions below establish them here. Conditional needs such as an identity provider, durable releases, or a deployment environment become new actions when their trigger occurs.\n"
+    "heading": "PH-07",
+    "anchor": "ph-07",
+    "text": "PH-07\n[ ] **Authorize access to the MNS Meta Business account and support number.**\n**Status** Pending for live testing and cutover. **Owner** MNS Meta Business account administrator.\nThe current workspace has no delegated Meta Business session for the company. Grant appropriate roles on the MNS Meta business portfolio and WhatsApp account, or complete the account and number verification that requires access to the organization and its phone. Enable access to a test number before production. The team can then configure webhook subscriptions and submit the closure template. Verify with a signed test webhook, a test reply and later template approval. Affects PJ-15, PJ-17 and PJ-18.\n"
   },
   {
     "id": "repository/docs/project/human-actions",
     "title": "MNS Suporte Human Actions",
     "group": "Project guides",
     "kind": "repository",
-    "heading": "Maintaining this checklist",
-    "anchor": "maintaining-this-checklist",
-    "text": "Maintaining this checklist\nInspect existing decisions, access, tools, configuration, and prior authorization before requesting human intervention. Complete authorized automation and all useful preparation first.\nKeep one stable `PH-NN` ID per coherent action; never reuse or renumber IDs. Split broad items into independently verifiable actions as they become concrete, and add newly discovered actions immediately.\nEvery action retains its ID, checkbox, owner, status, dependency, and evidence. Active or conditional requests also need the exact action, reason, non-secret configuration names, and verification method. Use `pending`, `in progress`, `completed`, `blocked`, or `changed` consistently with the [plan](implementation-plan.md#maintaining-this-plan).\nBefore asking the user, provide a concrete request: the exact setting or decision, prepared options where appropriate, why automation cannot finish it, affected task IDs, and how completion will be checked.\nIf an action blocks work now, mark the dependent plan task `blocked`, link this entry, and surface the request to the user. Continue independent authorized work.\nUse `[x]` and `completed` only after verification, recording safe evidence and the verification date. If direct verification is unavailable, record the limitation rather than claiming success.\nReopen an action with `[ ]` if later evidence invalidates completion, access expires, or configuration changes, and record why.\nA conditional item that becomes unnecessary remains `[ ]` with status `changed`, an explicit reason, and its future trigger or replacement.\n"
+    "heading": "PH-08",
+    "anchor": "ph-08",
+    "text": "PH-08\n[ ] **Grant scoped access to the company GLPI environments.**\n**Status** Pending for live testing and cutover. **Owner** MNS GLPI administrator.\nThe workspace has only the legacy integration copy. Issue a dedicated test service credential with directory lookup and scoped ticket and attachment permissions, and grant equivalent restricted production access for deployment. Supply the endpoint and credential securely. Verify by creating, consulting and attaching media to a synthetic ticket in test GLPI. Affects PJ-09, PJ-17 and PJ-18.\n"
   },
   {
     "id": "repository/docs/project/human-actions",
     "title": "MNS Suporte Human Actions",
     "group": "Project guides",
     "kind": "repository",
-    "heading": "Safe configuration handoff",
-    "anchor": "safe-configuration-handoff",
-    "text": "Safe configuration handoff\nRecord configuration names, required scopes, environment, purpose, non-secret resource identifiers, and secure destination. Never record passwords, tokens, API keys, connection strings containing credentials, private keys, or complete environment dumps here, in the plan, in chat, or in tracked example files.\nName only implemented configuration keys and link the [generated configuration reference](../generated/configuration/api.md); do not invent variable names in advance.\nHumans place secrets directly into the selected protected secret store or an explicitly documented ignored local file. Contributors verify presence and authorized behavior without printing secret contents.\nUse synthetic local and test data and ephemeral credentials where possible. Production secrets must not be prerequisites for ordinary development or CI.\n"
+    "heading": "PH-09",
+    "anchor": "ph-09",
+    "text": "PH-09\n[ ] **Authorize an approved corporate mail sender.**\n**Status** Pending for live testing. **Owner** MNS mail administrator.\nGrant relay access or provide a service credential and verified From address for employee verification email. The workspace has no delegated corporate mail service. Verify delivery of a synthetic challenge to an approved test mailbox. Affects PJ-10 and PJ-17.\n"
   },
   {
     "id": "repository/docs/project/human-actions",
     "title": "MNS Suporte Human Actions",
     "group": "Project guides",
     "kind": "repository",
-    "heading": "PH-01",
-    "anchor": "ph-01",
-    "text": "PH-01\n[ ] **Create MNS Suporte's repository and publish the initialized default branch.**\n**Status:** pending. **Owner:** project owner or repository administrator.\n**Dependency / trigger:** [PJ-01](implementation-plan.md#current-work); required before this repository has its own pull requests, CI runs, or settings.\n**Request and reason:** Create an empty repository at https://github.com/GabriellMDias/mns-suporte without a generated README, license, or ignore file, then run `git push -u origin main`. Initialization configured `origin` locally but never creates remote repositories or pushes.\n**Configuration:** none. Do not embed credentials in remote URLs.\n**Verification:** `git ls-remote origin main` returns the local `main` commit, and `pnpm orion:check` passes in a fresh clone.\n**Evidence / blocker:** Not started.\n"
+    "heading": "PH-10",
+    "anchor": "ph-10",
+    "text": "PH-10\n[ ] **Grant access to the company hosting and ingress.**\n**Status** Pending for external pilot and cutover. **Owner** MNS infrastructure administrator.\nGrant deployment access and permissions for a company HTTPS endpoint, database and secret storage. The local Docker environment supports development and verification. The external webhook and production deployment require access to company infrastructure. Verify reachability over TLS, restricted database access and backup restore before moving the corporate number. Affects PJ-16 and PJ-18.\n"
   },
   {
     "id": "repository/docs/project/human-actions",
     "title": "MNS Suporte Human Actions",
     "group": "Project guides",
     "kind": "repository",
-    "heading": "PH-02",
-    "anchor": "ph-02",
-    "text": "PH-02\n[ ] **Require pull requests and the CI gate on this repository's default branch, and keep merge commits available.**\n**Status:** pending. **Owner:** repository administrator.\n**Dependency / trigger:** PH-01; [PJ-01](implementation-plan.md#current-work).\n**Request and reason:** Protect `main`: require pull requests and the `Orion required gate` status check, block force pushes and deletion, and review bypass actors. Keep merge commits allowed and do not require linear history on `main`, because Orion upgrade pull requests must be merged with a merge commit to preserve upstream ancestry ([upgrade workflow](../project-derivation.md#upgrade-to-a-newer-orion-revision)). Branch protection is repository administration that local automation cannot perform.\n**Configuration:** none beyond the repository ruleset and merge settings.\n**Verification:** Read the effective rules for `main` and confirm the required check name matches [CI](../../.github/workflows/ci.yml) and that no linear-history requirement applies; confirm merge commits are allowed; a successful required-gate run appears on a pull request.\n**Evidence / blocker:** Not started.\n"
-  },
-  {
-    "id": "repository/docs/project/human-actions",
-    "title": "MNS Suporte Human Actions",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "PH-03",
-    "anchor": "ph-03",
-    "text": "PH-03\n[ ] **Enable Renovate for this repository.**\n**Status:** pending. **Owner:** repository administrator.\n**Dependency / trigger:** PH-01.\n**Request and reason:** Grant the Renovate GitHub App access to https://github.com/GabriellMDias/mns-suporte so the committed [configuration](../../renovate.json) runs. App installation is an account action.\n**Configuration:** none; no personal token is required.\n**Verification:** Renovate opens this repository's Dependency Dashboard reflecting the committed dependencies and schedule.\n**Evidence / blocker:** Not started.\n"
-  },
-  {
-    "id": "repository/docs/project/human-actions",
-    "title": "MNS Suporte Human Actions",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "PH-04",
-    "anchor": "ph-04",
-    "text": "PH-04\n[ ] **Enable and verify applicable GitHub security controls.**\n**Status:** pending. **Owner:** repository administrator.\n**Dependency / trigger:** PH-01.\n**Request and reason:** Enable available code scanning, secret scanning and push protection, dependency graph, and vulnerability alerts, and set the Actions variable `DEPENDENCY_REVIEW_ENABLED=true` so the dependency-review job runs. Record entitlement limits for this repository's visibility and plan.\n**Configuration:** Actions variable `DEPENDENCY_REVIEW_ENABLED` (non-secret).\n**Verification:** Inspect effective security settings and a pull-request run in which dependency review executed and the aggregate gate passed.\n**Evidence / blocker:** Not started.\n"
-  },
-  {
-    "id": "repository/docs/project/human-actions",
-    "title": "MNS Suporte Human Actions",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "PH-05",
-    "anchor": "ph-05",
-    "text": "PH-05\n[ ] **Define the product scope and acceptance criteria.**\n**Status:** pending. **Owner:** project owner.\n**Dependency / trigger:** [PJ-02](implementation-plan.md#current-work); required before product modules are implemented.\n**Request and reason:** Describe the product, actors, first capabilities, data classification, identity and authorization needs, and acceptance scenarios. Agents must not invent product requirements.\n**Configuration:** none.\n**Verification:** Requirements are recorded in the repository and linked from the project plan.\n**Evidence / blocker:** Not started.\n"
-  },
-  {
-    "id": "repository/docs/project/human-actions",
-    "title": "MNS Suporte Human Actions",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "PH-06",
-    "anchor": "ph-06",
-    "text": "PH-06\n[ ] **Determine the product license before distribution requires it.**\n**Status:** pending (conditional on distribution). **Owner:** project owner, with legal input when needed.\n**Dependency / trigger:** Publication or distribution of MNS Suporte.\n**Request and reason:** Choose the license, copyright holder, and distribution model for MNS Suporte's own work. Agents must not choose legal policy by assumption. Material inherited from Orion is Apache-2.0, which does not decide MNS Suporte's license.\n**Configuration:** none.\n**Verification:** License files, the README, and publication metadata match the recorded decision.\n**Evidence / blocker:** No product license selected.\n"
-  },
-  {
-    "id": "repository/docs/project/human-actions",
-    "title": "MNS Suporte Human Actions",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "New action template",
-    "anchor": "new-action-template",
-    "text": "New action template\nAllocate a new stable `PH-NN`; do not reuse existing IDs. Link it from the blocked or conditional plan task.\n## PH-NN\n\n- [ ] **Concrete human action.**\n\n**Status:** pending. **Owner:** actual person or responsible role.\n**Dependency / trigger:** Linked task; whether it blocks current work.\n**Request and reason:** Exact need, completed preparation, and why authorized automation cannot finish it.\n**Configuration:** Exact non-secret names, minimum scopes and secure destination; never secret values. Use \"none\" if no configuration is needed.\n**Verification:** Observable checks required before completion.\n**Evidence / blocker:** Dated safe evidence, outstanding limit, or changed applicability.\n\n"
+    "heading": "PH-11",
+    "anchor": "ph-11",
+    "text": "PH-11\n[ ] **Grant GitHub plan eligibility for branch protection on the private repository.**\n**Status** Blocked. **Owner** GitHub account or organization administrator.\nOn 2026-11-25, GitHub returned HTTP 403 for branch protection and rulesets on the private project and required a plan that supports those controls. Keep the repository private. Use an eligible organization or grant the existing owner the required plan when available. Verify by requiring the `Orion required gate` check through GitHub CLI and reading back the effective rule. CI and the pull-request workflow are available under the current plan. Affects PJ-01.\n"
   },
   {
     "id": "repository/docs/project/implementation-plan",
@@ -510,52 +591,79 @@
     "kind": "repository",
     "heading": "MNS Suporte Implementation Plan",
     "anchor": "mns-suporte-implementation-plan",
-    "text": "MNS Suporte Implementation Plan\n[Project human actions](human-actions.md) · [Project derivation](../project-derivation.md) · [Validation](../validation.md) · [Documentation index](../README.md)\n"
+    "text": "MNS Suporte Implementation Plan\n[Product scope](product-scope.md) · [Human actions](human-actions.md) · [Validation](../validation.md)\nMNS Suporte was initialized from Orion on 2026-11-25. The [manifest](../../.orion/project.json) records its foundation ancestry.\n"
   },
   {
     "id": "repository/docs/project/implementation-plan",
     "title": "MNS Suporte Implementation Plan",
     "group": "Project guides",
     "kind": "repository",
-    "heading": "Purpose and baseline",
-    "anchor": "purpose-and-baseline",
-    "text": "Purpose and baseline\nThis is MNS Suporte's living execution plan and the current plan for this repository. It tracks product and repository work; the [README](../../README.md), current policies, and [accepted ADRs](../adr/README.md) govern implementation.\nMNS Suporte was initialized on 2026-11-25 from Orion commit `6fe8aa850d9fc3d8e78584c6f4af27d524e3ac75` of https://github.com/GabriellMDias/Orion. The [project manifest](../../.orion/project.json) records that immutable initialization commit and the Orion baseline currently integrated. The repository starts with the foundation's architecture, policies, ADRs, tooling, validation gate, CI, generated references, and Living Documentation Portal, and with no product modules. Results recorded for the Orion repository are not results for this repository until they pass in this checkout and in this repository's CI.\n"
+    "heading": "Tracking",
+    "anchor": "tracking",
+    "text": "Tracking\nThe V1 denominator is the number of rows in [V1 work](#v1-work). Count a row as complete only after its acceptance criteria pass with recorded evidence. Report completed, in-progress, pending, and blocked counts on each handoff. Project decisions stay in the product scope or relevant ADR. Access that requires a human stays in the [human-action checklist](human-actions.md). Preserve task IDs and record scope changes here.\n"
   },
   {
     "id": "repository/docs/project/implementation-plan",
     "title": "MNS Suporte Implementation Plan",
     "group": "Project guides",
     "kind": "repository",
-    "heading": "Maintaining this plan",
-    "anchor": "maintaining-this-plan",
-    "text": "Maintaining this plan\nEvery contributor or coding agent performing implementation work must maintain this plan and the [project human actions](human-actions.md) within the user's authorized scope.\nBefore implementation, inspect actual repository state, the relevant task, its prerequisites, governing policy, and linked human actions. Do not treat a planned capability or unchecked action as available.\nMark a task `in progress` when work actually starts. Update statuses when evidence, scope, dependencies, or blockers change, and before each handoff or completion report.\nAllocate stable task IDs as `PJ-NN`; never reuse or renumber them. Add finer tasks when needed; do not hide unfinished subtasks inside a completed row.\nRecord concise evidence in the task row: implementation paths, validation commands and results, review references, or a linked decision. Record evidence produced for this repository—local validation, this repository's CI runs, and this repository's external settings. Do not store secret values or sensitive output.\nA task becomes `completed` only when its deliverables and acceptance criteria are satisfied with evidence. A partial implementation or an unavailable required check is not completion.\nWhen human intervention is necessary, add or update a project human action, link it from the affected task, mark that task `blocked`, and tell the user what is needed. Continue independent authorized work where possible.\nA future prerequisite is `pending`, not automatically `blocked`.\nWhen scope or sequencing changes, use `changed`, explain why and what replaces the work, and link supporting decisions. Do not delete unresolved obligations to make the plan look complete.\nUpdate command availability, current documentation, generated artifacts, and the human actions in the same coherent change where applicable. Do not change ADR status merely to record implementation progress.\nStatus\nMeaning\n`pending`\nNot started; includes conditional work whose trigger has not occurred.\n`in progress`\nWork has started and is incomplete.\n`completed`\nApplicable deliverables and acceptance criteria are satisfied with evidence.\n`blocked`\nThe identified work cannot proceed without a recorded dependency, decision, access, or correction.\n`changed`\nScope, applicability, or sequencing was explicitly revised; reason and replacement or disposition are recorded.\n"
+    "heading": "V1 work",
+    "anchor": "v1-work",
+    "text": "V1 work\nTask\nDeliverable and acceptance\nStatus\nEvidence or dependency\nPJ-01\nEstablish a private GitHub repository. Verify the initial default branch, security settings and enforced CI gate.\nblocked\nPrivate repository and vulnerability alerts verified. [Initial CI passed](https://github.com/GabriellMDias/mns-suporte/actions/runs/45622724328). Required branch protection depends on [PH-11](human-actions.md#ph-11).\nPJ-02\nRecord actors, scope, data ownership, first-release acceptance and the future AI boundary.\ncompleted\n[Approved scope and acceptance](product-scope.md).\nPJ-06\nImplement Meta callback verification and signed webhook ingestion. Verify the challenge, exact-byte HMAC, incoming identity fields and recipient scope with synthetic requests.\ncompleted\n[Webhook tests](../../apps/api/test/whatsapp/webhook.test.ts) passed. The [API guide](../../apps/api/README.md#whatsapp-webhook) documents configuration.\nPJ-07\nPersist incoming messages before acknowledgement and deduplicate replays, including concurrent delivery, using the restricted database role.\ncompleted\n[Webhook integration tests](../../apps/api/test/whatsapp/webhook.test.ts) verified concurrent replays, PostgreSQL grants and failure acknowledgement.\nPJ-08\nImplement the Meta outbound adapter and durable sends. Test text and interactive replies, safe retries and delivery status handling.\npending\nDepends on PJ-06 and PJ-07.\nPJ-09\nImplement the GLPI adapter and exact directory lookup. Test scoped credentials, timeouts, session renewal and explicit outcomes for mutations.\npending\nUse synthetic GLPI fixtures locally. Test against company test access under [PH-08](human-actions.md#ph-08).\nPJ-10\nVerify and persist employee identity with short-lived, rate-limited email challenges. Test invalid, replayed and expired codes, and access isolation between employees.\npending\nDepends on PJ-08 and PJ-09. Mail relay access under [PH-09](human-actions.md#ph-09).\nPJ-11\nImplement the menu, guided intake, resumable drafts, confirmation, editing, cancel and the direct path to IT. Test ordinary navigation and restart recovery.\npending\nDepends on PJ-07, PJ-08 and PJ-10.\nPJ-12\nProvide approved static troubleshooting with a direct path to open a ticket. Record whether it helped.\npending\nDepends on PJ-11.\nPJ-13\nCreate GLPI tickets with attachments and confirmed summaries. Test duplicates, ambiguous creation outcomes and recoverable attachment failures.\npending\nDepends on PJ-09 and PJ-11.\nPJ-14\nList the employee's open GLPI tickets and show authorized ticket details. Test ownership before disclosure and preserve existing ticket access through verified identity.\npending\nDepends on PJ-09 and PJ-10.\nPJ-15\nNotify on closure, capture permission to receive updates and use the approved utility template when required. Verify retries and delivery tracking.\npending\nDepends on PJ-08, PJ-13 and PJ-14. Live template under [PH-07](human-actions.md#ph-07).\nPJ-16\nPackage and document operation with a container, production configuration, restricted database access, retention, backup and restore, sanitized diagnostics, alerts and recovery procedures. Verify local deployment and rollback rehearsal.\npending\nStarts after stable local flows. Company ingress and deployment access under [PH-10](human-actions.md#ph-10).\nPJ-17\nRun the release acceptance suite against disposable infrastructure, then run a pilot with the test Meta number, company test GLPI and mail relay. Verify real end-to-end delivery and failure recovery.\npending\nDepends on PJ-08 through PJ-16 and external test access.\nPJ-18\nReconcile active legacy notifications and onboard verified employees. Deploy, verify smoke checks and supervise the switch to the corporate support number.\npending\nDepends on PJ-17. Production access and the support number under [PH-07](human-actions.md#ph-07), [PH-08](human-actions.md#ph-08) and [PH-10](human-actions.md#ph-10).\n"
   },
   {
     "id": "repository/docs/project/implementation-plan",
     "title": "MNS Suporte Implementation Plan",
     "group": "Project guides",
     "kind": "repository",
-    "heading": "Constraints throughout implementation",
-    "anchor": "constraints-throughout-implementation",
-    "text": "Constraints throughout implementation\nRetain the accepted stack recorded in the [technology map](../architecture/technology-decisions.md); incompatibilities require explicit resolution rather than silent substitution.\nAdd product capabilities as [API modules](../../apps/api/README.md#modules) and [web modules](../../apps/web/README.md#modules) composed in `apps/api/src/modules.ts` and `apps/web/src/modules.tsx`; Orion's [reference implementation](../project-derivation.md#orions-reference-implementation) shows a complete example.\nDeliver tests, security controls, telemetry, and documentation with the behavior they protect.\nKeep generated artifacts reproducible and subordinate to canonical sources. Reviewed SQL migrations follow their separate release-history rules.\nRequire non-mutating `pnpm validate` for substantial changes, using the same capabilities locally and in CI.\nAdopt newer Orion revisions only through the reviewed [upgrade workflow](../project-derivation.md#upgrade-to-a-newer-orion-revision).\n"
+    "heading": "Plan changes and later work",
+    "anchor": "plan-changes-and-later-work",
+    "text": "Plan changes and later work\nPJ-03 was the generic first module. PJ-06 through PJ-15 replace it with independently verifiable product capabilities.\nPJ-04 remains outside V1. The web shell already provides the local documentation portal and is available for a future operator interface.\nPJ-05 is split across PJ-10 and PJ-16. Corporate email verification is the V1 identity mechanism, with deployment work verified independently.\nPost-V1 candidates include supplementing tickets over WhatsApp, known incident notices, an editorial knowledge base, and optional AI guidance and summarization. The [AI extension boundary](product-scope.md#ai-extension) governs that work. These items are outside the V1 progress denominator.\n"
   },
   {
-    "id": "repository/docs/project/implementation-plan",
-    "title": "MNS Suporte Implementation Plan",
+    "id": "repository/docs/project/product-scope",
+    "title": "MNS Suporte Product Scope",
     "group": "Project guides",
     "kind": "repository",
-    "heading": "Current work",
-    "anchor": "current-work",
-    "text": "Current work\nTask\nScope\nStatus\nEvidence / dependency\nPJ-01\nPublish the default branch to this project's `origin`, then verify that `pnpm install --frozen-lockfile` and `pnpm validate` pass and that this repository's required CI gate runs and passes.\npending\n[PH-01](human-actions.md#ph-01), [PH-02](human-actions.md#ph-02).\nPJ-02\nDefine the product scope, actors, first capabilities, data classification, and acceptance criteria; replace the README introduction.\npending\n[PH-05](human-actions.md#ph-05).\nPJ-03\nImplement the first product module with its schema, migration, API contract, generated SDK use, web workflow, tests, and documentation.\npending\nDepends on PJ-02.\nPJ-04\nReplace the neutral placeholder brand mark and touch icon with the product's visual identity.\npending\n[Web identity](../../apps/web/README.md#identity); product decision.\nPJ-05\nSelect an identity provider when the product needs one, and establish deployment-specific operation (hosting, secrets, database, telemetry, backups, alerts, runbooks) when real environment requirements exist.\npending\nConditional; add project human actions when triggered. Governing policies: [production access](../security/production-access.md), [secrets](../security/secrets-management.md), [retention](../security/data-retention.md), [alerting](../reliability/alerting.md), [incident response](../security/incident-response.md), [runbook authoring](../runbooks/authoring.md).\n"
+    "heading": "MNS Suporte Product Scope",
+    "anchor": "mns-suporte-product-scope",
+    "text": "MNS Suporte Product Scope\n[Implementation plan](implementation-plan.md) · [Project README](../../README.md)\nMNS Suporte is an internal IT support channel for MNS employees. Employees use WhatsApp to open and consult GLPI tickets or find the IT contact. The IT team receives and resolves the tickets in GLPI. The V1 menu and employee-facing prompts use Brazilian Portuguese.\n"
   },
   {
-    "id": "repository/docs/project/implementation-plan",
-    "title": "MNS Suporte Implementation Plan",
+    "id": "repository/docs/project/product-scope",
+    "title": "MNS Suporte Product Scope",
     "group": "Project guides",
     "kind": "repository",
-    "heading": "Progress and plan changes",
-    "anchor": "progress-and-plan-changes",
-    "text": "Progress and plan changes\nCurrent task statuses own progress. Git preserves detailed editing history. Do not remove unresolved tasks or activation conditions when consolidating completed work.\n"
+    "heading": "V1 workflow",
+    "anchor": "v1-workflow",
+    "text": "V1 workflow\nVerify the employee with a short-lived code delivered to their corporate mailbox after an exact, unique lookup in the corporate directory exposed by GLPI. Bind the verified GLPI identity to the WhatsApp account. Limit challenges and attempts, and use neutral replies during lookup.\nOffer to open a ticket, list the employee's open tickets, or direct them to IT. The human contact is an explicit menu option and remains available during intake.\nCollect category, unit or department, description, impact, and optional photos, audio or documents. Keep a resumable draft. Offer a relevant static instruction when one exists. The employee can mark it helpful, request more support, or skip to ticket creation.\nPresent a draft summary for review. On confirmation, create the ticket and attach media in GLPI. Confirm creation only after obtaining the GLPI ticket ID. Surface attachment failures independently from ticket creation.\nCheck ownership in GLPI before displaying ticket details. Record permission for outbound updates, check for closure and send a notification. Use the approved Meta utility template outside the customer service window.\nEmail password reset was retired from the product scope. The verification code proves access to the mailbox for onboarding.\n"
+  },
+  {
+    "id": "repository/docs/project/product-scope",
+    "title": "MNS Suporte Product Scope",
+    "group": "Project guides",
+    "kind": "repository",
+    "heading": "Delivery and data boundaries",
+    "anchor": "delivery-and-data-boundaries",
+    "text": "Delivery and data boundaries\nMeta Cloud API carries conversations. Use a TLS webhook, verify its requests, scope incoming events to the configured business number, and persist supported inbound messages before acknowledging them. Use the business-scoped sender identifier when available and retain a supplied phone number only where needed for identity continuity and routing.\nGLPI remains authoritative for employee directory records, ticket ownership, tickets, attachments and ticket status. Its service account receives scoped permissions.\nPostgreSQL owns verified links, in-progress conversations, integration delivery state and job deduplication. Treat identifiers, user-provided support content and attachments as restricted. Exclude them from routine logs, keep media references only while needed for delivery to GLPI, and establish automated retention before real traffic.\nRecord ambiguous provider outcomes for reconciliation. A missing response after ticket submission may hide a successful creation. Replays or restarts must preserve the original intent and must not create a second ticket.\nExisting GLPI tickets remain in GLPI. Reverify legacy identity links. Reconcile pending legacy notifications with the live GLPI status and the employee's verified identity before sending from the new service.\n"
+  },
+  {
+    "id": "repository/docs/project/product-scope",
+    "title": "MNS Suporte Product Scope",
+    "group": "Project guides",
+    "kind": "repository",
+    "heading": "AI extension",
+    "anchor": "ai-extension",
+    "text": "AI extension\nThe conversation service owns its state and the complete guided flow. An optional assistant may return candidate field values, approved knowledge article references and a draft summary. Application rules validate those outputs and require employee review before ticket creation. On timeout, unavailability or lack of relevant guidance, continue from the saved step with the guided prompts. Limit context to approved content and the minimum necessary support data. Treat user messages and retrieved articles as untrusted input. AI receives no write capability in GLPI.\n"
+  },
+  {
+    "id": "repository/docs/project/product-scope",
+    "title": "MNS Suporte Product Scope",
+    "group": "Project guides",
+    "kind": "repository",
+    "heading": "Release acceptance",
+    "anchor": "release-acceptance",
+    "text": "Release acceptance\nAn employee can verify ownership of their corporate mailbox, resume a draft after restart, open a ticket with an attachment, consult their own tickets and receive a closure notice in the test environment.\nDirect access to IT and every core flow work with the guided messages alone.\nReplayed or concurrent inbound deliveries do not duplicate tickets. A GLPI outage preserves the draft and permits safe recovery.\nAnother employee cannot view ticket details or trigger actions with a stale or unverified messenger identity.\nRelease evidence includes local validation, a pilot on real service boundaries, backup and restore checks, and a supervised cutover rehearsal.\n"
   },
   {
     "id": "repository/docs/README",
@@ -763,131 +871,5 @@
     "heading": "Public vs internal error",
     "anchor": "public-vs-internal-error",
     "text": "Public vs internal error\nKeep public messages/codes separate from internal diagnostic evidence. Internal stacks and provider details must not leak through responses. An opaque `errorId` can connect a support reference to an occurrence, logs, and trace; it never grants telemetry access. Support staff and AI investigators need the same authorization as any other production investigator.\nCapture the producing service/application, environment, deployed release, and semantic operation. Release identity must identify the actual artifact, remain correlatable after rollback, and not be confused with API, SDK, or database version. Production and non-production must be distinguishable. Meaningful tracker regression analysis requires release metadata.\nInclude active trace/span and request correlation where available, preferably through infrastructure rather than manual copying. Follow [logging's correlation convention](logging.md#current-implementation-and-contract); public API field names are a separate contract. Request IDs remain useful when tracing is sampled. Background work can add safe job/event identity, type/consumer, and attempt, never the entire payload. Stable error codes and bounded semantic categories may help investigation; arbitrary messages are not error codes.\n"
-  },
-  {
-    "id": "repository/docs/reliability/error-reporting",
-    "title": "Error Reporting",
-    "group": "Reliability",
-    "kind": "repository",
-    "heading": "Context and capture safety",
-    "anchor": "context-and-capture-safety",
-    "text": "Context and capture safety\n[Telemetry redaction](../security/telemetry-redaction.md) and [data classification](../security/data-classification.md) govern every field, including automatic SDK capture. Use minimum explicit safe projections. If context cannot be sanitized confidently, drop it. Never intentionally send `RESTRICTED` data; provider-side filters are defense in depth.\nIndexed tags must be stable, bounded, and safe, such as service/environment/operation/code/provider. High-cardinality request, trace, user, resource, and job IDs belong in permitted non-indexed context when provider indexing costs warrant it. Context still needs size/nesting limits and a diagnostic purpose.\nPrefer opaque actor/tenant IDs to names, email, phone, or tenant metadata. Extra personal data requires an explicit approved need. Anonymous session IDs require safe semantics and bounded retention. Device/OS/app/locale metadata should be minimized; unnecessary IP collection and precise geolocation should be disabled/minimized. Do not indiscriminately collect desktop paths, usernames, or machine names.\nDo not attach complete requests, responses, user/domain/ORM objects, configuration, provider payloads, user content, or application state. Automatic request capture must omit bodies, authorization, cookies, and query values by default; response-body capture is disabled by default. Environment capture is disabled: only explicitly allowlisted safe configuration metadata may be attached.\nNever construct exception messages containing credentials or connection strings. Keep dynamic IDs out of message text where a safe separate field provides the same diagnostic value and better grouping.\nBreadcrumb buffers must be bounded and represent recent safe navigation, interaction categories, dependency calls, or state transitions. Review automatic console/network/DOM capture before use. Prefer method, normalized route, status, and duration; exclude typed content, payloads, credentials, sensitive query strings, and unnecessary resource IDs.\nAttachments are disabled or used only with particular caution; never upload arbitrary diagnostics automatically. Screenshots require explicit classification, consent, access, and redaction rules. Session replay requires privacy/security review and is not a default. Automatic stack-frame local-variable capture is disabled unless a safe mechanism is proven.\nProduction tracker access follows [least privilege](../security/production-access.md), including vendor support access. [Retention and deletion](../security/data-retention.md) apply to providers storing personal data. A suspected telemetry leak follows [incident response](../security/incident-response.md): contain collection, determine affected events/providers, rotate exposed secrets where applicable, remove accessible leaked data where possible, fix the source, and add regression protection.\n"
-  },
-  {
-    "id": "repository/docs/reliability/error-reporting",
-    "title": "Error Reporting",
-    "group": "Reliability",
-    "kind": "repository",
-    "heading": "Grouping and fingerprint checklist",
-    "anchor": "grouping-and-fingerprint-checklist",
-    "text": "Grouping and fingerprint checklist\nGroup occurrences by the underlying defect. Prefer provider defaults until evidence shows over-grouping of different causes or under-grouping of one defect. Ordinary deployments/line shifts should not unnecessarily split one issue. Dynamic identifiers, generated paths, and arbitrary provider messages can make grouping unstable.\nBefore adding a custom fingerprint, identify the defect, occurrences that belong together, failures that must remain separate, and how behavior will be validated. Values must be stable, bounded, semantic, and non-sensitive: category, operation, stable provider code, or exception class may fit. Request/user/resource IDs, email, and raw messages must not be fingerprint inputs. Give material custom grouping logic an owner and tests; avoid manual fingerprints on every error.\nDeliberate filters can remove known non-actionable extension/environment/cancellation noise. Prefer stable evidence over fragile message substrings. Significant ignore rules need a reason, owner, scope, and reviewability; do not broadly ignore an exception class without understanding other failures it represents. Earlier filtering reduces privacy risk/cost but must not hide important defects.\n"
-  },
-  {
-    "id": "repository/docs/reliability/error-reporting",
-    "title": "Error Reporting",
-    "group": "Reliability",
-    "kind": "repository",
-    "heading": "Source map checklist",
-    "anchor": "source-map-checklist",
-    "text": "Source map checklist\nBuild transformations must not make required production diagnostics unusable. When source maps, native symbols, or mapping files are needed:\nGenerate them reproducibly and associate them with the exact deployed artifact, release/build, and platform. Incorrect maps are misleading.\nDefine trusted storage/upload and access explicitly. Do not accidentally publish application source because a tracker needs it.\nMake upload/missing-artifact failures visible in release validation when diagnostics depend on them.\nVerify useful stack resolution against the actual artifact; include bounded shutdown/flush behavior for short-lived crash reporting where applicable.\nNative crash/hang/ANR and mobile/desktop symbolication pipelines remain conditional on selected platforms. Introducing them does not permit unrestricted device or environment capture.\n"
-  },
-  {
-    "id": "repository/docs/reliability/error-reporting",
-    "title": "Error Reporting",
-    "group": "Reliability",
-    "kind": "repository",
-    "heading": "Volume and provider failure",
-    "anchor": "volume-and-provider-failure",
-    "text": "Volume and provider failure\nBound buffers, event sizes, export waits, CPU/memory/network use, and provider quotas. A failure storm must not amplify the application outage. Rate limiting, local/collector deduplication, or sampling can preserve issue existence, representative context, and frequency estimates where possible; give critical or rare failures higher retention priority. Understand provider event, attachment, indexing, and retention limits and degrade safely when reached.\nCapture should normally be buffered, bounded, and non-blocking. An unavailable exporter must not normally fail business operations. Emit bounded fallback logs/metrics for capture loss or export failure without recursively reporting the tracker's own failure through itself. Development may use an isolated integration but must not trigger production incidents; ordinary test exceptions belong in CI, with test exporters or isolated environments for integration verification.\n"
-  },
-  {
-    "id": "repository/docs/reliability/error-reporting",
-    "title": "Error Reporting",
-    "group": "Reliability",
-    "kind": "repository",
-    "heading": "Ownership, triage, and review",
-    "anchor": "ownership-triage-and-review",
-    "text": "Ownership, triage, and review\nImportant error groups should have an identifiable application/domain/integration owner. Routing can use reliable source/service/operation metadata; avoid brittle incidental stack-frame rules or complexity unsupported by team structure. Prioritize impact, affected operations, data integrity/security, release correlation, reproducibility, criticality, frequency, and regression status. A single corruption or boundary failure can be critical; high occurrence count or HTTP status alone does not determine severity.\nResolved tracker status is not proof of a fix. Preserve release-aware regression detection where supported, add a regression test for confirmed bugs whenever practical, and connect important issues to corrections, tests, incidents, and runbooks. Durable architectural/incident conclusions belong in the repository, not only external issue comments. Recurring high-impact failures warrant investigation/recovery guidance.\n[Alerting](alerting.md) owns notification policy: actionable new issues, regressions, volume changes, fatal crashes, or critical workflow failures may notify; do not alert on every captured occurrence. Metrics express rates, traces causal execution, logs operational evidence, and trackers grouped defects. Audit records must not depend on tracker sampling, retention, or grouping.\nBefore adding capture, verify semantic classification, authoritative boundary, duplicate risk, preserved safe cause, release/environment/correlation, minimal classified context, grouping/volume, owner, and test strategy. Verify safety with synthetic failures/secrets and isolated capture. Do not claim provider, source-map, or deployment checks exist until implemented; available checks are listed in [validation](../validation.md).\n"
-  },
-  {
-    "id": "repository/docs/reliability/health-checks",
-    "title": "Health Checks",
-    "group": "Reliability",
-    "kind": "repository",
-    "heading": "Health Checks",
-    "anchor": "health-checks",
-    "text": "Health Checks\nThis policy owns startup, liveness, readiness, and diagnostic-health semantics. Probes answer narrow operational questions; [metrics](metrics.md), [alerts](alerting.md), synthetic monitoring, and full diagnostics serve different purposes. The application owns dependency criticality; shared mechanisms or an orchestrator must not infer it automatically.\n"
-  },
-  {
-    "id": "repository/docs/reliability/health-checks",
-    "title": "Health Checks",
-    "group": "Reliability",
-    "kind": "repository",
-    "heading": "Current API contract",
-    "anchor": "current-api-contract",
-    "text": "Current API contract\nThe implemented [health contracts](../../apps/api/src/health-contracts.ts), [handlers](../../apps/api/src/app.ts), and [lifecycle](../../apps/api/src/lifecycle.ts) define three endpoints with `200`/`503` and minimal `{ \"status\": \"ok\" | \"unavailable\" }` responses:\nEndpoint\nCurrent behavior\n`/health/startup`\nUnavailable while lifecycle is `starting`; successful after leaving that phase\n`/health/live`\nSuccessful until lifecycle reaches `stopped`; does not query PostgreSQL\n`/health/ready`\nSuccessful only in `ready`, plus the feature's database check when configured; dependency failure or a 500 ms wait deadline makes it unavailable\n[Bootstrap](../../apps/api/src/main.ts) validates configuration, checks configured database connectivity, listens, then marks ready. Shutdown begins drain before closing HTTP and resources. Ordinary requests during draining/stopped receive a safe unavailable response. The readiness wait deadline does not itself cancel the underlying database operation. The current handler verifies connectivity, not full schema compatibility or every business capability.\nHealth paths/status/schema are implemented contracts, not deferred choices. Orchestrator probe frequency/thresholds, deployed routing, diagnostics authorization, uptime/synthetic monitors, and recovery objectives remain deployment-specific. Global response logging/instrumentation currently includes health traffic; the noise guidance below is an intended improvement, not existing exclusion behavior.\n"
-  },
-  {
-    "id": "repository/docs/reliability/health-checks",
-    "title": "Health Checks",
-    "group": "Reliability",
-    "kind": "repository",
-    "heading": "Liveness",
-    "anchor": "liveness",
-    "text": "Liveness\nLiveness asks whether the process can make progress and whether restarting has a reasonable chance of repair. Prefer cheap process-local evidence such as irrecoverable state or inability to serve the handler. A remote database, cache, broker, identity, or provider outage normally does not justify restarting otherwise healthy replicas. Dependency-coupled liveness can amplify shared outages, startup load, and loss of evidence.\nUse runtime/platform controls where adequate instead of fragile custom memory/disk/event-loop thresholds without evidence. High load or memory pressure is not automatically death; rate limiting/backpressure may remain safe. Serverless/client runtimes need appropriate initialization/reachability behavior, not forced container-style endpoints.\n"
-  },
-  {
-    "id": "repository/docs/reliability/health-checks",
-    "title": "Health Checks",
-    "group": "Reliability",
-    "kind": "repository",
-    "heading": "Readiness",
-    "anchor": "readiness",
-    "text": "Readiness\nReadiness asks whether this runtime can safely accept its expected work now. Failure normally removes new traffic/job claiming without terminating the process. Consider required initialization/configuration, truly critical dependencies/resources, and draining. A process can be live and unready while a dependency recovers.\nClassify dependencies by actual application responsibility. Optional email/analytics/cache failure may permit degraded operation; a broker can be critical for a worker without being critical to a read API. A nominally optional cache can become critical if fallback overloads the database, so use tested behavior. Do not map every circuit breaker, dependency outage, or individual module to whole-process unready automatically.\nDefine “degraded” explicitly if used. Independent read/write capabilities may justify scoped routing, separate runtimes, or bounded degraded responses when real requirements demand it; do not create dozens of probes preemptively. Health aggregation for a dashboard is not orchestration health authority. Readiness is minimum work-acceptance evidence, not complete correctness, SLO compliance, or a customer-specific domain validation.\n"
-  },
-  {
-    "id": "repository/docs/reliability/health-checks",
-    "title": "Health Checks",
-    "group": "Reliability",
-    "kind": "repository",
-    "heading": "Startup check and shutdown",
-    "anchor": "startup-check-and-shutdown",
-    "text": "Startup check and shutdown\nStartup distinguishes legitimate initialization time from failure. Bound initialization and fail visibly when it cannot finish. Invalid required configuration generally needs fast failure, while recoverable dependency outages may allow a process to wait/recover if designed to do so. Permanently bad credentials must become observable configuration defects rather than indefinite restart loops. Validate expensive deterministic configuration/schema compatibility at an appropriate boundary rather than repeating full inspection per probe.\nA runtime known to be incompatible with its database schema must not serve unsafe work; the current API connectivity probe does not establish that guarantee. Readiness must precede deployment success, not process creation alone.\nOn shutdown/maintenance, become unready, stop new work, drain in-flight operations within the allowed window, then terminate. A draining process can remain live. Workers must stop claiming and follow their queue's safe completion/release semantics. Do not use liveness failure simply to take an instance out of traffic. Deployment rollback/failure decisions must follow actual release policy and compatibility.\n"
-  },
-  {
-    "id": "repository/docs/reliability/health-checks",
-    "title": "Health Checks",
-    "group": "Reliability",
-    "kind": "repository",
-    "heading": "Probe safety and dependency cost",
-    "anchor": "probe-safety-and-dependency-cost",
-    "text": "Probe safety and dependency cost\nChecks must be read-only, cheap, deterministic, and bounded. Never create/delete business records, send messages/email, charge payments, or mutate providers as a routine probe. Avoid data-dependent/random sample rows, full scans/joins, migration replay, schema diffs, all-system tests, and full integrity validation. Cheap connectivity/constant queries should use runtime credentials where practical so an administrator's success does not hide runtime permission failure.\nDo not poll every third party on every probe. Provider checks can consume quotas, cost, and availability; observed error/latency/circuit state may be better evidence. Readiness can remain valid when the service safely queues, retries later, degrades, or returns bounded dependency failures. Long integrity checks belong to separate monitoring unless a discovered defect makes work unsafe.\nEach dependency wait needs a short timeout, with total latency comfortably inside the caller's budget. Parallel independent checks can help but must remain resource-bounded. Account for replica count × frequency, concurrent checks, lingering work after wait deadlines, and recovery thundering herds. Probe cost should not scale with user/table/history size. Define success/failure thresholds or hysteresis only when needed to balance responsiveness and flapping; cached health introduces explicit staleness/recovery delay.\nKeep health handlers simple and responsive during partial degradation. Basic transport/security/correlation middleware may apply; avoid expensive business orchestration or authorization where unnecessary. If saturation prevents safe new work, readiness needs a deliberate decision coordinated with timeouts/retries/backpressure, not a generic restart rule.\n"
-  },
-  {
-    "id": "repository/docs/reliability/health-checks",
-    "title": "Health Checks",
-    "group": "Reliability",
-    "kind": "repository",
-    "heading": "Output, monitoring, and security",
-    "anchor": "output-monitoring-and-security",
-    "text": "Output, monitoring, and security\nMachine probes need deterministic minimal state and matching transport status. Detailed diagnostics are a separate authorized surface with stable logical dependency names, not raw hostnames/IPs, configuration, topology, credentials, stack traces, or exceptions. An unauthenticated minimal probe must not become an account/tenant/session inspection endpoint. Network isolation can support probe access but never authorizes a public diagnostic dump.\nProbe response schemas and behavior are compatibility contracts for load balancers, orchestrators, deployers, and monitors. Coordinate changes with consumers. Public correlation IDs are optional and must remain safe. Prefer state-transition evidence over a log/error issue per poll; suppress/sample routine successes and avoid repeated warnings during known outages. Trace health sparingly and use underlying dependency signals where possible.\nProbe failures alone do not determine incident urgency: assess duration, replicas, traffic, error rate, and actual capability. One failed replica may recover automatically; all unready replicas can indicate a shared dependency or bad release. Uptime checks answer external DNS/TLS/routing/reachability; synthetic transactions use isolated data and separate safety controls to test real workflows. Neither replaces readiness.\n"
-  },
-  {
-    "id": "repository/docs/reliability/health-checks",
-    "title": "Health Checks",
-    "group": "Reliability",
-    "kind": "repository",
-    "heading": "Health check testing and review",
-    "anchor": "health-check-testing-and-review",
-    "text": "Health check testing and review\nTest actual startup, required-dependency failure, optional degradation where supported, liveness independence, invalid configuration, bounded wait, drain/new-work rejection, safe response shape, and critical recovery transitions. Complex caching/hysteresis needs transition coverage. Do not use production business records as probe fixtures.\nBefore changing a check, identify consumer/owner, exact question, expected recovery action, dependency criticality, safe work during outage, runtime identity, full-scale cost, timeout/cancellation semantics, response security, compatibility, and tests. Add a real runbook only for known repeatable failures. Consult [validation](../validation.md) and the runtime README for available checks; hosting integrations remain out of scope until selected.\n"
-  },
-  {
-    "id": "repository/docs/reliability/logging",
-    "title": "Logging",
-    "group": "Reliability",
-    "kind": "repository",
-    "heading": "Logging",
-    "anchor": "logging",
-    "text": "Logging\nThis policy owns structured operational log events, levels, correlation, and reporting boundaries. [Observability](observability.md) explains signal selection; [redaction](../security/telemetry-redaction.md) owns what may be captured. Logs are diagnostic evidence, not an authoritative audit ledger, business database, analytics warehouse, or substitute for metrics/traces/error reporting.\n"
   }
 ]

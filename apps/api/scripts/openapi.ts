@@ -27,7 +27,11 @@ type Schema = Record<string, unknown>;
 function asSchema(value: object): Schema {
   return value as Schema;
 }
-function response(schema: unknown, status: string) {
+function response(
+  schema: unknown,
+  status: string,
+  contentType = "application/json",
+) {
   return {
     description: "Response",
     ...(status === "429"
@@ -40,7 +44,7 @@ function response(schema: unknown, status: string) {
           },
         }
       : {}),
-    content: { "application/json": { schema } },
+    content: { [contentType]: { schema } },
   };
 }
 
@@ -105,7 +109,7 @@ export async function generateOpenApi(
     const responses = Object.fromEntries(
       Object.entries(schema.response).map(([code, value]) => [
         code,
-        response(value, code),
+        response(value, code, operation.responseContentTypes?.[Number(code)]),
       ]),
     );
     if (operation.expectedErrors) {

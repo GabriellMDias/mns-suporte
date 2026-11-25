@@ -12,3 +12,6 @@
 | `RATE_LIMITED` | 429 | rate_limit | yes | Too many requests. Try again later. |
 | `INTERNAL_ERROR` | 500 | internal | no | An unexpected error occurred. |
 | `SERVICE_UNAVAILABLE` | 503 | availability | yes | The service is unavailable. |
+| `WHATSAPP_WEBHOOK_UNVERIFIED` | 403 | authentication | no | The webhook request could not be verified. |
+| `WHATSAPP_WEBHOOK_TOO_LARGE` | 413 | validation | no | The webhook payload is too large. |
+| `WHATSAPP_WEBHOOK_UNSUPPORTED_MEDIA_TYPE` | 415 | validation | no | The webhook must use JSON. |

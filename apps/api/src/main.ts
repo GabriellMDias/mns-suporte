@@ -1,4 +1,4 @@
-import { parseServerConfig } from "./config.js";
+import { parseServerConfig, whatsappWebhookFrom } from "./config.js";
 import { createLogger } from "./logging.js";
 import { errorDiagnostics } from "./error-diagnostics.js";
 import { shutdownRuntime, withDeadline } from "./lifecycle.js";
@@ -47,7 +47,7 @@ try {
       : undefined;
   const modules = activateModules(
     apiModules,
-    { database, verifier },
+    { database, verifier, whatsappWebhook: whatsappWebhookFrom(config) },
     config.environment,
   );
   const { app, lifecycle } = createApp(logger, undefined, {
