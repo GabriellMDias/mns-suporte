@@ -78,6 +78,28 @@ Lifecycle: Created or replaced only as a challenge is consumed. Proof expires af
 | `whatsapp_verified_identities_pkey` | `PRIMARY KEY (scope_key)` | Maintains one current verified GLPI identity for a WhatsApp sender scope. |
 | `whatsapp_verified_identities_user` | `CHECK ((glpi_user_id > 0))` | Requires a positive GLPI directory identity. |
 
+## whatsapp_troubleshooting_feedback
+
+A single employee response to a versioned static troubleshooting guide offered during ticket intake.
+
+Owner: WhatsApp guided conversations. Classification: INTERNAL.
+
+Lifecycle: Recorded once as the conversation leaves the guidance step. The result survives dismissal of the draft and carries no contact, description or attachment fields.
+
+| Column | PostgreSQL type | Nullable | Default | Classification | Meaning | Null meaning | Unit |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `draft_id` | `uuid` | no | — | INTERNAL | Opaque identifier of the draft whose guidance was rated or skipped. | — | — |
+| `guidance_id` | `text` | no | — | INTERNAL | Stable, versioned identifier of the instructions shown. | — | — |
+| `outcome` | `"WhatsAppTroubleshootingOutcome"` | no | — | INTERNAL | Employee choice to report resolution, ask for more help or skip the suggestion. | — | — |
+| `recorded_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Instant at which the conversation accepted the response. | — | — |
+
+### Constraints and indexes
+
+| Object | Physical definition | Purpose |
+| --- | --- | --- |
+| `whatsapp_troubleshooting_feedback_pkey` | `PRIMARY KEY (draft_id)` | Keeps one guidance outcome per draft across retries. |
+| `whatsapp_troubleshooting_feedback_outcome_idx` | `CREATE INDEX whatsapp_troubleshooting_feedback_outcome_idx ON public.whatsapp_troubleshooting_feedback USING btree (guidance_id, outcome)` | Supports aggregate reporting by guide and outcome. |
+
 ## whatsapp_inbound_messages
 
 Durable intake of supported and authenticated Meta messages for the configured business number.
@@ -147,3 +169,4 @@ Lifecycle: Enqueued before dispatch. Retried only after an explicit provider thr
 | --- | --- | --- |
 | `WhatsAppConversationAction` | REQUEST_CODE, CONFIRM_CODE | Identity operation to request or confirm an employee email code after committing the preceding conversation move. |
 | `WhatsAppOutboundState` | PENDING, SENDING, ACCEPTED, SENT, DELIVERED, READ, FAILED, UNCERTAIN, EXPIRED | Tracks work from pending and claimed through acceptance, delivery, read, known failure, uncertainty, or service-window expiry. |
+| `WhatsAppTroubleshootingOutcome` | RESOLVED, NOT_RESOLVED, SKIPPED | Employee response to optional guidance. RESOLVED closes the draft. NOT_RESOLVED and SKIPPED keep the draft for review. |

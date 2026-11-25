@@ -141,6 +141,16 @@
       "file": "pages/database/whatsapp_outbound_messages.json"
     },
     {
+      "id": "database/whatsapp_troubleshooting_feedback",
+      "kind": "database",
+      "title": "whatsapp_troubleshooting_feedback",
+      "group": "WhatsApp guided conversations",
+      "source": "docs/generated/database/schema.md",
+      "summary": "A single employee response to a versioned static troubleshooting guide offered during ticket intake.",
+      "headings": [],
+      "file": "pages/database/whatsapp_troubleshooting_feedback.json"
+    },
+    {
       "id": "database/whatsapp_verified_identities",
       "kind": "database",
       "title": "whatsapp_verified_identities",
@@ -1060,16 +1070,16 @@
         "count": 68,
         "kinds": ["api", "component", "database", "repository"]
       },
-      { "file": "search/0001.json", "count": 111, "kinds": ["repository"] },
-      { "file": "search/0002.json", "count": 118, "kinds": ["repository"] },
-      { "file": "search/0003.json", "count": 152, "kinds": ["repository"] },
-      { "file": "search/0004.json", "count": 113, "kinds": ["repository"] },
+      { "file": "search/0001.json", "count": 109, "kinds": ["repository"] },
+      { "file": "search/0002.json", "count": 120, "kinds": ["repository"] },
+      { "file": "search/0003.json", "count": 153, "kinds": ["repository"] },
+      { "file": "search/0004.json", "count": 114, "kinds": ["repository"] },
       { "file": "search/0005.json", "count": 114, "kinds": ["repository"] },
-      { "file": "search/0006.json", "count": 96, "kinds": ["repository"] },
+      { "file": "search/0006.json", "count": 98, "kinds": ["repository"] },
       { "file": "search/0007.json", "count": 101, "kinds": ["repository"] },
       { "file": "search/0008.json", "count": 94, "kinds": ["repository"] },
       { "file": "search/0009.json", "count": 12, "kinds": ["repository"] }
     ],
-    "count": 979
+    "count": 983
   }
 }

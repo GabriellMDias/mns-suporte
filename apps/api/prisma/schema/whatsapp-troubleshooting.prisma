@@ -1,0 +1,15 @@
+enum WhatsAppTroubleshootingOutcome {
+  RESOLVED
+  NOT_RESOLVED
+  SKIPPED
+}
+
+model WhatsAppTroubleshootingFeedback {
+  draftId    String                         @id(map: "whatsapp_troubleshooting_feedback_pkey") @map("draft_id") @db.Uuid
+  guidanceId String                         @map("guidance_id")
+  outcome    WhatsAppTroubleshootingOutcome
+  recordedAt DateTime                       @map("recorded_at") @db.Timestamptz(3)
+
+  @@index([guidanceId, outcome], map: "whatsapp_troubleshooting_feedback_outcome_idx")
+  @@map("whatsapp_troubleshooting_feedback")
+}

@@ -2,6 +2,12 @@ import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { normalizeEmail } from "../../email-address.js";
 import type { OutboundPayload } from "./outbound-contract.js";
+import {
+  guidanceIdSchema,
+  guidanceInstructions,
+  selectGuidance,
+  type GuidanceId,
+} from "./troubleshooting.js";
 
 const category = Type.Literal("category");
 const unit = Type.Literal("unit");
@@ -15,6 +21,7 @@ const draftStep = Type.Union([
   impact,
   attachments,
   Type.Literal("review"),
+  Type.Literal("guidance"),
   Type.Literal("edit"),
 ]);
 const attachment = Type.Object({
@@ -48,6 +55,7 @@ const draftSchema = Type.Object({
   impact: Type.Optional(Type.String({ maxLength: fieldLimits.impact })),
   attachments: Type.Array(attachment, { maxItems: 5 }),
   confirmedAt: Type.Optional(Type.String()),
+  guidanceId: Type.Optional(guidanceIdSchema),
 });
 const conversationSchema = Type.Object({
   phase: Type.Union([
@@ -74,10 +82,16 @@ type Draft = Static<typeof draftSchema>;
 export type ConversationInput = Static<typeof inboxContent>;
 type Reply = OutboundPayload["content"];
 export type IdentityAction = "request_code" | "confirm_code";
+export type TroubleshootingFeedback = {
+  draftId: string;
+  guidanceId: GuidanceId;
+  outcome: "RESOLVED" | "NOT_RESOLVED" | "SKIPPED";
+};
 export type ConversationMove = {
   state: Conversation;
   reply?: Reply;
   action?: IdentityAction;
+  feedback?: TroubleshootingFeedback;
 };
 
 const text = (body: string): Reply => ({ type: "text", body });
@@ -162,6 +176,10 @@ const aliases: Readonly<Record<string, string>> = {
   pular: "draft:review",
   confirmar: "draft:confirm",
   editar: "draft:edit",
+  resolveu: "draft:resolved",
+  "ainda preciso de ajuda": "draft:unresolved",
+  "ainda preciso": "draft:unresolved",
+  "ir para o chamado": "draft:skip-guide",
   reenviar: "auth:retry",
   "limpar anexos": "draft:clear-media",
 };
@@ -197,6 +215,19 @@ function review(draft: Draft): Reply {
     : text(summary + "\n\nDigite *Confirmar*, *Editar* ou *Cancelar*.");
 }
 
+function troubleshooting(draft: Draft): Reply {
+  if (!draft.guidanceId)
+    throw new Error("Missing active troubleshooting guide");
+  return draftButtons(
+    draft,
+    guidanceInstructions(draft.guidanceId) +
+      "\n\nSe preferir, siga direto para revisar o chamado.",
+    ["resolved", "Resolveu"],
+    ["unresolved", "Ainda preciso"],
+    ["skip-guide", "Ir para o chamado"],
+  );
+}
+
 function intake(draft: Draft, reply?: Reply): ConversationMove {
   return {
     state: { phase: "intake", draft },
@@ -206,7 +237,9 @@ function intake(draft: Draft, reply?: Reply): ConversationMove {
         ? review(draft)
         : draft.step === "attachments"
           ? mediaPrompt(draft)
-          : prompts[draft.step]),
+          : draft.step === "guidance"
+            ? troubleshooting(draft)
+            : prompts[draft.step]),
   };
 }
 
@@ -219,6 +252,40 @@ function routeDraft(
   if (draft.confirmedAt)
     return { state: withDraft("menu", draft), reply: pendingReply };
   switch (draft.step) {
+    case "guidance": {
+      if (!draft.guidanceId)
+        throw new Error("Missing active troubleshooting guide");
+      const outcome =
+        command === "draft:resolved"
+          ? "RESOLVED"
+          : command === "draft:unresolved"
+            ? "NOT_RESOLVED"
+            : command === "draft:skip-guide" ||
+                command === "draft:review" ||
+                command === "menu:open"
+              ? "SKIPPED"
+              : undefined;
+      if (!outcome) return intake(draft);
+      const feedback: TroubleshootingFeedback = {
+        draftId: draft.id,
+        guidanceId: draft.guidanceId,
+        outcome,
+      };
+      if (outcome === "RESOLVED")
+        return {
+          state: { phase: "menu" },
+          reply: buttons(
+            "Que bom que resolveu. Vou encerrar este rascunho.",
+            ["menu:open", "Abrir chamado"],
+            ["menu:it", "Falar com a TI"],
+          ),
+          feedback,
+        };
+      return {
+        ...intake({ ...draft, step: "review", revision: draft.revision + 1 }),
+        feedback,
+      };
+    }
     case "review":
       if (command === "draft:edit") return intake({ ...draft, step: "edit" });
       if (command === "draft:confirm")
@@ -238,8 +305,21 @@ function routeDraft(
       return intake(field ? { ...draft, step: field, editing: true } : draft);
     }
     case "attachments":
-      if (command === "draft:review")
+      if (command === "draft:review") {
+        // Editing an existing draft must not replay prior advice.
+        const guide =
+          draft.editing || draft.guidanceId
+            ? undefined
+            : selectGuidance(draft.description);
+        if (guide)
+          return intake({
+            ...draft,
+            step: "guidance",
+            guidanceId: guide,
+            revision: draft.revision + 1,
+          });
         return intake({ ...draft, step: "review", editing: false });
+      }
       if (command === "draft:clear-media")
         return intake(
           { ...draft, revision: draft.revision + 1, attachments: [] },
@@ -391,6 +471,12 @@ export function routeConversation(
   }
   if (command === "menu:open" || (raw === "1" && state.phase === "menu")) {
     if (draft?.confirmedAt) return { state: menuState, reply: pendingReply };
+    if (
+      draft?.step === "guidance" &&
+      state.phase === "intake" &&
+      command === "menu:open"
+    )
+      return routeDraft(draft, input, command, context.now);
     return intake(
       draft ?? {
         id: context.draftId,

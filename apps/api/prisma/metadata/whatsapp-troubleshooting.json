@@ -1,0 +1,35 @@
+{
+  "tables": {
+    "whatsapp_troubleshooting_feedback": {
+      "owner": "WhatsApp guided conversations",
+      "classification": "INTERNAL",
+      "description": "A single employee response to a versioned static troubleshooting guide offered during ticket intake.",
+      "lifecycle": "Recorded once as the conversation leaves the guidance step. The result survives dismissal of the draft and carries no contact, description or attachment fields.",
+      "columns": {
+        "draft_id": {
+          "description": "Opaque identifier of the draft whose guidance was rated or skipped.",
+          "classification": "INTERNAL"
+        },
+        "guidance_id": {
+          "description": "Stable, versioned identifier of the instructions shown.",
+          "classification": "INTERNAL"
+        },
+        "outcome": {
+          "description": "Employee choice to report resolution, ask for more help or skip the suggestion.",
+          "classification": "INTERNAL"
+        },
+        "recorded_at": {
+          "description": "Instant at which the conversation accepted the response.",
+          "classification": "INTERNAL"
+        }
+      },
+      "objects": {
+        "whatsapp_troubleshooting_feedback_pkey": "Keeps one guidance outcome per draft across retries.",
+        "whatsapp_troubleshooting_feedback_outcome_idx": "Supports aggregate reporting by guide and outcome."
+      }
+    }
+  },
+  "enums": {
+    "WhatsAppTroubleshootingOutcome": "Employee response to optional guidance. RESOLVED closes the draft. NOT_RESOLVED and SKIPPED keep the draft for review."
+  }
+}

@@ -23,6 +23,7 @@ type Transaction = Pick<
   | "whatsAppConversation"
   | "whatsAppInboundMessage"
   | "whatsAppOutboundMessage"
+  | "whatsAppTroubleshootingFeedback"
 >;
 type Identity = Pick<
   ReturnType<typeof createIdentityVerification>,
@@ -104,6 +105,11 @@ async function applyMove(
     create: { scopeKey: address.scopeKey, ...next },
     update: next,
   });
+  if (move.feedback)
+    await tx.whatsAppTroubleshootingFeedback.createMany({
+      data: { ...move.feedback, recordedAt: now },
+      skipDuplicates: true,
+    });
   if (move.reply && address.expiresAt > now)
     await enqueueWhatsAppReply(tx, {
       id: randomUUID(),

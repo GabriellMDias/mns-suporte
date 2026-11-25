@@ -10,7 +10,7 @@ The entries below cover access held outside this workspace. Implementation, tech
 
 **Status** Pending for live testing and cutover. **Owner** MNS Meta Business account administrator.
 
-The current workspace has no delegated Meta Business session for the company. Grant appropriate roles on the MNS Meta business portfolio and WhatsApp account, or complete the account and number verification that requires access to the organization and its phone. Enable access to a test number before production. The team can then configure webhook subscriptions and submit the closure template. Verify with a signed test webhook, a test reply and later template approval. Affects PJ-15, PJ-17 and PJ-18.
+The Meta MCP can access the supplied pilot sender. On 2026-11-25, Meta accepted one direct test message through that connection. The sender account subscription was present, and callback setup and app publishing remained pending in the onboarding check. The pilot runtime still needs a scoped service token in its secret store and access to the Meta app secret. The Meta business administrator can grant access to the relevant app and assets or provision those credentials where only they have permission. If the live sender belongs to a separate portfolio, grant equivalent access there. Verify the service with a signed incoming webhook, an observed reply and the approved closure template. Affects PJ-15, PJ-17 and PJ-18.
 
 ## PH-08
 
