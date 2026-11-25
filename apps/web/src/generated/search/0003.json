@@ -4,6 +4,24 @@
     "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
     "group": "Decisions",
     "kind": "repository",
+    "heading": "Context",
+    "anchor": "context",
+    "text": "Context\nOrion requires a continuous-integration strategy that converts the repository validation contract established by ADR-0003 into an enforceable pull-request and primary-branch quality gate.\nThe CI system must support the repository as it grows from a small TypeScript monorepo into potentially large applications containing:\nbackend services;\nReact web applications;\nshared packages;\ndatabase migrations;\ngenerated API artifacts;\nintegration tests using real infrastructure;\nbrowser tests;\nend-to-end tests;\narchitecture validation;\nsecurity checks.\nThe CI strategy must preserve a fundamental Orion principle:\nlocal validation\n    =\nCI validation capabilities\n\nCI must not become a separate implementation of repository correctness.\nA contributor or AI agent should be able to reproduce a CI failure locally using repository-owned commands rather than reverse-engineering workflow YAML.\nThe repository has already established:\npnpm validate\n\nas its canonical repository validation entry point.\nCI must orchestrate those capabilities without duplicating their logic.\nThe CI system must also address software supply-chain risks.\nA modern TypeScript repository depends on:\nnpm packages;\ntransitive dependencies;\nGitHub Actions;\ngenerated lockfiles;\nbrowser binaries;\ncontainer images;\nexternal development tools.\nDependency updates must therefore be automated enough to prevent stagnation while remaining reviewable and controlled.\nGitHub is the repository platform assumed by the current Orion foundation, making GitHub Actions a natural CI candidate.\nHowever, GitHub-specific workflow mechanics must remain an orchestration concern rather than leak into application architecture.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Decision",
+    "anchor": "decision",
+    "text": "Decision\nOrion will use **GitHub Actions as its primary continuous-integration platform**.\nCI will execute repository-owned validation commands and will not duplicate linting, formatting, type-checking, testing, architecture, generation, or build logic directly in workflow YAML.\nThe primary model is:\ndeveloper / AI agent\n        ↓\nrepository commands\n        ↓\npnpm validate\n        ↓\nsame capabilities\n        ↓\nGitHub Actions\n\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
     "heading": "Canonical validation contract",
     "anchor": "canonical-validation-contract",
     "text": "Canonical validation contract\n`pnpm validate` remains the canonical repository validation contract.\nCI may decompose validation capabilities into separate jobs for:\nparallel execution;\nclearer failure reporting;\nresource isolation;\nbrowser requirements;\ncontainer requirements;\nfuture sharding.\nFor example, CI may conceptually execute:\nformat / lint / architecture\ntypecheck\nunit tests\nintegration tests\nbrowser tests\nE2E tests\ngenerated-artifact validation\nbuild validation\n\nas independent jobs.\nThose jobs must invoke repository scripts implementing the same capabilities available locally.\nWorkflow YAML must not contain an independent implementation of validation logic.\nFor example, this is preferred:\nGitHub Actions\n    ↓\npnpm test:integration\n\nrather than embedding database setup, test discovery, test filters, and project-specific test semantics exclusively inside the workflow.\nThe stable interface is the repository command.\nThe CI workflow is an orchestrator.\n"
@@ -1357,14 +1375,5 @@
     "heading": "Maintenance and deferred mechanisms",
     "anchor": "maintenance-and-deferred-mechanisms",
     "text": "Maintenance and deferred mechanisms\nRoutine maintenance should be limited to permitted corrections and supersession metadata. Current architecture must remain discoverable without reading the entire chronological ADR history. Keep descriptive titles, explicit technologies/concepts, and useful related references.\nFrontmatter, automatic numbering, generated indexing, status/supersession validation, approval workflows, and required reviewers remain tooling or organizational decisions. Introduce them only when justified. ADRs should preserve meaningful reasoning without becoming bureaucratic records for every change.\n"
-  },
-  {
-    "id": "repository/docs/adr/README",
-    "title": "Architecture Decision Records",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Architecture Decision Records",
-    "anchor": "architecture-decision-records",
-    "text": "Architecture Decision Records\nUse this index to locate governing decisions without reading the full history. Each linked record owns its status, decision, rationale, and consequences. Acceptance does not imply implementation; see [validation availability](../validation.md) and the [technology map](../architecture/technology-decisions.md).\nFor a new decision, read [authoring policy](authoring.md), inspect related records, and use the [proposed template](template.md). Current behavior belongs in the [policy index](../README.md), not in rewritten historical ADRs.\n"
   }
 ]

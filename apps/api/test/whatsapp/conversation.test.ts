@@ -177,10 +177,11 @@ const metaButton = (id: string) => ({
 });
 
 it("continues signed onboarding and intake after restarts, with one reply per processed input", async () => {
-  await withMigratedDatabase(async (runtimeUrl) => {
+  await withMigratedDatabase(async (runtimeUrl, migrationUrl) => {
     let now = Date.now();
     const clock = () => new Date(now);
     let database = createDatabase(runtimeUrl);
+    const inspector = createDatabase(migrationUrl);
     const options = { businessPhoneId, supportContact };
     const lookup = vi
       .fn<(email: string) => Promise<{ kind: "found"; userId: number }>>()
@@ -334,13 +335,34 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
       expect((await send(metaText("menu"))).reply.body).toContain("retomar");
       expect((await send(metaText("retomar"))).reply.body).toContain("unidade");
       await send(metaText("Loja Centro"));
-      await send(metaText("Impressora travou durante a emissão."));
+      await send(metaText("A impressora não imprime durante a emissão."));
       await send(metaText("Um caixa afetado"));
       await send({
         type: "image",
         image: { id: "10002", mime_type: "image/jpeg" },
       });
-      const review = (await send(metaText("Revisar rascunho"))).reply;
+      const offer = (await send(metaText("Revisar rascunho"))).reply;
+      expect(offer.body).toContain("Impressora indisponível");
+      if (offer.type !== "buttons")
+        throw new Error("Expected troubleshooting buttons");
+      const continueButton = offer.buttons.find(
+        ({ title }) => title === "Ainda preciso",
+      );
+      if (!continueButton) throw new Error("Expected continue button");
+      const draftId = (await draftState()).draft?.id;
+      if (!draftId) throw new Error("Expected a durable draft");
+
+      await restart();
+      expect((await draftState()).draft?.step).toBe("guidance");
+      const feedbackInput = await send(metaButton(continueButton.id));
+      const review = feedbackInput.reply;
+      expect((await app.inject(feedbackInput.request)).statusCode).toBe(200);
+      expect(await process(signal)).toBe(false);
+      expect(
+        await inspector.whatsAppTroubleshootingFeedback.findMany(),
+      ).toMatchObject([
+        { draftId, guidanceId: "printer_offline_v1", outcome: "NOT_RESOLVED" },
+      ]);
       expect(review.body).toContain("Anexos: 1");
       if (review.type !== "buttons") throw new Error("Expected review buttons");
       const oldConfirm = review.buttons.find(
@@ -454,7 +476,7 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
       }
     } finally {
       await app.close();
-      await database.$disconnect();
+      await Promise.all([database.$disconnect(), inspector.$disconnect()]);
     }
   });
 }, 120_000);

@@ -84,6 +84,14 @@ Inbound events and replies use PostgreSQL. A short transaction serializes the ne
 
 [Conversation state and prompts](src/features/whatsapp/conversation.ts) · [Processing and recovery](src/features/whatsapp/conversation-processor.ts) · [Restart and transport tests](test/whatsapp/conversation.test.ts) · [Meta customer service window](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages)
 
+### Static troubleshooting
+
+Before review, a single clear symptom match can show a short instruction for an unavailable printer or a connectivity problem. The employee can report that it worked, continue to the ticket, or skip the suggestion. Unmatched and ambiguous reports go straight to review. Confirmed drafts and field edits do not repeat the advice.
+
+The conversation commits at most one feedback record per draft together with the selected transition. A resolved report closes the draft. The other choices preserve all entered fields and media references for ticket review. The feedback table stores the opaque draft ID, versioned guide ID, choice and timestamp. Keep earlier guide versions readable when changing the catalogue, because in-progress conversations can still reference them.
+
+[Guide catalogue](src/features/whatsapp/troubleshooting.ts) · [Feedback schema](prisma/schema/whatsapp-troubleshooting.prisma)
+
 ## Local commands
 
 Use [setup](../../docs/setup.md) for the frozen install, generated Prisma client, environment loading, containers, and startup order. `pnpm -C apps/api dev` loads the ignored root `.env.local` when present; `start` runs emitted code and expects its process environment without loading that file.

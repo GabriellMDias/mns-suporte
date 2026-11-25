@@ -1,0 +1,62 @@
+{
+  "kind": "database",
+  "name": "whatsapp_troubleshooting_feedback",
+  "description": "A single employee response to a versioned static troubleshooting guide offered during ticket intake.",
+  "owner": "WhatsApp guided conversations",
+  "classification": "INTERNAL",
+  "lifecycle": "Recorded once as the conversation leaves the guidance step. The result survives dismissal of the draft and carries no contact, description or attachment fields.",
+  "columns": [
+    {
+      "Column": "draft_id",
+      "PostgreSQL type": "uuid",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Opaque identifier of the draft whose guidance was rated or skipped.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "guidance_id",
+      "PostgreSQL type": "text",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Stable, versioned identifier of the instructions shown.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "outcome",
+      "PostgreSQL type": "\"WhatsAppTroubleshootingOutcome\"",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Employee choice to report resolution, ask for more help or skip the suggestion.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "recorded_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Instant at which the conversation accepted the response.",
+      "Null meaning": "—",
+      "Unit": "—"
+    }
+  ],
+  "constraints": [
+    {
+      "Object": "whatsapp_troubleshooting_feedback_pkey",
+      "Physical definition": "PRIMARY KEY (draft_id)",
+      "Purpose": "Keeps one guidance outcome per draft across retries."
+    },
+    {
+      "Object": "whatsapp_troubleshooting_feedback_outcome_idx",
+      "Physical definition": "CREATE INDEX whatsapp_troubleshooting_feedback_outcome_idx ON public.whatsapp_troubleshooting_feedback USING btree (guidance_id, outcome)",
+      "Purpose": "Supports aggregate reporting by guide and outcome."
+    }
+  ]
+}
