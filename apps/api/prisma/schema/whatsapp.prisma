@@ -10,6 +10,7 @@ model WhatsAppInboundMessage {
   conversationAction          WhatsAppConversationAction? @map("conversation_action")
   conversationClaimId         String?                    @map("conversation_claim_id") @db.Uuid
   conversationClaimUntil      DateTime?                  @map("conversation_claim_until") @db.Timestamptz(3)
+  conversationRequesterId     BigInt?                    @map("conversation_requester_id")
 
   @@index([businessPhoneId, conversationProcessedAt, receivedAt, occurredAt, messageId], map: "whatsapp_inbound_messages_conversation_idx")
 
@@ -19,6 +20,7 @@ model WhatsAppInboundMessage {
 enum WhatsAppConversationAction {
   REQUEST_CODE
   CONFIRM_CODE
+  QUERY_TICKETS
 }
 
 enum WhatsAppOutboundState {

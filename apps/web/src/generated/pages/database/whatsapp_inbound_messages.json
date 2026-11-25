@@ -92,8 +92,8 @@
       "Nullable": "yes",
       "Default": "—",
       "Classification": "INTERNAL",
-      "Meaning": "Durable identity operation owned by this inbound event.",
-      "Null meaning": "There is no outstanding identity operation for the conversation.",
+      "Meaning": "Durable identity or ticket lookup operation owned by this inbound event.",
+      "Null meaning": "There is no outstanding deferred conversation operation.",
       "Unit": "—"
     },
     {
@@ -102,8 +102,8 @@
       "Nullable": "yes",
       "Default": "—",
       "Classification": "INTERNAL",
-      "Meaning": "Unique fence for the worker currently allowed to finalize the identity operation.",
-      "Null meaning": "The event has no identity work claim.",
+      "Meaning": "Unique fence for the worker currently allowed to finalize the conversation operation.",
+      "Null meaning": "The event has no deferred work claim.",
       "Unit": "—"
     },
     {
@@ -112,8 +112,18 @@
       "Nullable": "yes",
       "Default": "—",
       "Classification": "INTERNAL",
-      "Meaning": "Time after which another conversation worker may reclaim an unfinished identity operation.",
-      "Null meaning": "The event has no active identity work claim.",
+      "Meaning": "Time after which another conversation worker may reclaim an unfinished operation.",
+      "Null meaning": "The event has no active work claim.",
+      "Unit": "—"
+    },
+    {
+      "Column": "conversation_requester_id",
+      "PostgreSQL type": "bigint",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Verified GLPI requester bound to a claimed ticket consultation. Cleared when the event completes.",
+      "Null meaning": "The event has no pending ticket consultation.",
       "Unit": "—"
     }
   ],
@@ -121,12 +131,17 @@
     {
       "Object": "whatsapp_inbound_messages_conversation_claim",
       "Physical definition": "CHECK ((((conversation_claim_id IS NULL) AND (conversation_claim_until IS NULL)) OR ((conversation_claim_id IS NOT NULL) AND (conversation_claim_until IS NOT NULL) AND (conversation_action IS NOT NULL) AND (conversation_processed_at IS NULL))))",
-      "Purpose": "Requires a complete claim only on an outstanding identity operation and keeps completed events unlocked."
+      "Purpose": "Requires a complete claim only on an outstanding operation and keeps completed events unlocked."
     },
     {
       "Object": "whatsapp_inbound_messages_pkey",
       "Physical definition": "PRIMARY KEY (message_id)",
       "Purpose": "Keeps one accepted event per Meta message ID across retries and concurrent delivery."
+    },
+    {
+      "Object": "whatsapp_inbound_messages_requester_claim",
+      "Physical definition": "CHECK (((conversation_requester_id IS NULL) OR ((conversation_requester_id > 0) AND (conversation_claim_id IS NOT NULL))))",
+      "Purpose": "Restricts a stored GLPI requester to a positive ID on a claimed event."
     },
     {
       "Object": "whatsapp_inbound_messages_sender_required",

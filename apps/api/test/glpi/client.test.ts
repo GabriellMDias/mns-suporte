@@ -25,6 +25,13 @@ const row = (
   email: string | string[],
   active: number | string | boolean = 1,
 ) => ({ "2": id, "5": email, "8": active });
+const ticketRow = (id: number, status = 2) => ({
+  "1": "Legacy ticket " + id,
+  "2": String(id),
+  "12": String(status),
+  "19": "2026-08-20 13:14:15",
+});
+const ticketSignal = new AbortController().signal;
 
 function page(totalcount: number, data: object[], status = 200) {
   return Response.json({ totalcount, count: data.length, data }, { status });
@@ -38,6 +45,135 @@ function requestUrl(input: Parameters<typeof fetch>[0]): URL {
   if (!(input instanceof URL)) throw new Error("Expected an absolute URL");
   return input;
 }
+
+it("scopes open ticket pages and verifies the requester of every candidate before returning it", async () => {
+  function providerResponse(input: Parameters<typeof fetch>[0]) {
+    const url = requestUrl(input);
+    if (url.pathname.endsWith("/initSession"))
+      return Response.json({ session_token: "test-session" });
+    if (url.pathname.endsWith("/search/Ticket")) {
+      expect(url.searchParams.get("criteria[0][field]")).toBe("4");
+      expect(url.searchParams.get("criteria[0][value]")).toBe("37");
+      expect(url.searchParams.get("criteria[1][value]")).toBe("notold");
+      expect(url.searchParams.get("order")).toBe("DESC");
+      expect(url.searchParams.get("range")).toBe("0-5");
+      expect(url.searchParams.get("is_deleted")).toBe("false");
+      const before = url.searchParams.get("criteria[2][value]");
+      if (before === "<44") {
+        expect(url.searchParams.get("criteria[2][searchtype]")).toBe(
+          "contains",
+        );
+        return page(1, [ticketRow(43)]);
+      }
+      return page(
+        6,
+        [48, 47, 46, 45, 44, 43].map((id) => ticketRow(id)),
+      );
+    }
+    const id = Number(url.pathname.split("/").at(-2));
+    expect(url.pathname.endsWith("/Ticket_User")).toBe(true);
+    expect(url.searchParams.get("searchText[users_id]")).toBe("^37$");
+    expect(url.searchParams.get("searchText[type]")).toBe("^1$");
+    return Response.json([
+      { tickets_id: String(id), users_id: "37", type: "1" },
+    ]);
+  }
+  const fetchGlpi = vi.fn<typeof fetch>((input) =>
+    Promise.resolve(providerResponse(input)),
+  );
+  const client = createGlpiClient(config, fetchGlpi);
+  expect(
+    await client.readOwnedTickets(37, { kind: "open" }, ticketSignal),
+  ).toMatchObject({
+    kind: "ready",
+    nextBefore: 44,
+    tickets: [48, 47, 46, 45, 44].map((id) => ({
+      id,
+      title: "Legacy ticket " + id,
+      status: 2,
+    })),
+  });
+  expect(fetchGlpi).toHaveBeenCalledTimes(8);
+  expect(
+    await client.readOwnedTickets(
+      37,
+      { kind: "open", before: 44 },
+      ticketSignal,
+    ),
+  ).toEqual({
+    kind: "ready",
+    tickets: [
+      {
+        id: 43,
+        title: "Legacy ticket 43",
+        status: 2,
+        updatedAt: "2026-08-20 13:14:15",
+      },
+    ],
+  });
+});
+
+it("requires an exact ticket and requester relation and gives inaccessible and missing details the same result", async () => {
+  const fetchGlpi = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json({ session_token: "test-session" }))
+    .mockResolvedValueOnce(page(1, [ticketRow(91, 6)]))
+    .mockResolvedValueOnce(
+      Response.json([{ tickets_id: 91, users_id: 37, type: 1 }]),
+    )
+    .mockResolvedValueOnce(page(1, [ticketRow(91, 6)]))
+    .mockResolvedValueOnce(
+      Response.json([
+        { tickets_id: 91, users_id: 37, type: 2 },
+        { tickets_id: 91, users_id: 37, type: 3 },
+        { tickets_id: 91, users_id: 48, type: 1 },
+      ]),
+    )
+    .mockResolvedValueOnce(page(0, []))
+    .mockResolvedValueOnce(page(1, [ticketRow(89)]))
+    .mockResolvedValueOnce(
+      Response.json([{ tickets_id: 91, users_id: 37, type: 1 }]),
+    );
+  const client = createGlpiClient(config, fetchGlpi);
+  expect(
+    await client.readOwnedTickets(
+      37,
+      { kind: "detail", ticketId: 91 },
+      ticketSignal,
+    ),
+  ).toEqual({
+    kind: "ready",
+    tickets: [
+      {
+        id: 91,
+        title: "Legacy ticket 91",
+        status: 6,
+        updatedAt: "2026-08-20 13:14:15",
+      },
+    ],
+  });
+  const detailQuery = requestUrl(fetchGlpi.mock.calls[1][0]).searchParams;
+  expect(detailQuery.get("criteria[1][field]")).toBe("2");
+  expect(detailQuery.get("criteria[1][value]")).toBe("91");
+  const unavailable = { kind: "ready", tickets: [] };
+  expect(
+    await client.readOwnedTickets(
+      37,
+      { kind: "detail", ticketId: 91 },
+      ticketSignal,
+    ),
+  ).toEqual(unavailable);
+  expect(
+    await client.readOwnedTickets(
+      37,
+      { kind: "detail", ticketId: 92 },
+      ticketSignal,
+    ),
+  ).toEqual(unavailable);
+  expect(
+    await client.readOwnedTickets(37, { kind: "open" }, ticketSignal),
+  ).toEqual({ kind: "unavailable" });
+});
 
 it("requires complete server-only credentials and protects the configured target", () => {
   expect(

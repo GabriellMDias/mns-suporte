@@ -5,6 +5,7 @@ import { withMigratedDatabase } from "../../scripts/migrated-database.js";
 import { createApp } from "../../src/app.js";
 import { createDatabase } from "../../src/database.js";
 import type { SendReply } from "../../src/features/whatsapp/graph-client.js";
+import { scopeOf } from "../../src/features/whatsapp/identity-code.js";
 import {
   dispatchNextWhatsAppReply,
   enqueueWhatsAppReply,
@@ -225,6 +226,39 @@ it("persists reply intents, claims them once and reconciles signed delivery evid
       expect((await state(stale.id)).state).toBe("UNCERTAIN");
       expect((await state(expired.id)).state).toBe("EXPIRED");
       expect(uncertain).toHaveBeenCalledTimes(1);
+      const protectedReply = {
+        ...intent(),
+        payload: { ...payload, requiredGlpiUserId: 37 },
+      };
+      const scopeKey = scopeOf({
+        businessPhoneId,
+        senderPhone: payload.recipient.value,
+      })!;
+      await db.whatsAppVerifiedIdentity.create({
+        data: {
+          scopeKey,
+          glpiUserId: 37,
+          verifiedAt: clock(),
+          expiresAt: protectedReply.expiresAt,
+        },
+      });
+      await enqueueWhatsAppReply(db, protectedReply);
+      const retryLookup = vi.fn<SendReply>().mockResolvedValue({
+        kind: "throttled",
+        code: 130429,
+        retryAfterMs: 0,
+      });
+      await dispatch(retryLookup);
+      expect(retryLookup).toHaveBeenCalledTimes(1);
+      expect((await state(protectedReply.id)).state).toBe("PENDING");
+      await db.whatsAppVerifiedIdentity.update({
+        where: { scopeKey },
+        data: { glpiUserId: 38 },
+      });
+      now += 2100;
+      await dispatch(retryLookup);
+      expect(retryLookup).toHaveBeenCalledTimes(1);
+      expect((await state(protectedReply.id)).state).toBe("EXPIRED");
       await expect(
         db.whatsAppOutboundMessage.update({
           where: { id: first.id },

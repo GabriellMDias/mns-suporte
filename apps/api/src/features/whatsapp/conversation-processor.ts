@@ -4,6 +4,8 @@ import type {
   WhatsAppConversationAction,
   WhatsAppInboundMessage,
 } from "../../generated/prisma/client.js";
+import type { createGlpiClient } from "../../integrations/glpi/client.js";
+import type { TicketQuery } from "../../integrations/glpi/ticket-lookup.js";
 import {
   finishVerification,
   readConversationInput,
@@ -16,6 +18,7 @@ import { scopeOf } from "./identity-code.js";
 import type { createIdentityVerification } from "./identity-service.js";
 import type { OutboundPayload } from "./outbound-contract.js";
 import { enqueueWhatsAppReply } from "./outbox.js";
+import { readTicketQuery, ticketQueryReply } from "./ticket-query.js";
 
 type Transaction = Pick<
   Database,
@@ -36,20 +39,31 @@ export type ReplyAddress = {
   expiresAt: Date;
 };
 type Claim = {
-  kind: "identity";
+  kind: "claim";
   action: WhatsAppConversationAction;
   message: WhatsAppInboundMessage;
   address: ReplyAddress;
   id: string;
+  lookup?: { requesterId: number; query: TicketQuery };
 };
 type ProcessResult = Claim | { kind: "idle" | "processed" };
 
 const claimLifetime = 45_000;
 const customerWindow = 24 * 60 * 60 * 1000;
+const lookupReplyLifetime = 60_000;
+const actions: Record<
+  NonNullable<ConversationMove["action"]>,
+  WhatsAppConversationAction
+> = {
+  request_code: "REQUEST_CODE",
+  confirm_code: "CONFIRM_CODE",
+  query_tickets: "QUERY_TICKETS",
+};
 const cleared = {
   conversationClaimId: null,
   conversationClaimUntil: null,
   conversationAction: null,
+  conversationRequesterId: null,
 };
 
 function resolveAddress(
@@ -157,11 +171,15 @@ export async function applyMove(
 
 export function createConversationProcessor(
   store: Database,
-  options: { businessPhoneId: string; supportContact: string },
+  options: {
+    businessPhoneId: string;
+    supportContact: string;
+    readOwnedTickets: ReturnType<typeof createGlpiClient>["readOwnedTickets"];
+  },
   identity: Identity,
   clock = () => new Date(),
 ) {
-  const { businessPhoneId, supportContact } = options;
+  const { businessPhoneId, supportContact, readOwnedTickets } = options;
 
   async function prepare(): Promise<ProcessResult> {
     return store.$transaction(async (tx) => {
@@ -198,9 +216,13 @@ export function createConversationProcessor(
         return { kind: "processed" };
       }
       let action = message.conversationAction;
+      let requesterId = message.conversationRequesterId;
+      const userId =
+        !action || action === "QUERY_TICKETS"
+          ? await verifiedUser(tx, address.scopeKey, now)
+          : undefined;
       if (!action) {
         const state = await stateFor(tx, address.scopeKey);
-        const userId = await verifiedUser(tx, address.scopeKey, now);
         const move = routeConversation(state, input, {
           userId,
           supportContact,
@@ -208,16 +230,30 @@ export function createConversationProcessor(
           now,
         });
         await applyMove(tx, address, businessPhoneId, move, now);
-        action =
-          move.action === "request_code"
-            ? "REQUEST_CODE"
-            : move.action === "confirm_code"
-              ? "CONFIRM_CODE"
-              : null;
+        action = move.action ? actions[move.action] : null;
+        if (action === "QUERY_TICKETS" && userId !== undefined)
+          requesterId = BigInt(userId);
       }
       if (!action) {
         await inbox.update({ where, data: { conversationProcessedAt: now } });
         return { kind: "processed" };
+      }
+      let lookup: Claim["lookup"];
+      if (action === "QUERY_TICKETS") {
+        const query = readTicketQuery(input, true);
+        if (
+          userId === undefined ||
+          requesterId === null ||
+          userId !== Number(requesterId) ||
+          !query
+        ) {
+          await inbox.update({
+            where,
+            data: { ...cleared, conversationProcessedAt: now },
+          });
+          return { kind: "processed" };
+        }
+        lookup = { requesterId: userId, query };
       }
       const id = randomUUID();
       await inbox.update({
@@ -226,14 +262,19 @@ export function createConversationProcessor(
           conversationAction: action,
           conversationClaimId: id,
           conversationClaimUntil: new Date(now.getTime() + claimLifetime),
+          conversationRequesterId: requesterId,
         },
       });
-      return { kind: "identity", action, message, address, id };
+      return { kind: "claim", action, message, address, id, lookup };
     });
   }
 
-  async function complete(claim: Claim): Promise<void> {
-    const { address, message, action } = claim;
+  async function complete(claim: Claim, signal: AbortSignal): Promise<void> {
+    const { address, message, action, lookup } = claim;
+    const result = lookup
+      ? await readOwnedTickets(lookup.requesterId, lookup.query, signal)
+      : undefined;
+    if (lookup && signal.aborted) return;
     const input = readConversationInput(message.content);
     if (action === "REQUEST_CODE" && input?.type === "text")
       await identity.requestVerification(
@@ -255,10 +296,35 @@ export function createConversationProcessor(
           messageId: message.messageId,
           conversationClaimId: claim.id,
           conversationProcessedAt: null,
+          ...(lookup ? { conversationClaimUntil: { gt: now } } : {}),
         },
         data: { ...cleared, conversationProcessedAt: now },
       });
-      if (accepted.count !== 1 || action !== "CONFIRM_CODE") return;
+      if (accepted.count !== 1) return;
+      if (lookup && result) {
+        if (
+          address.expiresAt <= now ||
+          (await verifiedUser(tx, address.scopeKey, now)) !== lookup.requesterId
+        )
+          return;
+        await enqueueWhatsAppReply(tx, {
+          id: randomUUID(),
+          businessPhoneId,
+          expiresAt: new Date(
+            Math.min(
+              address.expiresAt.getTime(),
+              now.getTime() + lookupReplyLifetime,
+            ),
+          ),
+          payload: {
+            recipient: address.recipient,
+            content: ticketQueryReply(lookup.query, result),
+            requiredGlpiUserId: lookup.requesterId,
+          },
+        });
+        return;
+      }
+      if (action !== "CONFIRM_CODE") return;
       // If the worker restarted after consuming the code, the durable link
       // is the source of truth for the response.
       const userId = await verifiedUser(tx, address.scopeKey, now);
@@ -276,7 +342,7 @@ export function createConversationProcessor(
   return async (signal: AbortSignal): Promise<boolean> => {
     if (signal.aborted) return false;
     const next = await prepare();
-    if (next.kind === "identity" && !signal.aborted) await complete(next);
+    if (next.kind === "claim" && !signal.aborted) await complete(next, signal);
     return next.kind !== "idle";
   };
 }

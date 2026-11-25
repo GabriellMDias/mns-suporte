@@ -84,7 +84,14 @@ export const whatsAppModule: ApiModule = {
           };
           registerWhatsAppDispatchWorker(
             app,
-            createConversationProcessor(store, conversationOptions, identity),
+            createConversationProcessor(
+              store,
+              {
+                ...conversationOptions,
+                readOwnedTickets: glpi.readOwnedTickets,
+              },
+              identity,
+            ),
             "whatsapp_conversation_unavailable",
           );
           registerWhatsAppDispatchWorker(

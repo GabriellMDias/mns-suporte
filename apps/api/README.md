@@ -78,9 +78,9 @@ Set `WHATSAPP_SUPPORT_CONTACT` to the approved IT mailbox or HTTPS support page 
 
 The conversation offers ticket intake, ticket consultation, and the IT contact. Intake collects category, unit or department, description, impact, and up to five media references. An employee can review and edit fields, cancel an unconfirmed draft, or return to it via the menu after a restart. Review buttons carry the current draft revision. The stored draft belongs to its verified GLPI user, and a different verified user on the same sender scope does not inherit it.
 
-Confirmation enqueues [ticket submission](#glpi-ticket-submission). The [V1 plan](../../docs/project/implementation-plan.md#v1-work) tracks listing owned tickets and sending status notices.
+Confirmation enqueues [ticket submission](#glpi-ticket-submission). Verified employees can [consult their tickets](#glpi-ticket-consultation). The [V1 plan](../../docs/project/implementation-plan.md#v1-work) tracks status notices.
 
-Inbound events and replies use PostgreSQL. A short transaction serializes the next inbox event for one business number and commits the conversation move and its outbound reply together. Email requests commit the neutral reply before querying GLPI or submitting mail. Identity operations are reclaimed after a 45-second lease. An old claim cannot finalize a newer one. The employee's verified link recovers a successful confirmation when a worker was interrupted after consuming the code. Inbound events outside the customer service window are completed without applying a move or sending a reply.
+Inbound events and replies use PostgreSQL. A short transaction serializes the next inbox event for one business number and commits the conversation move and its outbound reply together. Email requests commit the neutral reply before querying GLPI or submitting mail. Deferred identity and consultation operations can be reclaimed after a 45-second lease. An old claim cannot finalize a newer one. The employee's verified link recovers a successful confirmation when a worker was interrupted after consuming the code. Inbound events outside the customer service window are completed without applying a move or sending a reply.
 
 [Conversation state and prompts](src/features/whatsapp/conversation.ts) · [Processing and recovery](src/features/whatsapp/conversation-processor.ts) · [Restart and transport tests](test/whatsapp/conversation.test.ts) · [Meta customer service window](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages)
 
@@ -103,6 +103,16 @@ Each stage has a 45-second lease. Transient download failures, a GLPI failure be
 For an uncertain creation, IT can search the GLPI description for the exact MNS reference from the conversation and confirm whether the ticket exists before recreating it manually. For an uncertain document, inspect the known ticket's documents for the filename beginning with `mns-<draft ID>-<attachment number>`. The employee can use the ticket number to send missing files to IT. The queue stores outcome and counts. It releases the copied description after creation and clears the reply address and media references at termination. The reply uses the confirmation's service window and requires the requester to still own the verified sender link at completion.
 
 [Submission worker](src/features/whatsapp/ticket-submission-worker.ts) · [Recovery tests](test/whatsapp/ticket-submission.test.ts) · [Meta media retrieval](https://www.postman.com/meta/whatsapp-business-platform/request/ptjyi84/retrieve-media-url) · [GLPI upload contract](https://github.com/glpi-project/glpi/blob/10.0/bugfixes/apirest.md#upload-a-document-file)
+
+### GLPI ticket consultation
+
+Choose **Meus chamados** for up to five active tickets per page, ordered by GLPI ticket number, or send **Chamado 123** to view a specific ticket. The detail shows its title, status and latest update when GLPI provides one. This also covers existing GLPI tickets created through other channels and allows lookup of closed tickets by number. The open list includes new, assigned, planned and pending tickets.
+
+The adapter scopes each search to the verified GLPI user and confirms the corresponding requester relation in `Ticket_User` before rendering a result. Ticket numbers from text and pagination buttons are search inputs. Requester authorization comes from GLPI. Missing tickets and denied details produce the same response. The reply projects the ticket number, title, status and update date.
+
+Consultation runs outside the database transaction. A deferred request retains its original GLPI requester across a restart. The worker checks the verified sender binding at the start and again before committing a reply. Protected replies expire after one minute or at the end of the service window, whichever comes first. Dispatch checks the verified binding before each attempt.
+
+[Lookup adapter](src/integrations/glpi/ticket-lookup.ts) · [Signed conversation tests](test/whatsapp/conversation.test.ts) · [GLPI Ticket requester relation](https://github.com/glpi-project/glpi/blob/10.0/bugfixes/src/Ticket_User.php)
 
 ## Local commands
 

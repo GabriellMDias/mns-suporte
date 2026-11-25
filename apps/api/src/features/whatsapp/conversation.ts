@@ -2,6 +2,7 @@ import { Type, type Static } from "typebox";
 import { Value } from "typebox/value";
 import { normalizeEmail } from "../../email-address.js";
 import type { OutboundPayload } from "./outbound-contract.js";
+import { readTicketQuery } from "./ticket-query.js";
 import {
   guidanceIdSchema,
   guidanceInstructions,
@@ -92,7 +93,7 @@ export type TroubleshootingFeedback = {
 export type ConversationMove = {
   state: Conversation;
   reply?: Reply;
-  action?: IdentityAction;
+  action?: IdentityAction | "query_tickets";
   feedback?: TroubleshootingFeedback;
   submission?: TicketSubmission;
 };
@@ -178,7 +179,6 @@ const fieldNext = {
 const aliases: Readonly<Record<string, string>> = {
   "abrir chamado": "menu:open",
   retomar: "menu:open",
-  "meus chamados": "menu:tickets",
   "falar com a ti": "menu:it",
   "falar com ti": "menu:it",
   menu: "menu",
@@ -516,6 +516,8 @@ export function routeConversation(
 
   const draft = state.draft?.ownerId === userId ? state.draft : undefined;
   const menuState = withDraft("menu", draft);
+  if (readTicketQuery(input, state.phase === "menu"))
+    return { state: withDraft(state.phase, draft), action: "query_tickets" };
   if (draft?.uncertainSubmission) {
     if (command !== "draft:new") return uncertainTicket(draft, supportContact);
     return intake({
@@ -567,15 +569,6 @@ export function routeConversation(
       },
     );
   }
-  if (command === "menu:tickets" || (raw === "2" && state.phase === "menu"))
-    return {
-      state: menuState,
-      reply: text(
-        "A consulta de chamados pelo WhatsApp está em preparação. Fale com a TI por " +
-          supportContact +
-          ".",
-      ),
-    };
   if (state.phase === "intake" && draft)
     return routeDraft(draft, input, command, context.now);
   return { state: menuState, reply: menu };

@@ -46,6 +46,9 @@ const payloadSchema = Type.Object(
         { additionalProperties: false },
       ),
     ]),
+    requiredGlpiUserId: Type.Optional(
+      Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
+    ),
   },
   { additionalProperties: false },
 );

@@ -25,6 +25,6 @@
     }
   },
   "enums": {
-    "WhatsAppConversationAction": "Identity operation to request or confirm an employee email code after committing the preceding conversation move."
+    "WhatsAppConversationAction": "Deferred operation to request or confirm an email code or consult GLPI tickets after committing the preceding conversation move."
   }
 }

@@ -182,7 +182,15 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
     const clock = () => new Date(now);
     let database = createDatabase(runtimeUrl);
     const inspector = createDatabase(migrationUrl);
-    const options = { businessPhoneId, supportContact };
+    const options = {
+      businessPhoneId,
+      supportContact,
+      readOwnedTickets: vi
+        .fn<
+          Parameters<typeof createConversationProcessor>[1]["readOwnedTickets"]
+        >()
+        .mockResolvedValue({ kind: "ready", tickets: [] }),
+    };
     const lookup = vi
       .fn<(email: string) => Promise<{ kind: "found"; userId: number }>>()
       .mockResolvedValue({ kind: "found", userId: 37 });
@@ -406,6 +414,47 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
           where: { conversationProcessedAt: null },
         }),
       ).toBe(0);
+      // A lookup already in progress cannot publish under a different binding.
+      const scopeKey = scopeOf(sender)!;
+      options.readOwnedTickets.mockImplementationOnce(async (owner) => {
+        expect(owner).toBe(37);
+        await inspector.whatsAppVerifiedIdentity.update({
+          where: { scopeKey },
+          data: { glpiUserId: 38 },
+        });
+        return {
+          kind: "ready",
+          tickets: [{ id: 80, title: "Private old ticket", status: 6 }],
+        };
+      });
+      await receive(metaText("Chamado 80"));
+      expect(await process(signal)).toBe(true);
+      expect(await database.whatsAppOutboundMessage.count()).toBe(before);
+
+      options.readOwnedTickets.mockRejectedValueOnce(
+        new Error("Synthetic lookup interruption"),
+      );
+      await receive(metaText("Chamado 80"), "wamid.interrupted-lookup");
+      await expect(process(signal)).rejects.toThrow(
+        "Synthetic lookup interruption",
+      );
+      expect(
+        await database.whatsAppInboundMessage.findUnique({
+          where: { messageId: "wamid.interrupted-lookup" },
+        }),
+      ).toMatchObject({
+        conversationRequesterId: 38n,
+        conversationAction: "QUERY_TICKETS",
+      });
+      await inspector.whatsAppVerifiedIdentity.update({
+        where: { scopeKey },
+        data: { glpiUserId: 39 },
+      });
+      await restart();
+      now += 45_001;
+      expect(await process(signal)).toBe(true);
+      expect(options.readOwnedTickets).toHaveBeenCalledTimes(2);
+      expect(await database.whatsAppOutboundMessage.count()).toBe(before);
       // Exercise the real module wiring for a second number and stub only provider HTTP.
       const wiredPhone = "20202";
       const wiredScope = scopeOf({ ...sender, businessPhoneId: wiredPhone })!;
@@ -445,15 +494,45 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
         const url = new URL(request.url);
         if (url.pathname.endsWith("/messages")) {
           const body = (await request.json()) as {
-            text: { body: string };
+            text?: { body: string };
+            interactive?: { body: { text: string } };
+            requiredGlpiUserId?: number;
           };
-          replies.push(body.text.body);
+          const rendered = body.text?.body ?? body.interactive?.body.text;
+          if (!rendered) throw new Error("Missing WhatsApp content");
+          expect(body.requiredGlpiUserId).toBeUndefined();
+          replies.push(rendered);
           return Response.json({
             messages: [{ id: "wamid.synthetic-runtime-" + replies.length }],
           });
         }
         if (url.pathname.endsWith("/initSession"))
           return Response.json({ session_token: "synthetic-session" });
+        if (url.pathname.endsWith("/search/Ticket")) {
+          const filter = url.searchParams.get("criteria[1][value]");
+          const candidates =
+            filter === "notold"
+              ? [{ "1": "Chamado antigo em atendimento", "2": "76", "12": "2" }]
+              : filter === "80"
+                ? [
+                    {
+                      "1": "Chamado antigo fechado",
+                      "2": "80",
+                      "12": "6",
+                      "19": "2026-08-20 13:14:15",
+                    },
+                  ]
+                : [];
+          return Response.json({
+            totalcount: candidates.length,
+            count: candidates.length,
+            data: candidates,
+          });
+        }
+        if (url.pathname.endsWith("/Ticket_User")) {
+          const id = Number(url.pathname.split("/").at(-2));
+          return Response.json([{ tickets_id: id, users_id: 37, type: 1 }]);
+        }
         if (url.pathname.endsWith("/Ticket")) {
           expect(request.method).toBe("POST");
           expect(await request.json()).toEqual({
@@ -577,6 +656,67 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
           mediaIds: [],
           recipient: null,
         });
+        async function consult(id: string, message: object) {
+          const previous = replies.length;
+          const request = delivery(now, id, message, wiredPhone);
+          expect((await wiredApp.inject(request)).statusCode).toBe(200);
+          await vi.waitFor(() => expect(replies).toHaveLength(previous + 1), {
+            timeout: 8000,
+          });
+          return { body: replies[previous], request };
+        }
+        const listed = await consult(
+          "wamid.legacy-list",
+          metaButton("menu:tickets"),
+        );
+        expect(listed.body).toContain(
+          "#76 · Chamado antigo em atendimento · Em atendimento",
+        );
+        expect((await wiredApp.inject(listed.request)).statusCode).toBe(200);
+        const detail = await consult(
+          "wamid.legacy-detail",
+          metaText("Chamado 80"),
+        );
+        expect(detail.body).toContain(
+          "Chamado antigo fechado\nSituação: Fechado\nÚltima atualização: 20/08/2026 às 13:14",
+        );
+
+        const otherSender = "BR.synthetic-other-reader";
+        await database.whatsAppVerifiedIdentity.create({
+          data: {
+            scopeKey: scopeOf({
+              businessPhoneId: wiredPhone,
+              senderBusinessId: otherSender,
+            })!,
+            glpiUserId: 93,
+            verifiedAt: clock(),
+            expiresAt: new Date(now + 86_400_000),
+          },
+        });
+        const inaccessible = await consult("wamid.other-detail", {
+          ...metaText("Chamado 80"),
+          from_user_id: otherSender,
+        });
+        const missing = await consult("wamid.other-missing", {
+          ...metaText("Chamado 81"),
+          from_user_id: otherSender,
+        });
+        expect(inaccessible.body).toBe(missing.body);
+        expect(inaccessible.body).not.toContain("80");
+
+        const searchCallsBefore = fakeFetch.mock.calls.filter(([input]) =>
+          new Request(input).url.includes("/search/Ticket"),
+        ).length;
+        const unverified = await consult("wamid.unverified-detail", {
+          ...metaText("Chamado 80"),
+          from_user_id: "BR.synthetic-guest",
+        });
+        expect(unverified.body).toContain("e-mail corporativo");
+        expect(
+          fakeFetch.mock.calls.filter(([input]) =>
+            new Request(input).url.includes("/search/Ticket"),
+          ),
+        ).toHaveLength(searchCallsBefore);
       } finally {
         await wiredApp.close();
         vi.unstubAllGlobals();
