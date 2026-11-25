@@ -18,7 +18,7 @@ The current workspace has no delegated Meta Business session for the company. Gr
 
 **Status** Pending for live testing and cutover. **Owner** MNS GLPI administrator.
 
-The workspace has only the legacy integration copy. Issue a dedicated test service credential with directory lookup and scoped ticket and attachment permissions, and grant equivalent restricted production access for deployment. Supply the endpoint and credential securely. Verify by creating, consulting and attaching media to a synthetic ticket in test GLPI. Affects PJ-09, PJ-17 and PJ-18.
+The workspace has only the legacy integration copy. Issue a dedicated test service credential with directory lookup and scoped ticket and attachment permissions, and grant equivalent restricted production access for deployment. Supply the endpoint and credential securely. Verify by creating, consulting and attaching media to a synthetic ticket in test GLPI. The adapter is validated with local fixtures. This access affects the live pilot and cutover under PJ-17 and PJ-18.
 
 ## PH-09
 

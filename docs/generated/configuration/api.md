@@ -25,3 +25,6 @@ No values are eligible for client exposure. `ORION_ENV` is always required. The 
 | `WHATSAPP_PHONE_NUMBER_ID` | Meta asset identifier | no | — | server | INTERNAL | no | Meta business phone number ID accepted by the webhook. |
 | `WHATSAPP_ACCESS_TOKEN` | secret string | no | — | server | RESTRICTED | yes | Meta system user token that enables WhatsApp outbound dispatch. |
 | `WHATSAPP_GRAPH_API_VERSION` | Graph API version | no | `v27.0` | server | INTERNAL | no | Graph API version used by WhatsApp outbound dispatch. |
+| `GLPI_API_URL` | HTTPS URL | no | — | server | INTERNAL | no | Base URL of the GLPI REST v1 API, including its API path. |
+| `GLPI_APP_TOKEN` | secret string | no | — | server | RESTRICTED | yes | Application token for the configured GLPI API client. |
+| `GLPI_USER_TOKEN` | secret string | no | — | server | RESTRICTED | yes | User token for the scoped GLPI service account. |
