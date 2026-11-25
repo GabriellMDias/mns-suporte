@@ -32,7 +32,7 @@
       "Nullable": "no",
       "Default": "—",
       "Classification": "RESTRICTED",
-      "Meaning": "Immutable destination and validated text or interactive reply content.",
+      "Meaning": "Immutable destination, validated text or interactive content and optional required GLPI recipient identity.",
       "Null meaning": "—",
       "Unit": "—"
     },
@@ -52,7 +52,7 @@
       "Nullable": "no",
       "Default": "—",
       "Classification": "INTERNAL",
-      "Meaning": "Last allowed dispatch deadline from the current inbound customer service window.",
+      "Meaning": "Last allowed dispatch deadline under the inbound customer service window and any shorter lifetime required by the reply.",
       "Null meaning": "—",
       "Unit": "UTC instant"
     },

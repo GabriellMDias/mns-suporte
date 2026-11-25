@@ -3,6 +3,14 @@ import { Value } from "typebox/value";
 import type { GlpiConfig } from "../../config.js";
 import { normalizeEmail } from "../../email-address.js";
 import { directoryQuery, positiveId, readDirectoryPage } from "./directory.js";
+import {
+  isTicketRequester,
+  readTicketCandidates,
+  ticketPageSize,
+  ticketSearch,
+  type TicketLookupResult,
+  type TicketQuery,
+} from "./ticket-lookup.js";
 
 type IoFailure = "timeout" | "transport" | "invalid_response";
 type RequestFailure = IoFailure | "permission";
@@ -31,7 +39,9 @@ type Ticket = Readonly<{
 }>;
 type Operation =
   | { path: "search/User"; query: URLSearchParams }
+  | { path: "search/Ticket"; query: URLSearchParams }
   | { path: `Ticket/${number}`; query: URLSearchParams }
+  | { path: `Ticket/${number}/Ticket_User`; query: URLSearchParams }
   | { path: "Ticket"; input: object }
   | { path: "Document"; input: FormData };
 const tokenSchema = Type.Object({
@@ -304,6 +314,65 @@ export function createGlpiClient(config: GlpiConfig, fetchGlpi = fetch) {
             : { kind: "found", userId: match, email };
       }
       return { kind: "unavailable", reason: "directory_limit" };
+    },
+
+    async readOwnedTickets(
+      this: void,
+      requesterId: number,
+      query: TicketQuery,
+      signal: AbortSignal,
+    ): Promise<TicketLookupResult> {
+      const target = query.kind === "detail" ? query.ticketId : query.before;
+      if (
+        !positiveId(requesterId) ||
+        (target !== undefined && !positiveId(target))
+      )
+        return { kind: "unavailable" };
+      const budget = AbortSignal.any([signal, AbortSignal.timeout(10_000)]);
+      const response = await run(
+        { path: "search/Ticket", query: ticketSearch(requesterId, query) },
+        budget,
+      );
+      if (
+        response.kind !== "response" ||
+        (response.status !== 200 && response.status !== 206)
+      )
+        return { kind: "unavailable" };
+      const candidates = readTicketCandidates(response.body, query);
+      if (!candidates) return { kind: "unavailable" };
+      const ownership = await Promise.all(
+        candidates.map(async ({ id }) => {
+          const reply = await run(
+            {
+              path: `Ticket/${id}/Ticket_User`,
+              query: new URLSearchParams({
+                range: "0-4",
+                get_hateoas: "false",
+                "searchText[users_id]": "^" + requesterId + "$",
+                "searchText[type]": "^1$",
+              }),
+            },
+            budget,
+          );
+          return (
+            reply.kind === "response" &&
+            (reply.status === 200 || reply.status === 206) &&
+            isTicketRequester(reply.body, id, requesterId)
+          );
+        }),
+      );
+      if (!ownership.every(Boolean))
+        return query.kind === "detail"
+          ? { kind: "ready", tickets: [] }
+          : { kind: "unavailable" };
+      const tickets = candidates.slice(0, ticketPageSize);
+      return {
+        kind: "ready",
+        tickets,
+        ...(candidates.length > ticketPageSize
+          ? { nextBefore: tickets[ticketPageSize - 1].id }
+          : {}),
+      };
     },
 
     async createTicket(

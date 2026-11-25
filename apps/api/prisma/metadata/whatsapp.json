@@ -44,25 +44,31 @@
           "nullMeaning": "The guided worker has not completed this message."
         },
         "conversation_action": {
-          "description": "Durable identity operation owned by this inbound event.",
+          "description": "Durable identity or ticket lookup operation owned by this inbound event.",
           "classification": "INTERNAL",
-          "nullMeaning": "There is no outstanding identity operation for the conversation."
+          "nullMeaning": "There is no outstanding deferred conversation operation."
         },
         "conversation_claim_id": {
-          "description": "Unique fence for the worker currently allowed to finalize the identity operation.",
+          "description": "Unique fence for the worker currently allowed to finalize the conversation operation.",
           "classification": "INTERNAL",
-          "nullMeaning": "The event has no identity work claim."
+          "nullMeaning": "The event has no deferred work claim."
         },
         "conversation_claim_until": {
-          "description": "Time after which another conversation worker may reclaim an unfinished identity operation.",
+          "description": "Time after which another conversation worker may reclaim an unfinished operation.",
           "classification": "INTERNAL",
-          "nullMeaning": "The event has no active identity work claim."
+          "nullMeaning": "The event has no active work claim."
+        },
+        "conversation_requester_id": {
+          "description": "Verified GLPI requester bound to a claimed ticket consultation. Cleared when the event completes.",
+          "classification": "RESTRICTED",
+          "nullMeaning": "The event has no pending ticket consultation."
         }
       },
       "objects": {
         "whatsapp_inbound_messages_pkey": "Keeps one accepted event per Meta message ID across retries and concurrent delivery.",
         "whatsapp_inbound_messages_sender_required": "Requires at least one sender identifier so a message can be associated with a conversation.",
-        "whatsapp_inbound_messages_conversation_claim": "Requires a complete claim only on an outstanding identity operation and keeps completed events unlocked.",
+        "whatsapp_inbound_messages_conversation_claim": "Requires a complete claim only on an outstanding operation and keeps completed events unlocked.",
+        "whatsapp_inbound_messages_requester_claim": "Restricts a stored GLPI requester to a positive ID on a claimed event.",
         "whatsapp_inbound_messages_conversation_idx": "Supports finding the earliest unprocessed message for one business number."
       }
     },
@@ -81,7 +87,7 @@
           "classification": "INTERNAL"
         },
         "payload": {
-          "description": "Immutable destination and validated text or interactive reply content.",
+          "description": "Immutable destination, validated text or interactive content and optional required GLPI recipient identity.",
           "classification": "RESTRICTED"
         },
         "state": {
@@ -89,7 +95,7 @@
           "classification": "INTERNAL"
         },
         "expires_at": {
-          "description": "Last allowed dispatch deadline from the current inbound customer service window.",
+          "description": "Last allowed dispatch deadline under the inbound customer service window and any shorter lifetime required by the reply.",
           "classification": "INTERNAL",
           "unit": "UTC instant"
         },

@@ -18,7 +18,7 @@ The Meta MCP can access the supplied pilot sender. On 2026-11-25, Meta accepted 
 
 **Status** Pending for live testing and cutover. **Owner** MNS GLPI administrator.
 
-The workspace has only the legacy integration copy. Issue a dedicated test service credential with directory lookup, ticket creation and read access for the pilot, and permission to create and verify ticket attachments. Grant equivalent restricted production access for deployment. Supply the endpoint and credential securely. Verify by creating, consulting and attaching media to a synthetic ticket in test GLPI. This access affects the live pilot and cutover under PJ-17 and PJ-18.
+The workspace has only the legacy integration copy. Issue a dedicated test service credential with directory lookup, ticket creation, ticket and requester-relation read access, and permission to create and verify ticket attachments. Grant equivalent restricted production access for deployment. Supply the endpoint and credential securely. Verify creation, consultation and attaching media with synthetic test tickets, including consultation where a different test user is the requester. This access affects the live pilot and cutover under PJ-17 and PJ-18.
 
 ## PH-09
 

@@ -157,16 +157,18 @@ Lifecycle: Created before acknowledging the webhook. Redelivery preserves the or
 | `received_at` | `timestamp(3) with time zone` | no | `CURRENT_TIMESTAMP` | INTERNAL | Database timestamp of the first accepted delivery. | — | UTC instant |
 | `content` | `jsonb` | no | — | RESTRICTED | Normalized text, action identifier, media reference or protected verification-code digest consumed by the conversation flow. | — | — |
 | `conversation_processed_at` | `timestamp(3) with time zone` | yes | — | INTERNAL | Time the guided worker completed processing this input and committed its effects. | The guided worker has not completed this message. | — |
-| `conversation_action` | `"WhatsAppConversationAction"` | yes | — | INTERNAL | Durable identity operation owned by this inbound event. | There is no outstanding identity operation for the conversation. | — |
-| `conversation_claim_id` | `uuid` | yes | — | INTERNAL | Unique fence for the worker currently allowed to finalize the identity operation. | The event has no identity work claim. | — |
-| `conversation_claim_until` | `timestamp(3) with time zone` | yes | — | INTERNAL | Time after which another conversation worker may reclaim an unfinished identity operation. | The event has no active identity work claim. | — |
+| `conversation_action` | `"WhatsAppConversationAction"` | yes | — | INTERNAL | Durable identity or ticket lookup operation owned by this inbound event. | There is no outstanding deferred conversation operation. | — |
+| `conversation_claim_id` | `uuid` | yes | — | INTERNAL | Unique fence for the worker currently allowed to finalize the conversation operation. | The event has no deferred work claim. | — |
+| `conversation_claim_until` | `timestamp(3) with time zone` | yes | — | INTERNAL | Time after which another conversation worker may reclaim an unfinished operation. | The event has no active work claim. | — |
+| `conversation_requester_id` | `bigint` | yes | — | RESTRICTED | Verified GLPI requester bound to a claimed ticket consultation. Cleared when the event completes. | The event has no pending ticket consultation. | — |
 
 ### Constraints and indexes
 
 | Object | Physical definition | Purpose |
 | --- | --- | --- |
-| `whatsapp_inbound_messages_conversation_claim` | `CHECK ((((conversation_claim_id IS NULL) AND (conversation_claim_until IS NULL)) OR ((conversation_claim_id IS NOT NULL) AND (conversation_claim_until IS NOT NULL) AND (conversation_action IS NOT NULL) AND (conversation_processed_at IS NULL))))` | Requires a complete claim only on an outstanding identity operation and keeps completed events unlocked. |
+| `whatsapp_inbound_messages_conversation_claim` | `CHECK ((((conversation_claim_id IS NULL) AND (conversation_claim_until IS NULL)) OR ((conversation_claim_id IS NOT NULL) AND (conversation_claim_until IS NOT NULL) AND (conversation_action IS NOT NULL) AND (conversation_processed_at IS NULL))))` | Requires a complete claim only on an outstanding operation and keeps completed events unlocked. |
 | `whatsapp_inbound_messages_pkey` | `PRIMARY KEY (message_id)` | Keeps one accepted event per Meta message ID across retries and concurrent delivery. |
+| `whatsapp_inbound_messages_requester_claim` | `CHECK (((conversation_requester_id IS NULL) OR ((conversation_requester_id > 0) AND (conversation_claim_id IS NOT NULL))))` | Restricts a stored GLPI requester to a positive ID on a claimed event. |
 | `whatsapp_inbound_messages_sender_required` | `CHECK (((sender_business_id IS NOT NULL) OR (sender_phone IS NOT NULL)))` | Requires at least one sender identifier so a message can be associated with a conversation. |
 | `whatsapp_inbound_messages_conversation_idx` | `CREATE INDEX whatsapp_inbound_messages_conversation_idx ON public.whatsapp_inbound_messages USING btree (business_phone_id, conversation_processed_at, received_at, occurred_at, message_id)` | Supports finding the earliest unprocessed message for one business number. |
 
@@ -182,9 +184,9 @@ Lifecycle: Enqueued before dispatch. Retried only after an explicit provider thr
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `id` | `uuid` | no | — | INTERNAL | Caller-assigned immutable UUID for one reply intent and the opaque identifier echoed by Meta on delivery callbacks. | — | — |
 | `business_phone_id` | `text` | no | — | INTERNAL | Meta business phone number ID that owns and sends the reply. | — | — |
-| `payload` | `jsonb` | no | — | RESTRICTED | Immutable destination and validated text or interactive reply content. | — | — |
+| `payload` | `jsonb` | no | — | RESTRICTED | Immutable destination, validated text or interactive content and optional required GLPI recipient identity. | — | — |
 | `state` | `"WhatsAppOutboundState"` | no | `'PENDING'::"WhatsAppOutboundState"` | INTERNAL | Current queue, provider acceptance or delivery evidence state. | — | — |
-| `expires_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Last allowed dispatch deadline from the current inbound customer service window. | — | UTC instant |
+| `expires_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Last allowed dispatch deadline under the inbound customer service window and any shorter lifetime required by the reply. | — | UTC instant |
 | `available_at` | `timestamp(3) with time zone` | no | `CURRENT_TIMESTAMP` | INTERNAL | Earliest eligible time for the next dispatch attempt. | — | UTC instant |
 | `attempt_started_at` | `timestamp(3) with time zone` | yes | — | INTERNAL | Most recent claim time used to detect an abandoned dispatch. | The queue has not claimed this reply. | UTC instant |
 | `attempts` | `integer` | no | `0` | INTERNAL | Number of claims recorded before making a provider request. | — | claims |
@@ -206,7 +208,7 @@ Lifecycle: Enqueued before dispatch. Retried only after an explicit provider thr
 
 | Enum | Values | Meaning |
 | --- | --- | --- |
-| `WhatsAppConversationAction` | REQUEST_CODE, CONFIRM_CODE | Identity operation to request or confirm an employee email code after committing the preceding conversation move. |
+| `WhatsAppConversationAction` | REQUEST_CODE, CONFIRM_CODE, QUERY_TICKETS | Deferred operation to request or confirm an email code or consult GLPI tickets after committing the preceding conversation move. |
 | `WhatsAppOutboundState` | PENDING, SENDING, ACCEPTED, SENT, DELIVERED, READ, FAILED, UNCERTAIN, EXPIRED | Tracks work from pending and claimed through acceptance, delivery, read, known failure, uncertainty, or service-window expiry. |
 | `WhatsAppTicketSubmissionState` | PENDING, COMPLETED, FAILED, UNCERTAIN | PENDING covers dispatch and bounded retries. COMPLETED confirms a ticket and records attachment outcomes. FAILED confirms no ticket was created. UNCERTAIN requires checking GLPI before a repeat. |
 | `WhatsAppTroubleshootingOutcome` | RESOLVED, NOT_RESOLVED, SKIPPED | Employee response to optional guidance. RESOLVED closes the draft. NOT_RESOLVED and SKIPPED keep the draft for review. |

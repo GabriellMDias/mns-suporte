@@ -3,6 +3,7 @@ import { Value } from "typebox/value";
 import type { Database } from "../../database.js";
 import type { WhatsAppOutboundState } from "../../generated/prisma/client.js";
 import type { SendReply } from "./graph-client.js";
+import { scopeOf } from "./identity-code.js";
 import type { DeliveryStatus } from "./inbound.js";
 import {
   deliveryIdSchema,
@@ -48,7 +49,7 @@ export async function enqueueWhatsAppReply(
 }
 
 export async function dispatchNextWhatsAppReply(
-  store: OutboxStore,
+  store: OutboxStore & Pick<Database, "whatsAppVerifiedIdentity">,
   businessPhoneId: string,
   send: SendReply,
   signal: AbortSignal,
@@ -106,6 +107,32 @@ export async function dispatchNextWhatsAppReply(
   if (expiresAt <= clock()) {
     await queue.updateMany({ where: finalizable, data: { state: "EXPIRED" } });
     return true;
+  }
+  if (payload.requiredGlpiUserId !== undefined) {
+    const { recipient } = payload;
+    const scopeKey = scopeOf({
+      businessPhoneId,
+      ...(recipient.kind === "business_id"
+        ? { senderBusinessId: recipient.value }
+        : { senderPhone: recipient.value }),
+    });
+    const valid =
+      scopeKey &&
+      (await store.whatsAppVerifiedIdentity.findUnique({
+        where: {
+          scopeKey,
+          glpiUserId: payload.requiredGlpiUserId,
+          expiresAt: { gt: clock() },
+        },
+        select: { scopeKey: true },
+      }));
+    if (!valid || expiresAt <= clock()) {
+      await queue.updateMany({
+        where: finalizable,
+        data: { state: "EXPIRED" },
+      });
+      return true;
+    }
   }
 
   const outcome = await send(id, payload, signal);

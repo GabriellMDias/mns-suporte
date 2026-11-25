@@ -69,6 +69,25 @@ export function readDirectoryPage(
   start: number,
   pageSize: number,
 ) {
+  const page = readSearchPage(payload, start, pageSize);
+  if (!page) return undefined;
+  const candidates: { id: number; active: boolean; emails: string[] }[] = [];
+  for (const row of page.rows) {
+    if (!Value.Check(rowSchema, row)) return undefined;
+    const id = positiveId(row["2"]);
+    if (!id) return undefined;
+    const active = row["8"] === true || row["8"] === 1 || row["8"] === "1";
+    const emails = Array.isArray(row["5"]) ? row["5"] : [row["5"]];
+    candidates.push({ id, active, emails });
+  }
+  return { total: page.total, candidates };
+}
+
+export function readSearchPage(
+  payload: unknown,
+  start: number,
+  pageSize: number,
+) {
   if (!Value.Check(pageMetadata, payload)) return undefined;
   const rows = pageRows(payload.data);
   const total = Number(payload.totalcount);
@@ -82,14 +101,5 @@ export function readDirectoryPage(
   )
     return undefined;
 
-  const candidates: { id: number; active: boolean; emails: string[] }[] = [];
-  for (const row of rows) {
-    if (!Value.Check(rowSchema, row)) return undefined;
-    const id = positiveId(row["2"]);
-    if (!id) return undefined;
-    const active = row["8"] === true || row["8"] === 1 || row["8"] === "1";
-    const emails = Array.isArray(row["5"]) ? row["5"] : [row["5"]];
-    candidates.push({ id, active, emails });
-  }
-  return { total, candidates };
+  return { total, rows };
 }
