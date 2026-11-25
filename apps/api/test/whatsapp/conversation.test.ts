@@ -383,13 +383,10 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
       // Enable the real module wiring for a second business number. Only
       // the provider transport is stubbed, so both workers run normally.
       const wiredPhone = "20202";
-      const fakeFetch = vi
-        .fn<typeof fetch>()
-        .mockResolvedValue(
-          Response.json({
-            messages: [{ id: "wamid.synthetic-runtime-reply" }],
-          }),
-        );
+      const accepted = Response.json({
+        messages: [{ id: "wamid.synthetic-runtime-reply" }],
+      });
+      const fakeFetch = vi.fn<typeof fetch>().mockResolvedValue(accepted);
       vi.stubGlobal("fetch", fakeFetch);
       const wiredApp = createApp(logger, undefined, {
         modules: activateModules(
