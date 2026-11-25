@@ -5,9 +5,20 @@ model WhatsAppInboundMessage {
   senderPhone      String?  @map("sender_phone")
   occurredAt       DateTime @map("occurred_at") @db.Timestamptz(3)
   receivedAt       DateTime @default(now()) @map("received_at") @db.Timestamptz(3)
-  content          Json
+  content                     Json
+  conversationProcessedAt     DateTime?                  @map("conversation_processed_at") @db.Timestamptz(3)
+  conversationAction          WhatsAppConversationAction? @map("conversation_action")
+  conversationClaimId         String?                    @map("conversation_claim_id") @db.Uuid
+  conversationClaimUntil      DateTime?                  @map("conversation_claim_until") @db.Timestamptz(3)
+
+  @@index([businessPhoneId, conversationProcessedAt, receivedAt, occurredAt, messageId], map: "whatsapp_inbound_messages_conversation_idx")
 
   @@map("whatsapp_inbound_messages")
+}
+
+enum WhatsAppConversationAction {
+  REQUEST_CODE
+  CONFIRM_CODE
 }
 
 enum WhatsAppOutboundState {

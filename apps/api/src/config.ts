@@ -56,6 +56,9 @@ export const serverConfigSchema = Type.Object(
     identitySmtpPassword: Type.Optional(
       Type.String({ pattern: "^[ -~]{1,512}$" }),
     ),
+    whatsappSupportContact: Type.Optional(
+      Type.String({ minLength: 1, maxLength: 400 }),
+    ),
     identitySmtpFrom: Type.Optional(
       Type.String({ minLength: 1, maxLength: 254 }),
     ),
@@ -85,6 +88,11 @@ export type IdentityVerificationConfig = Readonly<{
   codeSecret: string;
   allowedEmailDomains: readonly string[];
   smtp: VerificationSmtpConfig;
+}>;
+export type WhatsAppConversationConfig = Readonly<{
+  glpi: GlpiConfig;
+  identity: IdentityVerificationConfig;
+  supportContact: string;
 }>;
 export type WhatsAppWebhookConfig = Readonly<{
   appSecret: string;
@@ -409,6 +417,18 @@ export const configReference = Object.freeze([
     secret: false,
     purpose: "Authorized From mailbox for employee verification email.",
   },
+  {
+    key: "whatsappSupportContact",
+    name: "WHATSAPP_SUPPORT_CONTACT",
+    type: "email address or HTTPS URL",
+    required: false,
+    default: "",
+    visibility: "server",
+    classification: "INTERNAL",
+    secret: false,
+    purpose:
+      "IT contact shown by the WhatsApp menu. Enables guided conversations with configured integrations.",
+  },
 ] as const satisfies readonly ConfigMetadata[]);
 
 function numberFromEnv(value: string | undefined, fallback: number): number {
@@ -421,6 +441,26 @@ function readAllowedEmailDomains(value: string): string[] {
   return [
     ...new Set(value.split(",").map((domain) => domain.trim().toLowerCase())),
   ];
+}
+
+function normalizeSupportContact(value: string): string | undefined {
+  const email = normalizeEmail(value);
+  if (email) return email;
+  try {
+    const url = new URL(value);
+    if (
+      url.protocol === "https:" &&
+      url.hostname &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash
+    )
+      return url.href;
+  } catch {
+    return undefined;
+  }
+  return undefined;
 }
 
 export function parseServerConfig(
@@ -488,6 +528,9 @@ export function parseServerConfig(
       ? {}
       : { identitySmtpFrom: env.IDENTITY_SMTP_FROM }),
     identitySmtpPort: numberFromEnv(env.IDENTITY_SMTP_PORT, 587),
+    ...(env.WHATSAPP_SUPPORT_CONTACT === undefined
+      ? {}
+      : { whatsappSupportContact: env.WHATSAPP_SUPPORT_CONTACT }),
   };
   if (!Value.Check(serverConfigSchema, candidate)) {
     throw new Error("Invalid API configuration");
@@ -619,6 +662,18 @@ export function parseServerConfig(
     throw new Error("Invalid API configuration: employee email domains");
   if (candidate.identitySmtpFrom && !normalizeEmail(candidate.identitySmtpFrom))
     throw new Error("Invalid API configuration: verification sender");
+  if (candidate.whatsappSupportContact) {
+    if (!normalizeSupportContact(candidate.whatsappSupportContact))
+      throw new Error("Invalid API configuration: WhatsApp support contact");
+    if (
+      !candidate.databaseUrl ||
+      !candidate.whatsappAccessToken ||
+      !candidate.identityCodeSecret
+    )
+      throw new Error(
+        "Invalid API configuration: incomplete WhatsApp conversation",
+      );
+  }
   return Object.freeze(candidate);
 }
 
@@ -692,6 +747,19 @@ export function identityVerificationFrom(
       }),
     });
   return undefined;
+}
+
+export function whatsappConversationFrom(
+  config: ServerConfig,
+): WhatsAppConversationConfig | undefined {
+  const glpi = glpiConfigFrom(config);
+  const identity = identityVerificationFrom(config);
+  const supportContact =
+    config.whatsappSupportContact &&
+    normalizeSupportContact(config.whatsappSupportContact);
+  return glpi && identity && supportContact
+    ? Object.freeze({ glpi, identity, supportContact })
+    : undefined;
 }
 
 // No browser-consumable API configuration exists. This projection

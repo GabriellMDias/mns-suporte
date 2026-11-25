@@ -6,7 +6,10 @@ import type { TSchema } from "typebox";
 import type { AccessTokenVerifier } from "./authentication.js";
 import type { Database } from "./database.js";
 import type { ErrorDefinition } from "./errors.js";
-import type { WhatsAppWebhookConfig } from "./config.js";
+import type {
+  WhatsAppConversationConfig,
+  WhatsAppWebhookConfig,
+} from "./config.js";
 
 export type AppInstance = FastifyInstance<
   Server,
@@ -39,6 +42,7 @@ export type ModuleResources = Readonly<{
   database?: Database;
   verifier?: AccessTokenVerifier;
   whatsappWebhook?: WhatsAppWebhookConfig;
+  whatsappConversation?: WhatsAppConversationConfig;
 }>;
 
 /** A module whose dependencies are satisfied and whose routes can mount. */

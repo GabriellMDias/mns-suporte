@@ -75,9 +75,54 @@
       "Meaning": "Normalized text, action identifier, media reference or protected verification-code digest consumed by the conversation flow.",
       "Null meaning": "—",
       "Unit": "—"
+    },
+    {
+      "Column": "conversation_processed_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Time the guided worker completed processing this input and committed its effects.",
+      "Null meaning": "The guided worker has not completed this message.",
+      "Unit": "—"
+    },
+    {
+      "Column": "conversation_action",
+      "PostgreSQL type": "\"WhatsAppConversationAction\"",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Durable identity operation owned by this inbound event.",
+      "Null meaning": "There is no outstanding identity operation for the conversation.",
+      "Unit": "—"
+    },
+    {
+      "Column": "conversation_claim_id",
+      "PostgreSQL type": "uuid",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Unique fence for the worker currently allowed to finalize the identity operation.",
+      "Null meaning": "The event has no identity work claim.",
+      "Unit": "—"
+    },
+    {
+      "Column": "conversation_claim_until",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Time after which another conversation worker may reclaim an unfinished identity operation.",
+      "Null meaning": "The event has no active identity work claim.",
+      "Unit": "—"
     }
   ],
   "constraints": [
+    {
+      "Object": "whatsapp_inbound_messages_conversation_claim",
+      "Physical definition": "CHECK ((((conversation_claim_id IS NULL) AND (conversation_claim_until IS NULL)) OR ((conversation_claim_id IS NOT NULL) AND (conversation_claim_until IS NOT NULL) AND (conversation_action IS NOT NULL) AND (conversation_processed_at IS NULL))))",
+      "Purpose": "Requires a complete claim only on an outstanding identity operation and keeps completed events unlocked."
+    },
     {
       "Object": "whatsapp_inbound_messages_pkey",
       "Physical definition": "PRIMARY KEY (message_id)",
@@ -87,6 +132,11 @@
       "Object": "whatsapp_inbound_messages_sender_required",
       "Physical definition": "CHECK (((sender_business_id IS NOT NULL) OR (sender_phone IS NOT NULL)))",
       "Purpose": "Requires at least one sender identifier so a message can be associated with a conversation."
+    },
+    {
+      "Object": "whatsapp_inbound_messages_conversation_idx",
+      "Physical definition": "CREATE INDEX whatsapp_inbound_messages_conversation_idx ON public.whatsapp_inbound_messages USING btree (business_phone_id, conversation_processed_at, received_at, occurred_at, message_id)",
+      "Purpose": "Supports finding the earliest unprocessed message for one business number."
     }
   ]
 }

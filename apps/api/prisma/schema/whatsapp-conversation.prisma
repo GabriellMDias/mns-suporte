@@ -1,0 +1,7 @@
+model WhatsAppConversation {
+  scopeKey   String   @id(map: "whatsapp_conversations_pkey") @map("scope_key")
+  state      Json
+  updatedAt  DateTime @map("updated_at") @db.Timestamptz(3)
+
+  @@map("whatsapp_conversations")
+}

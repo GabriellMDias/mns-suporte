@@ -165,7 +165,7 @@ describe("WhatsApp webhook", () => {
     }
   });
 
-  it("persists with insert-only privileges and deduplicates concurrent delivery", async () => {
+  it("persists immutable inbound content and deduplicates concurrent delivery", async () => {
     await withMigratedDatabase(async (runtimeUrl, migrationUrl) => {
       const database = createDatabase(runtimeUrl);
       const inspection = createDatabase(migrationUrl);
@@ -232,7 +232,12 @@ describe("WhatsApp webhook", () => {
             },
           },
         ]);
-        await expect(database.whatsAppInboundMessage.count()).rejects.toThrow();
+        await expect(
+          database.whatsAppInboundMessage.update({
+            where: { messageId: message.id },
+            data: { content: { type: "text", body: "Attempted alteration" } },
+          }),
+        ).rejects.toThrow();
       } finally {
         await app.close();
         await Promise.all([database.$disconnect(), inspection.$disconnect()]);

@@ -30,7 +30,7 @@ The WhatsApp module receives Meta callbacks at `/webhooks/whatsapp`. Development
 
 The subscription GET returns the original challenge as plain text after verifying the token. The POST computes HMAC-SHA256 over the exact request bytes before parsing JSON. Supported messages and matching outbound delivery updates for the configured number commit together before acknowledgement. Incoming message IDs deduplicate redelivery. Other numbers and unsupported events are ignored. Enable HTTPS at ingress and omit query strings from ingress logs because Meta sends the verification token in the subscription query.
 
-The inbox accepts text, interactive or template button replies, images, audio and documents. It stores normalized content and media references. The runtime role has only INSERT access to the inbox. Conversation processing and automated retention are tracked in the [V1 plan](../../docs/project/implementation-plan.md#v1-work).
+The inbox accepts text, interactive or template button replies, images, audio and documents. It stores normalized content and media references. The runtime role can read and append inbound events, and update only the guided worker metadata. Automated retention is tracked in the [V1 plan](../../docs/project/implementation-plan.md#v1-work).
 
 [Meta webhook protocol](https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/create-webhook-endpoint) · [Module source](src/features/whatsapp/module.ts) · [Database schema](prisma/schema/whatsapp.prisma)
 
@@ -42,7 +42,7 @@ The conversation flow can enqueue a text or up-to-three-button reply with a stab
 
 A timeout, disconnected response, malformed success, provider server error or abandoned claim can leave an unknown result. The row becomes `UNCERTAIN` and stays out of dispatch until reconciled by delivery evidence. The signed delivery callback identifies the local intent through the opaque ID or the known Meta message ID. Events can arrive before the send response. Later or repeated weaker events leave confirmed delivery or read status intact. The runtime can update dispatch evidence, and the stored intent stays immutable.
 
-The internal queue entry point is [outbox.ts](src/features/whatsapp/outbox.ts). The conversation flow that creates reply intents and the closure template are separate tasks in the [V1 plan](../../docs/project/implementation-plan.md#v1-work). Use test traffic until the operational controls in the plan are in place.
+The internal queue entry point is [outbox.ts](src/features/whatsapp/outbox.ts). The [guided conversation](#guided-whatsapp-conversation) creates reply intents. The closure template is tracked separately in the [V1 plan](../../docs/project/implementation-plan.md#v1-work). Use test traffic until the operational controls in the plan are in place.
 
 [Meta Messages API](https://developers.facebook.com/documentation/business-messaging/whatsapp/reference/whatsapp-business-phone-number/message-api) · [Reply buttons](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/interactive-reply-buttons-messages) · [Business-scoped recipients](https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids)
 
@@ -68,9 +68,21 @@ One reservation permits one SMTP submission. A code has the prefix `MNS-` and ex
 
 The webhook stores a keyed digest for a standalone verification code and removes complete code mentions from other message text. Challenges and mailbox quotas also use keyed digests. Rotating the key invalidates pending codes and starts new mailbox quota counters. Issuing the code and querying GLPI happen outside database locks. The conversation flow must durably enqueue the same neutral acknowledgement before doing any directory or mail work. That rule keeps mailbox eligibility and SMTP outcomes out of the response. A failed or unconfirmed relay response does not cause an automatic resend. The employee can make a new request within the quota.
 
-Configure the seven `IDENTITY_*` settings as a group with [GLPI](#glpi-integration). Generate the 32-byte secret with a cryptographically secure random generator and place it with the relay credentials in the server secret store. The [SMTP adapter](src/integrations/mail/verification.ts) uses implicit TLS on port 465 and requires STARTTLS on other ports, with normal certificate verification. Keep the identity service internal. The bot menu and processing of the stored verification event remain tracked in the [V1 plan](../../docs/project/implementation-plan.md#v1-work).
+Configure the seven `IDENTITY_*` settings as a group with [GLPI](#glpi-integration). Generate the 32-byte secret with a cryptographically secure random generator and place it with the relay credentials in the server secret store. The [SMTP adapter](src/integrations/mail/verification.ts) uses implicit TLS on port 465 and requires STARTTLS on other ports, with normal certificate verification. Keep the identity service internal. The [guided conversation](#guided-whatsapp-conversation) processes signed verification events.
 
 [Identity integration tests](test/whatsapp/identity.test.ts) · [SMTP transport test](test/whatsapp/verification-mail.test.ts) · [Nodemailer SMTP](https://nodemailer.com/smtp)
+
+## Guided WhatsApp conversation
+
+Set `WHATSAPP_SUPPORT_CONTACT` to the approved IT mailbox or HTTPS support page to enable guided processing. It requires the [WhatsApp outbound](#reply-dispatch), [GLPI](#glpi-integration), [employee verification](#employee-email-verification), and PostgreSQL settings. With the contact unset, the API can still receive signed events for integration testing. The configured contact is available to an employee before verification and during intake.
+
+The conversation offers ticket intake, ticket consultation, and the IT contact. Intake collects category, unit or department, description, impact, and up to five media references. An employee can review and edit fields, cancel an unconfirmed draft, or return to it via the menu after a restart. Review buttons carry the current draft revision. The stored draft belongs to its verified GLPI user, and a different verified user on the same sender scope does not inherit it.
+
+A confirmed draft is saved for ticket submission. The [V1 plan](../../docs/project/implementation-plan.md#v1-work) tracks registering that draft in GLPI, listing owned tickets and sending status notices. The interim WhatsApp replies make the current availability of those actions clear.
+
+Inbound events and replies use PostgreSQL. A short transaction serializes the next inbox event for one business number and commits the conversation move and its outbound reply together. Email requests commit the neutral reply before querying GLPI or submitting mail. Identity operations are reclaimed after a 45-second lease. An old claim cannot finalize a newer one. The employee's verified link recovers a successful confirmation when a worker was interrupted after consuming the code. Inbound events outside the customer service window are completed without applying a move or sending a reply.
+
+[Conversation state and prompts](src/features/whatsapp/conversation.ts) · [Processing and recovery](src/features/whatsapp/conversation-processor.ts) · [Restart and transport tests](test/whatsapp/conversation.test.ts) · [Meta customer service window](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages)
 
 ## Local commands
 

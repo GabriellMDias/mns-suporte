@@ -1,8 +1,16 @@
 import type { ApiModule } from "../../module.js";
+import { createGlpiClient } from "../../integrations/glpi/client.js";
+import {
+  createVerificationMailer,
+  VerificationMailUnconfirmedError,
+} from "../../integrations/mail/verification.js";
 import { webhookErrors, webhookOperations } from "./contracts.js";
+import { createConversationProcessor } from "./conversation-processor.js";
 import { registerWhatsAppDispatchWorker } from "./dispatch-worker.js";
 import { createWhatsAppGraphSender } from "./graph-client.js";
 import { protectIdentityCode } from "./identity-code.js";
+import { createPostgresIdentityRepository } from "./identity-repository.js";
+import { createIdentityVerification } from "./identity-service.js";
 import {
   applyWhatsAppDeliveryStatuses,
   dispatchNextWhatsAppReply,
@@ -15,7 +23,7 @@ export const whatsAppModule: ApiModule = {
   requires: ["database", "whatsappWebhook"],
   operations: webhookOperations,
   errors: webhookErrors,
-  activate: ({ database, whatsappWebhook }) => {
+  activate: ({ database, whatsappWebhook, whatsappConversation }) => {
     const store = database!;
     const config = whatsappWebhook!;
     return {
@@ -49,6 +57,38 @@ export const whatsAppModule: ApiModule = {
             );
           });
         });
+        if (whatsappConversation && config.outbound) {
+          const directory = createGlpiClient(whatsappConversation.glpi);
+          const sendCode = createVerificationMailer(
+            whatsappConversation.identity.smtp,
+          );
+          const identity = createIdentityVerification(
+            createPostgresIdentityRepository(store),
+            whatsappConversation.identity,
+            (email) => directory.findActiveUserByEmail(email),
+            async (recipient, code) => {
+              try {
+                await sendCode(recipient, code);
+              } catch (error) {
+                if (!(error instanceof VerificationMailUnconfirmedError))
+                  throw error;
+                app.log.warn("whatsapp_verification_mail_unconfirmed");
+              }
+            },
+          );
+          registerWhatsAppDispatchWorker(
+            app,
+            createConversationProcessor(
+              store,
+              {
+                businessPhoneId: config.phoneNumberId,
+                supportContact: whatsappConversation.supportContact,
+              },
+              identity,
+            ),
+            "whatsapp_conversation_unavailable",
+          );
+        }
         if (config.outbound) {
           const send = createWhatsAppGraphSender(
             config.phoneNumberId,
