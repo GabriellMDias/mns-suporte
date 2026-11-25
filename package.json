@@ -16,6 +16,7 @@
     "test": "pnpm db:generate && pnpm -C apps/api test && pnpm -C apps/web test:unit && pnpm -C apps/web test:browser",
     "build": "pnpm db:generate && pnpm -C apps/api build && pnpm -C apps/web build && pnpm -C apps/web bundle:check",
     "smoke": "node apps/api/scripts/smoke.mjs",
+    "ops:rehearse": "node infra/rehearse.mjs",
     "test:e2e": "pnpm -C apps/web test:e2e",
     "references:check": "pnpm -C apps/api references:check && pnpm -C packages/sdk references:check",
     "docs:references:write": "node tooling/documentation/generate.mjs --write",

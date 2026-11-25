@@ -4,13 +4,13 @@
 
 This is the canonical local setup and execution path. Tests use disposable PostgreSQL and synthetic identities; no production database, identity provider, telemetry vendor, or deployment account is needed. Commands address workspace packages by path (`pnpm -C apps/api …`), so they work unchanged whatever a project names its packages.
 
-| Goal | Prerequisites after installing pinned Node.js/pnpm | Start here |
-| --- | --- | --- |
-| Browse the documentation portal | Frozen dependency install; no container, API, or test browser needed | [Portal](#living-documentation-portal) |
-| Run the API and web application locally | Frozen dependency install, generated Prisma client, and local configuration | [Configuration](#load-local-configuration) |
-| Use a local PostgreSQL or access-token issuer | A database or issuer you control for development | [Local database and authentication](#local-database-and-authentication) |
-| Run the complete validation gate | All clean-checkout prerequisites, including containers and test browsers | [Prepare a clean checkout](#prepare-a-clean-checkout), then [validate](#validate-regenerate-and-build) |
-| Start a new project from Orion or upgrade a project's Orion baseline | A fresh full clone and frozen dependency install | [Project derivation](project-derivation.md) |
+| Goal                                                                 | Prerequisites after installing pinned Node.js/pnpm                          | Start here                                                                                             |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Browse the documentation portal                                      | Frozen dependency install; no container, API, or test browser needed        | [Portal](#living-documentation-portal)                                                                 |
+| Run the API and web application locally                              | Frozen dependency install, generated Prisma client, and local configuration | [Configuration](#load-local-configuration)                                                             |
+| Use a local PostgreSQL or access-token issuer                        | A database or issuer you control for development                            | [Local database and authentication](#local-database-and-authentication)                                |
+| Run the complete validation gate                                     | All clean-checkout prerequisites, including containers and test browsers    | [Prepare a clean checkout](#prepare-a-clean-checkout), then [validate](#validate-regenerate-and-build) |
+| Start a new project from Orion or upgrade a project's Orion baseline | A fresh full clone and frozen dependency install                            | [Project derivation](project-derivation.md)                                                            |
 
 ## Prepare a clean checkout
 
@@ -82,6 +82,8 @@ pnpm test:e2e
 `pnpm smoke` exercises the emitted API process, then any module process smokes. `pnpm test:e2e` runs the emitted API and the Vite web app for the shared documentation and shell journeys; module journeys start their own migrated PostgreSQL and synthetic issuer through the shared [end-to-end stack helpers](../apps/web/test/e2e/stack.ts). These fixtures are disposable and are not release or production data.
 
 ## Validate, regenerate, and build
+
+The [Compose rehearsal](runbooks/v1-deployment.md#disposable-rehearsal) exercises the release images and an isolated PostgreSQL restore. The production paths and integration configuration are in the [deployment runbook](runbooks/v1-deployment.md).
 
 Run the full, non-mutating tracked-source gate after changes:
 
