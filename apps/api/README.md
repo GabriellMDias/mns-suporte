@@ -46,6 +46,20 @@ The internal queue entry point is [outbox.ts](src/features/whatsapp/outbox.ts). 
 
 [Meta Messages API](https://developers.facebook.com/documentation/business-messaging/whatsapp/reference/whatsapp-business-phone-number/message-api) · [Reply buttons](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/interactive-reply-buttons-messages) · [Business-scoped recipients](https://developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids)
 
+## GLPI integration
+
+The server-side [GLPI client](src/integrations/glpi/client.ts) targets the REST v1 API used by the legacy support channel. Configure the base API URL, the GLPI API-client token and the scoped service-account user token together in the server environment. The [configuration reference](../../docs/generated/configuration/api.md) lists the keys. Use HTTPS for any real instance. HTTP is permitted on loopback in development and test. The transport rejects redirects.
+
+The user token is sent only to `initSession`. Requests with an established session use the application token and session token. Concurrent calls share session initialization. A directory read refreshes and retries once after GLPI explicitly rejects an expired session. The runtime and reverse proxy should exclude query strings, request bodies and authentication headers from logs because directory queries carry corporate email addresses.
+
+Directory lookup pages through `search/User`, verifies the entire normalized email against returned addresses, and checks the active flag. It accepts exactly one active GLPI user ID. Multiple matching users, incomplete or inconsistent pagination, and provider errors return distinct internal outcomes. The employee identity workflow will use neutral replies and verify mailbox ownership before linking an account.
+
+Ticket creation uses the supplied GLPI requester ID and escapes the plain-text description for GLPI's HTML field. A confirmed creation includes the positive ticket ID from GLPI. A known denial can be distinguished from a timeout, lost response or malformed success after dispatch. The client sends each write only once. The ticket workflow will persist the creation intent and reconcile uncertain outcomes before any further attempt.
+
+The adapter is covered by [synthetic contract and transport tests](test/glpi/client.test.ts). The employee verification and ticket workflows are tracked in the [V1 plan](../../docs/project/implementation-plan.md#v1-work). Live testing requires the scoped service account in [PH-08](../../docs/project/human-actions.md#ph-08).
+
+[GLPI REST v1 reference](https://github.com/glpi-project/glpi/blob/10.0/bugfixes/apirest.md) · [GLPI User search fields](https://github.com/glpi-project/glpi/blob/10.0/bugfixes/src/User.php)
+
 ## Local commands
 
 Use [setup](../../docs/setup.md) for the frozen install, generated Prisma client, environment loading, containers, and startup order. `pnpm -C apps/api dev` loads the ignored root `.env.local` when present; `start` runs emitted code and expects its process environment without loading that file.

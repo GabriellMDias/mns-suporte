@@ -4,6 +4,15 @@
     "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
     "group": "Decisions",
     "kind": "repository",
+    "heading": "CI secrets",
+    "anchor": "ci-secrets",
+    "text": "CI secrets\nOrdinary validation should require as few secrets as possible.\nTests should use ephemeral test credentials and local container infrastructure instead of external production-like credentials where practical.\nCI secrets must:\nfollow least privilege;\nbe scoped narrowly;\nnot be printed;\nnot be copied into artifacts;\nnot be required for unrelated validation jobs.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
     "heading": "OIDC for future privileged workflows",
     "anchor": "oidc-for-future-privileged-workflows",
     "text": "OIDC for future privileged workflows\nFuture workflows that need to authenticate to supported cloud providers or publishing systems should prefer short-lived identity federation through OpenID Connect when practical.\nLong-lived cloud credentials stored as GitHub secrets should not be the preferred Orion pattern.\nThe intended model is:\nGitHub Actions identity\n    ↓\nOIDC\n    ↓\nshort-lived provider credential\n\nrather than:\nGitHub secret\n    ↓\nlong-lived cloud access key\n\nActual deployment authentication is outside the scope of this ADR and will be decided when deployment targets exist.\n"
@@ -1384,14 +1393,5 @@
     "heading": "Details and additional delivery modes",
     "anchor": "details-and-additional-delivery-modes",
     "text": "Details and additional delivery modes\nEvery public details object needs a typed schema and a consumer purpose. Include only information safe for that caller; omit record dumps, protected resource/tenant identifiers, authorization evaluation, credentials, and provider payloads. Cross-cutting correlation/retry metadata should remain distinguishable from domain details. Once consumed, field meaning and shape are compatibility-sensitive.\nWhen additional modes are introduced:\nMode\nError requirement\nWebhook or upload\nFollow the operation/provider contract while minimizing signature-validation or scanning details. Bound and classify upload failures explicitly.\nAsynchronous work\nA successful acceptance response does not guarantee eventual success. Externally visible job status maps worker failures to stable public semantics, never worker exceptions.\nBatch/partial success\nDefine atomic versus partial processing and item identity in an operation-specific result. Do not ambiguously overload the ordinary single-error envelope.\n"
-  },
-  {
-    "id": "repository/docs/api/error-contract",
-    "title": "API Error Contract",
-    "group": "API guides",
-    "kind": "repository",
-    "heading": "Diagnostics and consumer behavior",
-    "anchor": "diagnostics-and-consumer-behavior",
-    "text": "Diagnostics and consumer behavior\nReport an unexpected occurrence once at its authoritative boundary. Preserve useful internal causal evidence only within [redaction rules](../security/telemetry-redaction.md); preservation never authorizes raw exception-message or stack export. The current runtime records allowlisted diagnostic fields rather than arbitrary error content. Expected validation, business, and access failures may contribute to safe metrics/security/audit signals without becoming unexpected incidents.\nClients and SDKs must preserve structured error semantics and correlation, and provide a safe fallback for unknown codes. Application consumers should not depend on framework-specific transport exceptions for business meaning. Product code decides whether to display safe server copy or localized client text; it must not parse that copy. The current thin SDK exposes generated response/error typing without adding a separate error-class hierarchy.\nCode meaning, status mappings, details, categories where consumed, and retry behavior require [compatibility review](versioning.md). Adding a code can break exhaustive consumers; renaming/removing a code or changing meaning is potentially breaking. Optional details are only additive if actual clients tolerate them.\n"
   }
 ]

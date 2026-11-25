@@ -164,6 +164,15 @@
     "title": "API Runtime",
     "group": "Workspace guides",
     "kind": "repository",
+    "heading": "GLPI integration",
+    "anchor": "glpi-integration",
+    "text": "GLPI integration\nThe server-side [GLPI client](src/integrations/glpi/client.ts) targets the REST v1 API used by the legacy support channel. Configure the base API URL, the GLPI API-client token and the scoped service-account user token together in the server environment. The [configuration reference](../../docs/generated/configuration/api.md) lists the keys. Use HTTPS for any real instance. HTTP is permitted on loopback in development and test. The transport rejects redirects.\nThe user token is sent only to `initSession`. Requests with an established session use the application token and session token. Concurrent calls share session initialization. A directory read refreshes and retries once after GLPI explicitly rejects an expired session. The runtime and reverse proxy should exclude query strings, request bodies and authentication headers from logs because directory queries carry corporate email addresses.\nDirectory lookup pages through `search/User`, verifies the entire normalized email against returned addresses, and checks the active flag. It accepts exactly one active GLPI user ID. Multiple matching users, incomplete or inconsistent pagination, and provider errors return distinct internal outcomes. The employee identity workflow will use neutral replies and verify mailbox ownership before linking an account.\nTicket creation uses the supplied GLPI requester ID and escapes the plain-text description for GLPI's HTML field. A confirmed creation includes the positive ticket ID from GLPI. A known denial can be distinguished from a timeout, lost response or malformed success after dispatch. The client sends each write only once. The ticket workflow will persist the creation intent and reconcile uncertain outcomes before any further attempt.\nThe adapter is covered by [synthetic contract and transport tests](test/glpi/client.test.ts). The employee verification and ticket workflows are tracked in the [V1 plan](../../docs/project/implementation-plan.md#v1-work). Live testing requires the scoped service account in [PH-08](../../docs/project/human-actions.md#ph-08).\n[GLPI REST v1 reference](https://github.com/glpi-project/glpi/blob/10.0/bugfixes/apirest.md) · [GLPI User search fields](https://github.com/glpi-project/glpi/blob/10.0/bugfixes/src/User.php)\n"
+  },
+  {
+    "id": "repository/apps/api/README",
+    "title": "API Runtime",
+    "group": "Workspace guides",
+    "kind": "repository",
     "heading": "Local commands",
     "anchor": "local-commands",
     "text": "Local commands\nUse [setup](../../docs/setup.md) for the frozen install, generated Prisma client, environment loading, containers, and startup order. `pnpm -C apps/api dev` loads the ignored root `.env.local` when present; `start` runs emitted code and expects its process environment without loading that file.\nFrom the repository root:\nPurpose\nCommand\nGenerate ignored Prisma client\n`pnpm -C apps/api db:generate`\nApply committed migrations to the configured database\n`pnpm -C apps/api db:migrate:deploy`\nCheck API behavior/types\n`pnpm -C apps/api test` and `pnpm -C apps/api typecheck`\nEmit/start API\n`pnpm -C apps/api build`, then `pnpm -C apps/api start`\nIntentionally regenerate tracked API/database/configuration/error references\n`pnpm -C apps/api references:write`\nCheck current API/database/SDK references without editing them\n`pnpm references:check`\nTests and reference generation use fresh migrated Testcontainers PostgreSQL, so a compatible container runtime must be reachable. Follow the [artifact workflow](../../docs/architecture/backend-execution-and-generated-artifacts.md) for downstream SDK/portal generation after source changes. The root `pnpm validate` also checks emitted builds, real-process recovery, and browser behavior; a focused package check alone does not replace it.\n"
@@ -653,32 +662,5 @@
     "heading": "Custom Architecture Validation Scripts",
     "anchor": "custom-architecture-validation-scripts",
     "text": "Custom Architecture Validation Scripts\nOrion could implement its own scripts to parse imports, inspect packages, and validate architecture rules.\nThis would provide complete control over the validation model.\nIt was not selected as the initial approach because maintaining a custom dependency analyzer would add substantial complexity while mature tools already solve the required graph-analysis problems.\nCustom validation should be introduced only when a real Orion rule cannot be represented reliably by existing focused tooling.\n"
-  },
-  {
-    "id": "repository/docs/adr/0003-establish-repository-validation-and-architecture-enforcement",
-    "title": "ADR-0003: Establish Repository Validation and Architecture Enforcement",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Dedicated Monorepo Task Runner",
-    "anchor": "dedicated-monorepo-task-runner",
-    "text": "Dedicated Monorepo Task Runner\nA tool such as Turborepo or Nx could orchestrate all repository validation tasks and provide caching, dependency-aware execution, and affected-project analysis.\nADR-0002 already defers this decision because Orion does not yet have sufficient repository scale or CI cost to justify an additional orchestration layer.\nThe validation contract established by this ADR is deliberately compatible with adopting such a tool later without changing the contributor-facing canonical command.\n"
-  },
-  {
-    "id": "repository/docs/adr/0003-establish-repository-validation-and-architecture-enforcement",
-    "title": "ADR-0003: Establish Repository Validation and Architecture Enforcement",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "TypeScript Project References from the Beginning",
-    "anchor": "typescript-project-references-from-the-beginning",
-    "text": "TypeScript Project References from the Beginning\nTypeScript project references can model package relationships and improve build and type-check performance in large TypeScript repositories.\nThey were not made mandatory because Orion does not yet have a sufficiently large TypeScript project graph to demonstrate that the added configuration and build semantics provide meaningful value.\nThey may be introduced later when repository scale or performance justifies them.\n"
-  },
-  {
-    "id": "repository/docs/adr/0003-establish-repository-validation-and-architecture-enforcement",
-    "title": "ADR-0003: Establish Repository Validation and Architecture Enforcement",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Consequences",
-    "anchor": "consequences",
-    "text": "Consequences\n"
   }
 ]

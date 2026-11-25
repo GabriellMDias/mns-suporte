@@ -1027,18 +1027,18 @@
     "shards": [
       {
         "file": "search/0000.json",
-        "count": 78,
+        "count": 76,
         "kinds": ["api", "component", "database", "repository"]
       },
-      { "file": "search/0001.json", "count": 108, "kinds": ["repository"] },
+      { "file": "search/0001.json", "count": 110, "kinds": ["repository"] },
       { "file": "search/0002.json", "count": 125, "kinds": ["repository"] },
       { "file": "search/0003.json", "count": 155, "kinds": ["repository"] },
       { "file": "search/0004.json", "count": 98, "kinds": ["repository"] },
-      { "file": "search/0005.json", "count": 122, "kinds": ["repository"] },
+      { "file": "search/0005.json", "count": 121, "kinds": ["repository"] },
       { "file": "search/0006.json", "count": 97, "kinds": ["repository"] },
       { "file": "search/0007.json", "count": 103, "kinds": ["repository"] },
-      { "file": "search/0008.json", "count": 81, "kinds": ["repository"] }
+      { "file": "search/0008.json", "count": 83, "kinds": ["repository"] }
     ],
-    "count": 967
+    "count": 968
   }
 }

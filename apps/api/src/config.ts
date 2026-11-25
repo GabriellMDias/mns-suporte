@@ -38,12 +38,20 @@ export const serverConfigSchema = Type.Object(
       Type.String({ pattern: "^\\S{16,2048}$" }),
     ),
     whatsappGraphApiVersion: Type.String({ pattern: "^v[1-9][0-9]{0,2}\\.0$" }),
+    glpiApiUrl: Type.Optional(Type.String({ pattern: "^\\S{1,2048}$" })),
+    glpiAppToken: Type.Optional(Type.String({ pattern: "^[!-~]{16,512}$" })),
+    glpiUserToken: Type.Optional(Type.String({ pattern: "^[!-~]{16,512}$" })),
   },
   { additionalProperties: false },
 );
 
 export type ServerConfig = Readonly<Static<typeof serverConfigSchema>>;
 export type ClientConfig = Readonly<Record<string, never>>;
+export type GlpiConfig = Readonly<{
+  apiUrl: string;
+  appToken: string;
+  userToken: string;
+}>;
 export type WhatsAppOutboundConfig = Readonly<{
   accessToken: string;
   graphVersion: string;
@@ -258,6 +266,39 @@ export const configReference = Object.freeze([
     secret: false,
     purpose: "Graph API version used by WhatsApp outbound dispatch.",
   },
+  {
+    key: "glpiApiUrl",
+    name: "GLPI_API_URL",
+    type: "HTTPS URL",
+    required: false,
+    default: "",
+    visibility: "server",
+    classification: "INTERNAL",
+    secret: false,
+    purpose: "Base URL of the GLPI REST v1 API, including its API path.",
+  },
+  {
+    key: "glpiAppToken",
+    name: "GLPI_APP_TOKEN",
+    type: "secret string",
+    required: false,
+    default: "",
+    visibility: "server",
+    classification: "RESTRICTED",
+    secret: true,
+    purpose: "Application token for the configured GLPI API client.",
+  },
+  {
+    key: "glpiUserToken",
+    name: "GLPI_USER_TOKEN",
+    type: "secret string",
+    required: false,
+    default: "",
+    visibility: "server",
+    classification: "RESTRICTED",
+    secret: true,
+    purpose: "User token for the scoped GLPI service account.",
+  },
 ] as const satisfies readonly ConfigMetadata[]);
 
 function numberFromEnv(value: string | undefined, fallback: number): number {
@@ -305,6 +346,13 @@ export function parseServerConfig(
       ? {}
       : { whatsappAccessToken: env.WHATSAPP_ACCESS_TOKEN }),
     whatsappGraphApiVersion: env.WHATSAPP_GRAPH_API_VERSION ?? "v27.0",
+    ...(env.GLPI_API_URL === undefined ? {} : { glpiApiUrl: env.GLPI_API_URL }),
+    ...(env.GLPI_APP_TOKEN === undefined
+      ? {}
+      : { glpiAppToken: env.GLPI_APP_TOKEN }),
+    ...(env.GLPI_USER_TOKEN === undefined
+      ? {}
+      : { glpiUserToken: env.GLPI_USER_TOKEN }),
   };
   if (!Value.Check(serverConfigSchema, candidate)) {
     throw new Error("Invalid API configuration");
@@ -384,6 +432,34 @@ export function parseServerConfig(
     whatsapp.some((value) => !value)
   )
     throw new Error("Invalid API configuration: incomplete WhatsApp webhook");
+  const glpi = [
+    candidate.glpiApiUrl,
+    candidate.glpiAppToken,
+    candidate.glpiUserToken,
+  ];
+  if (glpi.some(Boolean) && glpi.some((value) => !value))
+    throw new Error("Invalid API configuration: incomplete GLPI integration");
+  if (candidate.glpiApiUrl) {
+    let apiUrl: URL;
+    try {
+      apiUrl = new URL(candidate.glpiApiUrl);
+    } catch {
+      throw new Error("Invalid API configuration: GLPI URL");
+    }
+    const developmentLoopback =
+      apiUrl.protocol === "http:" &&
+      candidate.environment !== "production" &&
+      ["localhost", "127.0.0.1", "[::1]"].includes(apiUrl.hostname);
+    if (
+      (!developmentLoopback && apiUrl.protocol !== "https:") ||
+      !apiUrl.hostname ||
+      apiUrl.username ||
+      apiUrl.password ||
+      apiUrl.search ||
+      apiUrl.hash
+    )
+      throw new Error("Invalid API configuration: GLPI URL");
+  }
   return Object.freeze(candidate);
 }
 
@@ -405,6 +481,17 @@ export function whatsappWebhookFrom(
             }),
           }
         : {}),
+    });
+  return undefined;
+}
+
+export function glpiConfigFrom(config: ServerConfig): GlpiConfig | undefined {
+  const { glpiApiUrl, glpiAppToken, glpiUserToken } = config;
+  if (glpiApiUrl && glpiAppToken && glpiUserToken)
+    return Object.freeze({
+      apiUrl: glpiApiUrl,
+      appToken: glpiAppToken,
+      userToken: glpiUserToken,
     });
   return undefined;
 }
