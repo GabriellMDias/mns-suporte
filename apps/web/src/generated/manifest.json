@@ -66,6 +66,51 @@
       "file": "pages/api/getStartupHealth.json"
     },
     {
+      "id": "api/receiveWhatsAppWebhook",
+      "kind": "api",
+      "title": "receiveWhatsAppWebhook",
+      "group": "WhatsApp webhook",
+      "source": "docs/generated/api/openapi.json",
+      "summary": "POST /webhooks/whatsapp",
+      "method": "POST",
+      "path": "/webhooks/whatsapp",
+      "tags": ["WhatsApp webhook"],
+      "headings": [
+        { "id": "parameters", "text": "Parameters", "level": 2 },
+        { "id": "request", "text": "Request body", "level": 2 },
+        { "id": "responses", "text": "Responses", "level": 2 },
+        { "id": "explorer", "text": "Try this operation", "level": 2 }
+      ],
+      "file": "pages/api/receiveWhatsAppWebhook.json"
+    },
+    {
+      "id": "api/verifyWhatsAppWebhook",
+      "kind": "api",
+      "title": "verifyWhatsAppWebhook",
+      "group": "WhatsApp webhook",
+      "source": "docs/generated/api/openapi.json",
+      "summary": "GET /webhooks/whatsapp",
+      "method": "GET",
+      "path": "/webhooks/whatsapp",
+      "tags": ["WhatsApp webhook"],
+      "headings": [
+        { "id": "parameters", "text": "Parameters", "level": 2 },
+        { "id": "responses", "text": "Responses", "level": 2 },
+        { "id": "explorer", "text": "Try this operation", "level": 2 }
+      ],
+      "file": "pages/api/verifyWhatsAppWebhook.json"
+    },
+    {
+      "id": "database/whatsapp_inbound_messages",
+      "kind": "database",
+      "title": "whatsapp_inbound_messages",
+      "group": "WhatsApp webhook",
+      "source": "docs/generated/database/schema.md",
+      "summary": "Durable intake of supported and authenticated Meta messages for the configured business number.",
+      "headings": [],
+      "file": "pages/database/whatsapp_inbound_messages.json"
+    },
+    {
       "id": "components/Button",
       "kind": "component",
       "title": "Button",
@@ -663,7 +708,7 @@
       "title": "Database Reference",
       "group": "Generated references",
       "source": "docs/generated/database/schema.md",
-      "summary": "No application-owned tables exist yet. Add a module's Prisma model, reviewed migration, and metadata, then regenerate this reference.",
+      "summary": "Durable intake of supported and authenticated Meta messages for the configured business number.",
       "headings": [],
       "file": "pages/repository/docs/generated/database/schema.json"
     },
@@ -683,7 +728,7 @@
       "title": "MNS Suporte Human Actions",
       "group": "Project guides",
       "source": "docs/project/human-actions.md",
-      "summary": "This checklist records MNS Suporte's prerequisites that require a project-owner decision, a human-controlled account action, an unavailable privilege, or securely supplied…",
+      "summary": "The entries below cover access held outside this workspace. Implementation, technical decisions, GitHub configuration and generating application-owned secrets are tracked in…",
       "headings": [],
       "file": "pages/repository/docs/project/human-actions.json"
     },
@@ -693,9 +738,19 @@
       "title": "MNS Suporte Implementation Plan",
       "group": "Project guides",
       "source": "docs/project/implementation-plan.md",
-      "summary": "This is MNS Suporte's living execution plan and the current plan for this repository. It tracks product and repository work; the README, current policies, and accepted ADRs…",
+      "summary": "MNS Suporte was initialized from Orion on 2026-11-25. The manifest records its foundation ancestry.",
       "headings": [],
       "file": "pages/repository/docs/project/implementation-plan.json"
+    },
+    {
+      "id": "repository/docs/project/product-scope",
+      "kind": "repository",
+      "title": "MNS Suporte Product Scope",
+      "group": "Project guides",
+      "source": "docs/project/product-scope.md",
+      "summary": "MNS Suporte is an internal IT support channel for MNS employees. Employees use WhatsApp to open and consult GLPI tickets or find the IT contact. The IT team receives and…",
+      "headings": [],
+      "file": "pages/repository/docs/project/product-scope.json"
     },
     {
       "id": "repository/docs/README",
@@ -953,7 +1008,7 @@
       "title": "MNS Suporte",
       "group": "Project guides",
       "source": "README.md",
-      "summary": "MNS Suporte is a software product built on the Orion engineering foundation. Its product scope has not been recorded yet; define it under PJ-02 and replace this introduction.",
+      "summary": "MNS Suporte is the MNS internal IT support channel for opening, consulting, and following GLPI tickets from WhatsApp. The product scope defines the guided V1 workflow and the…",
       "headings": [],
       "file": "pages/repository/README.json"
     }
@@ -962,18 +1017,18 @@
     "shards": [
       {
         "file": "search/0000.json",
-        "count": 92,
-        "kinds": ["api", "component", "repository"]
+        "count": 82,
+        "kinds": ["api", "component", "database", "repository"]
       },
-      { "file": "search/0001.json", "count": 110, "kinds": ["repository"] },
-      { "file": "search/0002.json", "count": 130, "kinds": ["repository"] },
-      { "file": "search/0003.json", "count": 147, "kinds": ["repository"] },
-      { "file": "search/0004.json", "count": 128, "kinds": ["repository"] },
-      { "file": "search/0005.json", "count": 89, "kinds": ["repository"] },
-      { "file": "search/0006.json", "count": 99, "kinds": ["repository"] },
-      { "file": "search/0007.json", "count": 105, "kinds": ["repository"] },
-      { "file": "search/0008.json", "count": 58, "kinds": ["repository"] }
+      { "file": "search/0001.json", "count": 108, "kinds": ["repository"] },
+      { "file": "search/0002.json", "count": 129, "kinds": ["repository"] },
+      { "file": "search/0003.json", "count": 153, "kinds": ["repository"] },
+      { "file": "search/0004.json", "count": 106, "kinds": ["repository"] },
+      { "file": "search/0005.json", "count": 110, "kinds": ["repository"] },
+      { "file": "search/0006.json", "count": 97, "kinds": ["repository"] },
+      { "file": "search/0007.json", "count": 103, "kinds": ["repository"] },
+      { "file": "search/0008.json", "count": 74, "kinds": ["repository"] }
     ],
-    "count": 958
+    "count": 962
   }
 }

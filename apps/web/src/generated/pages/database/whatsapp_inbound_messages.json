@@ -1,0 +1,92 @@
+{
+  "kind": "database",
+  "name": "whatsapp_inbound_messages",
+  "description": "Durable intake of supported and authenticated Meta messages for the configured business number.",
+  "owner": "WhatsApp webhook",
+  "classification": "RESTRICTED",
+  "lifecycle": "Created before acknowledging the webhook. Redelivery preserves the original row. Processing and retention are release-plan work.",
+  "columns": [
+    {
+      "Column": "message_id",
+      "PostgreSQL type": "text",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Opaque Meta message identifier used to deduplicate redelivery.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "business_phone_id",
+      "PostgreSQL type": "text",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Meta asset identifier of the business number that received the event.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "sender_business_id",
+      "PostgreSQL type": "text",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Meta sender identifier scoped to the business portfolio.",
+      "Null meaning": "Meta supplied only the sender phone number.",
+      "Unit": "—"
+    },
+    {
+      "Column": "sender_phone",
+      "PostgreSQL type": "text",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Sender number supplied by Meta to support directory linking and routing.",
+      "Null meaning": "Meta supplied a business-scoped sender identifier without a phone number.",
+      "Unit": "—"
+    },
+    {
+      "Column": "occurred_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Timestamp reported by Meta as the message time.",
+      "Null meaning": "—",
+      "Unit": "UTC instant"
+    },
+    {
+      "Column": "received_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "no",
+      "Default": "CURRENT_TIMESTAMP",
+      "Classification": "INTERNAL",
+      "Meaning": "Database timestamp of the first accepted delivery.",
+      "Null meaning": "—",
+      "Unit": "UTC instant"
+    },
+    {
+      "Column": "content",
+      "PostgreSQL type": "jsonb",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Normalized text, action identifier or media reference consumed by the conversation flow.",
+      "Null meaning": "—",
+      "Unit": "—"
+    }
+  ],
+  "constraints": [
+    {
+      "Object": "whatsapp_inbound_messages_pkey",
+      "Physical definition": "PRIMARY KEY (message_id)",
+      "Purpose": "Keeps one accepted event per Meta message ID across retries and concurrent delivery."
+    },
+    {
+      "Object": "whatsapp_inbound_messages_sender_required",
+      "Physical definition": "CHECK (((sender_business_id IS NOT NULL) OR (sender_phone IS NOT NULL)))",
+      "Purpose": "Requires at least one sender identifier so a message can be associated with a conversation."
+    }
+  ]
+}

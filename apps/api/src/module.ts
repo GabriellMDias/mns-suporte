@@ -6,6 +6,7 @@ import type { TSchema } from "typebox";
 import type { AccessTokenVerifier } from "./authentication.js";
 import type { Database } from "./database.js";
 import type { ErrorDefinition } from "./errors.js";
+import type { WhatsAppWebhookConfig } from "./config.js";
 
 export type AppInstance = FastifyInstance<
   Server,
@@ -28,13 +29,16 @@ export type ApiOperation = Readonly<{
     body?: TSchema;
     response: Readonly<Record<number, TSchema>>;
   }>;
+  responseContentTypes?: Readonly<Record<number, "text/plain">>;
   expectedErrors?: readonly string[];
 }>;
 
-export type ModuleRequirement = "database" | "authentication";
+export type ModuleRequirement =
+  "database" | "authentication" | "whatsappWebhook";
 export type ModuleResources = Readonly<{
   database?: Database;
   verifier?: AccessTokenVerifier;
+  whatsappWebhook?: WhatsAppWebhookConfig;
 }>;
 
 /** A module whose dependencies are satisfied and whose routes can mount. */
@@ -70,6 +74,7 @@ export function activateModules(
   const available: Record<ModuleRequirement, boolean> = {
     database: resources.database !== undefined,
     authentication: resources.verifier !== undefined,
+    whatsappWebhook: resources.whatsappWebhook !== undefined,
   };
   const active: RegisteredModule[] = [];
   for (const module of modules) {

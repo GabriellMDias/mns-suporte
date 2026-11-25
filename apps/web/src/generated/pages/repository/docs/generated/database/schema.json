@@ -2,8 +2,18 @@
   "kind": "repository",
   "source": "docs/generated/database/schema.md",
   "title": "Database Reference",
-  "html": "<p><a href=\"/docs/repository/docs/database/schema-documentation\">Schema documentation policy</a> · <a href=\"/docs/repository/docs/database/principles\">Database principles</a></p>\n<p>No application-owned tables exist yet. Add a module's Prisma model, reviewed migration, and metadata, then regenerate this reference.</p>\n",
+  "html": "<p><a href=\"/docs/repository/docs/database/schema-documentation\">Schema documentation policy</a> · <a href=\"/docs/repository/docs/database/principles\">Database principles</a></p>\n<h2 id=\"whatsapp_inbound_messages\">whatsapp_inbound_messages</h2>\n<p>Durable intake of supported and authenticated Meta messages for the configured business number.</p>\n<p>Owner: WhatsApp webhook. Classification: RESTRICTED.</p>\n<p>Lifecycle: Created before acknowledging the webhook. Redelivery preserves the original row. Processing and retention are release-plan work.</p>\n<table>\n<thead>\n<tr>\n<th>Column</th>\n<th>PostgreSQL type</th>\n<th>Nullable</th>\n<th>Default</th>\n<th>Classification</th>\n<th>Meaning</th>\n<th>Null meaning</th>\n<th>Unit</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><code>message_id</code></td>\n<td><code>text</code></td>\n<td>no</td>\n<td>—</td>\n<td>RESTRICTED</td>\n<td>Opaque Meta message identifier used to deduplicate redelivery.</td>\n<td>—</td>\n<td>—</td>\n</tr>\n<tr>\n<td><code>business_phone_id</code></td>\n<td><code>text</code></td>\n<td>no</td>\n<td>—</td>\n<td>INTERNAL</td>\n<td>Meta asset identifier of the business number that received the event.</td>\n<td>—</td>\n<td>—</td>\n</tr>\n<tr>\n<td><code>sender_business_id</code></td>\n<td><code>text</code></td>\n<td>yes</td>\n<td>—</td>\n<td>RESTRICTED</td>\n<td>Meta sender identifier scoped to the business portfolio.</td>\n<td>Meta supplied only the sender phone number.</td>\n<td>—</td>\n</tr>\n<tr>\n<td><code>sender_phone</code></td>\n<td><code>text</code></td>\n<td>yes</td>\n<td>—</td>\n<td>RESTRICTED</td>\n<td>Sender number supplied by Meta to support directory linking and routing.</td>\n<td>Meta supplied a business-scoped sender identifier without a phone number.</td>\n<td>—</td>\n</tr>\n<tr>\n<td><code>occurred_at</code></td>\n<td><code>timestamp(3) with time zone</code></td>\n<td>no</td>\n<td>—</td>\n<td>INTERNAL</td>\n<td>Timestamp reported by Meta as the message time.</td>\n<td>—</td>\n<td>UTC instant</td>\n</tr>\n<tr>\n<td><code>received_at</code></td>\n<td><code>timestamp(3) with time zone</code></td>\n<td>no</td>\n<td><code>CURRENT_TIMESTAMP</code></td>\n<td>INTERNAL</td>\n<td>Database timestamp of the first accepted delivery.</td>\n<td>—</td>\n<td>UTC instant</td>\n</tr>\n<tr>\n<td><code>content</code></td>\n<td><code>jsonb</code></td>\n<td>no</td>\n<td>—</td>\n<td>RESTRICTED</td>\n<td>Normalized text, action identifier or media reference consumed by the conversation flow.</td>\n<td>—</td>\n<td>—</td>\n</tr>\n</tbody>\n</table>\n<h3 id=\"constraints-and-indexes\">Constraints and indexes</h3>\n<table>\n<thead>\n<tr>\n<th>Object</th>\n<th>Physical definition</th>\n<th>Purpose</th>\n</tr>\n</thead>\n<tbody>\n<tr>\n<td><code>whatsapp_inbound_messages_pkey</code></td>\n<td><code>PRIMARY KEY (message_id)</code></td>\n<td>Keeps one accepted event per Meta message ID across retries and concurrent delivery.</td>\n</tr>\n<tr>\n<td><code>whatsapp_inbound_messages_sender_required</code></td>\n<td><code>CHECK (((sender_business_id IS NOT NULL) OR (sender_phone IS NOT NULL)))</code></td>\n<td>Requires at least one sender identifier so a message can be associated with a conversation.</td>\n</tr>\n</tbody>\n</table>\n",
   "headings": [
-    { "id": "database-reference", "text": "Database Reference", "level": 1 }
+    { "id": "database-reference", "text": "Database Reference", "level": 1 },
+    {
+      "id": "whatsapp_inbound_messages",
+      "text": "whatsapp_inbound_messages",
+      "level": 2
+    },
+    {
+      "id": "constraints-and-indexes",
+      "text": "Constraints and indexes",
+      "level": 3
+    }
   ]
 }

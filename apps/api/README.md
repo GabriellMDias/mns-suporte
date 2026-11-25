@@ -6,15 +6,15 @@ The Fastify API runtime provides configuration, structured logging and tracing, 
 
 ## Find the owning implementation
 
-| Concern | Source |
-| --- | --- |
-| Configuration and process composition | [`src/config.ts`](src/config.ts), [`src/main.ts`](src/main.ts) |
-| HTTP boundary, lifecycle, and failures | [`src/app.ts`](src/app.ts), [`src/lifecycle.ts`](src/lifecycle.ts), [`src/errors.ts`](src/errors.ts) |
-| Module contract and composition | [`src/module.ts`](src/module.ts), [`src/modules.ts`](src/modules.ts), [`src/error-registry.ts`](src/error-registry.ts) |
-| Database client and token verification | [`src/database.ts`](src/database.ts), [`src/authentication.ts`](src/authentication.ts) |
-| Prisma schema, schema meaning, and runtime grants | [`prisma/schema/`](prisma/schema/schema.prisma), `prisma/metadata/`, `prisma/runtime-grants/`, reviewed `prisma/migrations/` |
-| Generated references | [`generate-references.ts`](scripts/generate-references.ts), [`openapi.ts`](scripts/openapi.ts), [`database-reference.ts`](scripts/database-reference.ts) |
-| Process smokes | [`scripts/smoke.mjs`](scripts/smoke.mjs) and module smokes in `scripts/smoke/` |
+| Concern                                           | Source                                                                                                                                                   |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Configuration and process composition             | [`src/config.ts`](src/config.ts), [`src/main.ts`](src/main.ts)                                                                                           |
+| HTTP boundary, lifecycle, and failures            | [`src/app.ts`](src/app.ts), [`src/lifecycle.ts`](src/lifecycle.ts), [`src/errors.ts`](src/errors.ts)                                                     |
+| Module contract and composition                   | [`src/module.ts`](src/module.ts), [`src/modules.ts`](src/modules.ts), [`src/error-registry.ts`](src/error-registry.ts)                                   |
+| Database client and token verification            | [`src/database.ts`](src/database.ts), [`src/authentication.ts`](src/authentication.ts)                                                                   |
+| Prisma schema, schema meaning, and runtime grants | [`prisma/schema/`](prisma/schema/schema.prisma), `prisma/metadata/`, `prisma/runtime-grants/`, reviewed `prisma/migrations/`                             |
+| Generated references                              | [`generate-references.ts`](scripts/generate-references.ts), [`openapi.ts`](scripts/openapi.ts), [`database-reference.ts`](scripts/database-reference.ts) |
+| Process smokes                                    | [`scripts/smoke.mjs`](scripts/smoke.mjs) and module smokes in `scripts/smoke/`                                                                           |
 
 ## Modules
 
@@ -24,20 +24,30 @@ Keep a module's files together under its name: `src/features/<module>/` for doma
 
 Outside production, a module whose requirements are not configured stays unmounted. In production, startup fails instead, so a composed capability cannot silently disappear. Generated OpenAPI and the public error registry always include every composed module, whether or not it is configured locally.
 
+## WhatsApp webhook
+
+The WhatsApp module receives Meta callbacks at `/webhooks/whatsapp`. Development and test can run health-only with this module unconfigured. To mount it, configure restricted PostgreSQL through `ORION_DATABASE_URL` and provide the three WhatsApp settings from the [configuration reference](../../docs/generated/configuration/api.md). Generate the callback verification token locally with a cryptographically secure random generator. The app secret and phone number ID come from the Meta dashboard. Keep secrets in ignored environment files or the deployment secret store.
+
+The subscription GET returns the original challenge as plain text after verifying the token. The POST computes HMAC-SHA256 over the exact request bytes before parsing JSON. Supported messages for the configured number are persisted together before the callback is acknowledged. The message ID is the deduplication key. A replay leaves the first accepted content intact. Other numbers, status callbacks, and unsupported message types are acknowledged without insertion. Delivery does not acknowledge a failed database write. Enable HTTPS at ingress and omit query strings from ingress logs, since Meta sends the verification token in the subscription query.
+
+This slice accepts text, interactive or template button replies, images, audio and documents. It stores normalized content and media references. The current runtime role has only INSERT access to the inbox. Conversation processing, outbound replies, delivery status tracking, and automated inbox retention are tracked in the [V1 plan](../../docs/project/implementation-plan.md#v1-work). Keep endpoints limited to synthetic traffic until those operational controls exist.
+
+[Meta webhook protocol](https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/create-webhook-endpoint) · [Module source](src/features/whatsapp/module.ts) · [Inbox schema](prisma/schema/whatsapp.prisma)
+
 ## Local commands
 
 Use [setup](../../docs/setup.md) for the frozen install, generated Prisma client, environment loading, containers, and startup order. `pnpm -C apps/api dev` loads the ignored root `.env.local` when present; `start` runs emitted code and expects its process environment without loading that file.
 
 From the repository root:
 
-| Purpose | Command |
-| --- | --- |
-| Generate ignored Prisma client | `pnpm -C apps/api db:generate` |
-| Apply committed migrations to the configured database | `pnpm -C apps/api db:migrate:deploy` |
-| Check API behavior/types | `pnpm -C apps/api test` and `pnpm -C apps/api typecheck` |
-| Emit/start API | `pnpm -C apps/api build`, then `pnpm -C apps/api start` |
-| Intentionally regenerate tracked API/database/configuration/error references | `pnpm -C apps/api references:write` |
-| Check current API/database/SDK references without editing them | `pnpm references:check` |
+| Purpose                                                                      | Command                                                  |
+| ---------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Generate ignored Prisma client                                               | `pnpm -C apps/api db:generate`                           |
+| Apply committed migrations to the configured database                        | `pnpm -C apps/api db:migrate:deploy`                     |
+| Check API behavior/types                                                     | `pnpm -C apps/api test` and `pnpm -C apps/api typecheck` |
+| Emit/start API                                                               | `pnpm -C apps/api build`, then `pnpm -C apps/api start`  |
+| Intentionally regenerate tracked API/database/configuration/error references | `pnpm -C apps/api references:write`                      |
+| Check current API/database/SDK references without editing them               | `pnpm references:check`                                  |
 
 Tests and reference generation use fresh migrated Testcontainers PostgreSQL, so a compatible container runtime must be reachable. Follow the [artifact workflow](../../docs/architecture/backend-execution-and-generated-artifacts.md) for downstream SDK/portal generation after source changes. The root `pnpm validate` also checks emitted builds, real-process recovery, and browser behavior; a focused package check alone does not replace it.
 

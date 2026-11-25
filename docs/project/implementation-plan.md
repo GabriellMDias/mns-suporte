@@ -1,54 +1,37 @@
 # MNS Suporte Implementation Plan
 
-[Project human actions](human-actions.md) · [Project derivation](../project-derivation.md) · [Validation](../validation.md) · [Documentation index](../README.md)
+[Product scope](product-scope.md) · [Human actions](human-actions.md) · [Validation](../validation.md)
 
-## Purpose and baseline
+MNS Suporte was initialized from Orion on 2026-11-25. The [manifest](../../.orion/project.json) records its foundation ancestry.
 
-This is MNS Suporte's living execution plan and the current plan for this repository. It tracks product and repository work; the [README](../../README.md), current policies, and [accepted ADRs](../adr/README.md) govern implementation.
+## Tracking
 
-MNS Suporte was initialized on 2026-11-25 from Orion commit `6fe8aa850d9fc3d8e78584c6f4af27d524e3ac75` of https://github.com/GabriellMDias/Orion. The [project manifest](../../.orion/project.json) records that immutable initialization commit and the Orion baseline currently integrated. The repository starts with the foundation's architecture, policies, ADRs, tooling, validation gate, CI, generated references, and Living Documentation Portal, and with no product modules. Results recorded for the Orion repository are not results for this repository until they pass in this checkout and in this repository's CI.
+The V1 denominator is the number of rows in [V1 work](#v1-work). Count a row as complete only after its acceptance criteria pass with recorded evidence. Report completed, in-progress, pending, and blocked counts on each handoff. Project decisions stay in the product scope or relevant ADR. Access that requires a human stays in the [human-action checklist](human-actions.md). Preserve task IDs and record scope changes here.
 
-## Maintaining this plan
+## V1 work
 
-Every contributor or coding agent performing implementation work must maintain this plan and the [project human actions](human-actions.md) within the user's authorized scope.
+| Task  | Deliverable and acceptance                                                                                                                                                                                                                   | Status    | Evidence or dependency                                                                                                                                                                                                   |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| PJ-01 | Establish a private GitHub repository. Verify the initial default branch, security settings and enforced CI gate.                                                                                                                            | blocked   | Private repository and vulnerability alerts verified. [Initial CI passed](https://github.com/GabriellMDias/mns-suporte/actions/runs/45622724328). Required branch protection depends on [PH-11](human-actions.md#ph-11). |
+| PJ-02 | Record actors, scope, data ownership, first-release acceptance and the future AI boundary.                                                                                                                                                   | completed | [Approved scope and acceptance](product-scope.md).                                                                                                                                                                       |
+| PJ-06 | Implement Meta callback verification and signed webhook ingestion. Verify the challenge, exact-byte HMAC, incoming identity fields and recipient scope with synthetic requests.                                                              | completed | [Webhook tests](../../apps/api/test/whatsapp/webhook.test.ts) passed. The [API guide](../../apps/api/README.md#whatsapp-webhook) documents configuration.                                                                |
+| PJ-07 | Persist incoming messages before acknowledgement and deduplicate replays, including concurrent delivery, using the restricted database role.                                                                                                 | completed | [Webhook integration tests](../../apps/api/test/whatsapp/webhook.test.ts) verified concurrent replays, PostgreSQL grants and failure acknowledgement.                                                                    |
+| PJ-08 | Implement the Meta outbound adapter and durable sends. Test text and interactive replies, safe retries and delivery status handling.                                                                                                         | pending   | Depends on PJ-06 and PJ-07.                                                                                                                                                                                              |
+| PJ-09 | Implement the GLPI adapter and exact directory lookup. Test scoped credentials, timeouts, session renewal and explicit outcomes for mutations.                                                                                               | pending   | Use synthetic GLPI fixtures locally. Test against company test access under [PH-08](human-actions.md#ph-08).                                                                                                             |
+| PJ-10 | Verify and persist employee identity with short-lived, rate-limited email challenges. Test invalid, replayed and expired codes, and access isolation between employees.                                                                      | pending   | Depends on PJ-08 and PJ-09. Mail relay access under [PH-09](human-actions.md#ph-09).                                                                                                                                     |
+| PJ-11 | Implement the menu, guided intake, resumable drafts, confirmation, editing, cancel and the direct path to IT. Test ordinary navigation and restart recovery.                                                                                 | pending   | Depends on PJ-07, PJ-08 and PJ-10.                                                                                                                                                                                       |
+| PJ-12 | Provide approved static troubleshooting with a direct path to open a ticket. Record whether it helped.                                                                                                                                       | pending   | Depends on PJ-11.                                                                                                                                                                                                        |
+| PJ-13 | Create GLPI tickets with attachments and confirmed summaries. Test duplicates, ambiguous creation outcomes and recoverable attachment failures.                                                                                              | pending   | Depends on PJ-09 and PJ-11.                                                                                                                                                                                              |
+| PJ-14 | List the employee's open GLPI tickets and show authorized ticket details. Test ownership before disclosure and preserve existing ticket access through verified identity.                                                                    | pending   | Depends on PJ-09 and PJ-10.                                                                                                                                                                                              |
+| PJ-15 | Notify on closure, capture permission to receive updates and use the approved utility template when required. Verify retries and delivery tracking.                                                                                          | pending   | Depends on PJ-08, PJ-13 and PJ-14. Live template under [PH-07](human-actions.md#ph-07).                                                                                                                                  |
+| PJ-16 | Package and document operation with a container, production configuration, restricted database access, retention, backup and restore, sanitized diagnostics, alerts and recovery procedures. Verify local deployment and rollback rehearsal. | pending   | Starts after stable local flows. Company ingress and deployment access under [PH-10](human-actions.md#ph-10).                                                                                                            |
+| PJ-19 | Triage GitHub dependency alerts and upgrade affected dependencies or document verified non-applicability. Revalidate the lockfile and runtime boundaries before the pilot.                                                                   | pending   | GitHub reported eight alerts on the inherited baseline on 2026-11-25, four high and four moderate. [Dependabot alerts](https://github.com/GabriellMDias/mns-suporte/security/dependabot).                                |
+| PJ-17 | Run the release acceptance suite against disposable infrastructure, then run a pilot with the test Meta number, company test GLPI and mail relay. Verify real end-to-end delivery and failure recovery.                                      | pending   | Depends on PJ-08 through PJ-16, PJ-19 and external test access.                                                                                                                                                          |
+| PJ-18 | Reconcile active legacy notifications and onboard verified employees. Deploy, verify smoke checks and supervise the switch to the corporate support number.                                                                                  | pending   | Depends on PJ-17. Production access and the support number under [PH-07](human-actions.md#ph-07), [PH-08](human-actions.md#ph-08) and [PH-10](human-actions.md#ph-10).                                                   |
 
-1. Before implementation, inspect actual repository state, the relevant task, its prerequisites, governing policy, and linked human actions. Do not treat a planned capability or unchecked action as available.
-2. Mark a task `in progress` when work actually starts. Update statuses when evidence, scope, dependencies, or blockers change, and before each handoff or completion report.
-3. Allocate stable task IDs as `PJ-NN`; never reuse or renumber them. Add finer tasks when needed; do not hide unfinished subtasks inside a completed row.
-4. Record concise evidence in the task row: implementation paths, validation commands and results, review references, or a linked decision. Record evidence produced for this repository—local validation, this repository's CI runs, and this repository's external settings. Do not store secret values or sensitive output.
-5. A task becomes `completed` only when its deliverables and acceptance criteria are satisfied with evidence. A partial implementation or an unavailable required check is not completion.
-6. When human intervention is necessary, add or update a project human action, link it from the affected task, mark that task `blocked`, and tell the user what is needed. Continue independent authorized work where possible.
-7. A future prerequisite is `pending`, not automatically `blocked`.
-8. When scope or sequencing changes, use `changed`, explain why and what replaces the work, and link supporting decisions. Do not delete unresolved obligations to make the plan look complete.
-9. Update command availability, current documentation, generated artifacts, and the human actions in the same coherent change where applicable. Do not change ADR status merely to record implementation progress.
+## Plan changes and later work
 
-| Status | Meaning |
-| --- | --- |
-| `pending` | Not started; includes conditional work whose trigger has not occurred. |
-| `in progress` | Work has started and is incomplete. |
-| `completed` | Applicable deliverables and acceptance criteria are satisfied with evidence. |
-| `blocked` | The identified work cannot proceed without a recorded dependency, decision, access, or correction. |
-| `changed` | Scope, applicability, or sequencing was explicitly revised; reason and replacement or disposition are recorded. |
-
-## Constraints throughout implementation
-
-- Retain the accepted stack recorded in the [technology map](../architecture/technology-decisions.md); incompatibilities require explicit resolution rather than silent substitution.
-- Add product capabilities as [API modules](../../apps/api/README.md#modules) and [web modules](../../apps/web/README.md#modules) composed in `apps/api/src/modules.ts` and `apps/web/src/modules.tsx`; Orion's [reference implementation](../project-derivation.md#orions-reference-implementation) shows a complete example.
-- Deliver tests, security controls, telemetry, and documentation with the behavior they protect.
-- Keep generated artifacts reproducible and subordinate to canonical sources. Reviewed SQL migrations follow their separate release-history rules.
-- Require non-mutating `pnpm validate` for substantial changes, using the same capabilities locally and in CI.
-- Adopt newer Orion revisions only through the reviewed [upgrade workflow](../project-derivation.md#upgrade-to-a-newer-orion-revision).
-
-## Current work
-
-| Task | Scope | Status | Evidence / dependency |
-| --- | --- | --- | --- |
-| PJ-01 | Publish the default branch to this project's `origin`, then verify that `pnpm install --frozen-lockfile` and `pnpm validate` pass and that this repository's required CI gate runs and passes. | pending | [PH-01](human-actions.md#ph-01), [PH-02](human-actions.md#ph-02). |
-| PJ-02 | Define the product scope, actors, first capabilities, data classification, and acceptance criteria; replace the README introduction. | pending | [PH-05](human-actions.md#ph-05). |
-| PJ-03 | Implement the first product module with its schema, migration, API contract, generated SDK use, web workflow, tests, and documentation. | pending | Depends on PJ-02. |
-| PJ-04 | Replace the neutral placeholder brand mark and touch icon with the product's visual identity. | pending | [Web identity](../../apps/web/README.md#identity); product decision. |
-| PJ-05 | Select an identity provider when the product needs one, and establish deployment-specific operation (hosting, secrets, database, telemetry, backups, alerts, runbooks) when real environment requirements exist. | pending | Conditional; add project human actions when triggered. Governing policies: [production access](../security/production-access.md), [secrets](../security/secrets-management.md), [retention](../security/data-retention.md), [alerting](../reliability/alerting.md), [incident response](../security/incident-response.md), [runbook authoring](../runbooks/authoring.md). |
-
-## Progress and plan changes
-
-Current task statuses own progress. Git preserves detailed editing history. Do not remove unresolved tasks or activation conditions when consolidating completed work.
+- PJ-03 was the generic first module. PJ-06 through PJ-15 replace it with independently verifiable product capabilities.
+- PJ-04 remains outside V1. The web shell already provides the local documentation portal and is available for a future operator interface.
+- PJ-05 is split across PJ-10 and PJ-16. Corporate email verification is the V1 identity mechanism, with deployment work verified independently.
+- Post-V1 candidates include supplementing tickets over WhatsApp, known incident notices, an editorial knowledge base, and optional AI guidance and summarization. The [AI extension boundary](product-scope.md#ai-extension) governs that work. These items are outside the V1 progress denominator.

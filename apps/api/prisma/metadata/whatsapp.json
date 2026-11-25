@@ -1,0 +1,48 @@
+{
+  "tables": {
+    "whatsapp_inbound_messages": {
+      "owner": "WhatsApp webhook",
+      "classification": "RESTRICTED",
+      "description": "Durable intake of supported and authenticated Meta messages for the configured business number.",
+      "lifecycle": "Created before acknowledging the webhook. Redelivery preserves the original row. Processing and retention are release-plan work.",
+      "columns": {
+        "message_id": {
+          "description": "Opaque Meta message identifier used to deduplicate redelivery.",
+          "classification": "RESTRICTED"
+        },
+        "business_phone_id": {
+          "description": "Meta asset identifier of the business number that received the event.",
+          "classification": "INTERNAL"
+        },
+        "sender_business_id": {
+          "description": "Meta sender identifier scoped to the business portfolio.",
+          "classification": "RESTRICTED",
+          "nullMeaning": "Meta supplied only the sender phone number."
+        },
+        "sender_phone": {
+          "description": "Sender number supplied by Meta to support directory linking and routing.",
+          "classification": "RESTRICTED",
+          "nullMeaning": "Meta supplied a business-scoped sender identifier without a phone number."
+        },
+        "occurred_at": {
+          "description": "Timestamp reported by Meta as the message time.",
+          "classification": "INTERNAL",
+          "unit": "UTC instant"
+        },
+        "received_at": {
+          "description": "Database timestamp of the first accepted delivery.",
+          "classification": "INTERNAL",
+          "unit": "UTC instant"
+        },
+        "content": {
+          "description": "Normalized text, action identifier or media reference consumed by the conversation flow.",
+          "classification": "RESTRICTED"
+        }
+      },
+      "objects": {
+        "whatsapp_inbound_messages_pkey": "Keeps one accepted event per Meta message ID across retries and concurrent delivery.",
+        "whatsapp_inbound_messages_sender_required": "Requires at least one sender identifier so a message can be associated with a conversation."
+      }
+    }
+  }
+}

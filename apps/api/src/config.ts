@@ -27,12 +27,24 @@ export const serverConfigSchema = Type.Object(
     tokenIssuer: Type.Optional(Type.String({ minLength: 1 })),
     tokenAudience: Type.Optional(Type.String({ minLength: 1 })),
     tokenJwksUrl: Type.Optional(Type.String({ minLength: 1 })),
+    whatsappAppSecret: Type.Optional(Type.String({ pattern: "^\\S{16,512}$" })),
+    whatsappVerifyToken: Type.Optional(
+      Type.String({ pattern: "^\\S{16,512}$" }),
+    ),
+    whatsappPhoneNumberId: Type.Optional(
+      Type.String({ pattern: "^[0-9]{1,20}$" }),
+    ),
   },
   { additionalProperties: false },
 );
 
 export type ServerConfig = Readonly<Static<typeof serverConfigSchema>>;
 export type ClientConfig = Readonly<Record<string, never>>;
+export type WhatsAppWebhookConfig = Readonly<{
+  appSecret: string;
+  verifyToken: string;
+  phoneNumberId: string;
+}>;
 
 type ConfigMetadata = {
   key: keyof ServerConfig;
@@ -182,6 +194,39 @@ export const configReference = Object.freeze([
     secret: false,
     purpose: "Trusted issuer public-key endpoint.",
   },
+  {
+    key: "whatsappAppSecret",
+    name: "WHATSAPP_APP_SECRET",
+    type: "secret string",
+    required: false,
+    default: "",
+    visibility: "server",
+    classification: "RESTRICTED",
+    secret: true,
+    purpose: "Meta app secret used to verify incoming webhook signatures.",
+  },
+  {
+    key: "whatsappVerifyToken",
+    name: "WHATSAPP_WEBHOOK_VERIFY_TOKEN",
+    type: "secret string",
+    required: false,
+    default: "",
+    visibility: "server",
+    classification: "RESTRICTED",
+    secret: true,
+    purpose: "Application-generated secret used to verify the Meta callback.",
+  },
+  {
+    key: "whatsappPhoneNumberId",
+    name: "WHATSAPP_PHONE_NUMBER_ID",
+    type: "Meta asset identifier",
+    required: false,
+    default: "",
+    visibility: "server",
+    classification: "INTERNAL",
+    secret: false,
+    purpose: "Meta business phone number ID accepted by the webhook.",
+  },
 ] as const satisfies readonly ConfigMetadata[]);
 
 function numberFromEnv(value: string | undefined, fallback: number): number {
@@ -216,6 +261,15 @@ export function parseServerConfig(
     ...(env.ORION_TOKEN_JWKS_URL === undefined
       ? {}
       : { tokenJwksUrl: env.ORION_TOKEN_JWKS_URL }),
+    ...(env.WHATSAPP_APP_SECRET === undefined
+      ? {}
+      : { whatsappAppSecret: env.WHATSAPP_APP_SECRET }),
+    ...(env.WHATSAPP_WEBHOOK_VERIFY_TOKEN === undefined
+      ? {}
+      : { whatsappVerifyToken: env.WHATSAPP_WEBHOOK_VERIFY_TOKEN }),
+    ...(env.WHATSAPP_PHONE_NUMBER_ID === undefined
+      ? {}
+      : { whatsappPhoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID }),
   };
   if (!Value.Check(serverConfigSchema, candidate)) {
     throw new Error("Invalid API configuration");
@@ -285,7 +339,28 @@ export function parseServerConfig(
     candidate.tokenAudience.trim() === ""
   )
     throw new Error("Invalid API configuration: token audience");
+  const whatsapp = [
+    candidate.whatsappAppSecret,
+    candidate.whatsappVerifyToken,
+    candidate.whatsappPhoneNumberId,
+  ];
+  if (whatsapp.some(Boolean) && whatsapp.some((value) => !value))
+    throw new Error("Invalid API configuration: incomplete WhatsApp webhook");
   return Object.freeze(candidate);
+}
+
+export function whatsappWebhookFrom(
+  config: ServerConfig,
+): WhatsAppWebhookConfig | undefined {
+  const { whatsappAppSecret, whatsappVerifyToken, whatsappPhoneNumberId } =
+    config;
+  if (whatsappAppSecret && whatsappVerifyToken && whatsappPhoneNumberId)
+    return Object.freeze({
+      appSecret: whatsappAppSecret,
+      verifyToken: whatsappVerifyToken,
+      phoneNumberId: whatsappPhoneNumberId,
+    });
+  return undefined;
 }
 
 // No browser-consumable API configuration exists. This projection

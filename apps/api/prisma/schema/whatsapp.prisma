@@ -1,0 +1,11 @@
+model WhatsAppInboundMessage {
+  messageId        String   @id(map: "whatsapp_inbound_messages_pkey") @map("message_id")
+  businessPhoneId  String   @map("business_phone_id")
+  senderBusinessId String?  @map("sender_business_id")
+  senderPhone      String?  @map("sender_phone")
+  occurredAt       DateTime @map("occurred_at") @db.Timestamptz(3)
+  receivedAt       DateTime @default(now()) @map("received_at") @db.Timestamptz(3)
+  content          Json
+
+  @@map("whatsapp_inbound_messages")
+}
