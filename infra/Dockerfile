@@ -25,9 +25,9 @@ COPY infra/container/database.mjs infra/container/migrate.mjs infra/container/ma
 CMD ["node", "ops/migrate.mjs"]
 
 FROM workspace AS production-dependencies
+# The compiled API does not need Prisma's optional CLI peer.
 RUN rm -rf /work/node_modules /work/apps/api/node_modules /work/apps/web/node_modules /work/packages/sdk/node_modules \
-    && pnpm --filter @mns-suporte/api install --prod --frozen-lockfile --offline \
-    && test ! -e /work/apps/api/node_modules/prisma
+    && pnpm --filter @mns-suporte/api install --prod --no-optional --frozen-lockfile --offline
 
 FROM base AS api
 WORKDIR /work/apps/api

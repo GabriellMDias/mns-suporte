@@ -281,6 +281,19 @@ try {
   source(["config", "--quiet"]);
   console.log("Building source and rollback images");
   source(["--profile", "tools", "build", "api", "migrate", "backup"]);
+  const apiPackages = run("docker", [
+    "run",
+    "--rm",
+    "--network",
+    "none",
+    "--entrypoint",
+    "node",
+    images.api,
+    "-e",
+    "console.log(require('node:fs').readdirSync('/work/node_modules/.pnpm').join('\\n'))",
+  ]);
+  assert.doesNotMatch(apiPackages, /^(?:prisma|effect)@/mu);
+  console.log("API image excludes the Prisma CLI and its Effect dependency");
   const revision = previousSource();
   const builtImageIds = run("docker", [
     "image",
