@@ -4,42 +4,6 @@
 
 [Component architecture](../../architecture/web-components.md) · [Living documentation](../../architecture/living-documentation.md)
 
-## AccessTokenForm
-
-Connects this reference workflow using a caller-supplied bearer token or optional local synthetic identity.
-
-Category: Forms. Scope: feature-specific. Owner: Approval Request workflow.
-
-Source: [apps/web/src/approval-requests/access-token-form.tsx](../../../apps/web/src/approval-requests/access-token-form.tsx) (export `AccessTokenForm`). Metadata: [apps/web/src/approval-requests/components.docs.json](../../../apps/web/src/approval-requests/components.docs.json).
-
-### Props
-
-| Name | Type | Meaning | Required | Default |
-| --- | --- | --- | --- | --- |
-| `onConnect` | `(token: string) => void` | Receives a token in memory after an explicit connection; never persist or log it. | Yes | — |
-| `showLocalIdentity` | `boolean` | Shows optional synthetic development identities when available. | No | true |
-
-### States
-
-- Manual entry
-- Required field
-- Optional local synthetic identity
-- Connecting
-- Connection error
-
-Accessibility: Provides a labeled required password field and a native submit action. Errors remain visible; connections and synthetic identity requests require explicit user actions.
-
-Usage: Keep credential handling inside this feature. Reuse Button and TextField for shared presentation; this form is not a general login, session or refresh component.
-
-### Examples
-
-- **Feature-owned connection form** (`access-token-form-usage`): Source example only; the catalog never connects credentials or calls an identity service.
-
-```tsx
-<AccessTokenForm showLocalIdentity={false} onConnect={connectInMemory} />
-```
-
-
 ## Button
 
 A native action button with explicit variants and safe pending behavior.
