@@ -86,8 +86,9 @@ describe("WhatsApp webhook", () => {
   it("verifies the challenge and authenticates the exact UTF-8 bytes before parsing", async () => {
     let received = 0;
     const { app } = createApp(logger);
-    registerWhatsAppWebhook(app, config, async (messages) => {
+    registerWhatsAppWebhook(app, config, (messages) => {
       received += messages.length;
+      return Promise.resolve();
     });
     try {
       const query = new URLSearchParams({
@@ -95,14 +96,18 @@ describe("WhatsApp webhook", () => {
         "hub.verify_token": config.verifyToken,
         "hub.challenge": "00001234",
       });
-      const accepted = await app.inject(path + "?" + query);
+      const accepted = await app.inject(path + "?" + query.toString());
       expect(accepted.statusCode).toBe(200);
       expect(accepted.headers["content-type"]).toMatch(/^text\/plain/);
       expect(accepted.body).toBe("00001234");
       query.set("hub.verify_token", "incorrect");
-      expect((await app.inject(path + "?" + query)).statusCode).toBe(403);
+      expect((await app.inject(path + "?" + query.toString())).statusCode).toBe(
+        403,
+      );
       query.delete("hub.verify_token");
-      expect((await app.inject(path + "?" + query)).statusCode).toBe(400);
+      expect((await app.inject(path + "?" + query.toString())).statusCode).toBe(
+        400,
+      );
 
       const body = payload(change(message));
       const altered = await app.inject(

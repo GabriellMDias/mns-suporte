@@ -25,7 +25,7 @@ export function registerWhatsAppWebhook(
   const verificationTokenHash = createHash("sha256")
     .update(config.verifyToken)
     .digest();
-  void app.register(async (scope) => {
+  void app.register((scope, _options, done) => {
     // Preserve the original bytes only in the webhook encapsulation scope.
     scope.removeContentTypeParser("text/plain");
     scope.addContentTypeParser(
@@ -128,5 +128,6 @@ export function registerWhatsAppWebhook(
         return reply.type("text/plain").send("EVENT_RECEIVED");
       },
     );
+    done();
   });
 }
