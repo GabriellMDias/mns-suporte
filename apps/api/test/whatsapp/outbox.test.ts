@@ -243,13 +243,11 @@ it("persists reply intents, claims them once and reconciles signed delivery evid
         },
       });
       await enqueueWhatsAppReply(db, protectedReply);
-      const retryLookup = vi
-        .fn<SendReply>()
-        .mockResolvedValue({
-          kind: "throttled",
-          code: 130429,
-          retryAfterMs: 0,
-        });
+      const retryLookup = vi.fn<SendReply>().mockResolvedValue({
+        kind: "throttled",
+        code: 130429,
+        retryAfterMs: 0,
+      });
       await dispatch(retryLookup);
       expect(retryLookup).toHaveBeenCalledTimes(1);
       expect((await state(protectedReply.id)).state).toBe("PENDING");
