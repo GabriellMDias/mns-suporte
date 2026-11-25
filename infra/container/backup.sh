@@ -2,7 +2,8 @@
 set -Eeuo pipefail
 umask 077
 export PGHOST=db PGPORT=5432 PGUSER=mns_migration PGDATABASE=mns_suporte PGCONNECT_TIMEOUT=5
-export PGPASSWORD="$(cat /run/secrets/database_password)"
+password="$(cat /run/secrets/database_password)"
+export PGPASSWORD="${password%$'\r'}"
 
 action="${1:-}"
 name="${2:-}"

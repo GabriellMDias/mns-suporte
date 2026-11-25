@@ -46,7 +46,7 @@ function project(name) {
   for (const role of ["admin", "migration", "runtime", "maintenance"])
     writeFileSync(
       join(secrets, role + ".password"),
-      randomBytes(32).toString("base64url"),
+      randomBytes(32).toString("base64url") + (role === "admin" ? "" : "\r\n"),
       { mode: 0o444, flag: "wx" },
     );
   writeFileSync(join(secrets, "api.env"), "", { mode: 0o444, flag: "wx" });

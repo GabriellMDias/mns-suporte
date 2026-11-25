@@ -1,9 +1,13 @@
 #!/bin/sh
 (
   set -eu
-  export MNS_MIGRATION_PASSWORD="$(cat /run/secrets/migration_password)"
-  export MNS_RUNTIME_PASSWORD="$(cat /run/secrets/runtime_password)"
-  export MNS_MAINTENANCE_PASSWORD="$(cat /run/secrets/maintenance_password)"
+  carriage_return="$(printf '\r')"
+  MNS_MIGRATION_PASSWORD="$(cat /run/secrets/migration_password)"
+  MNS_RUNTIME_PASSWORD="$(cat /run/secrets/runtime_password)"
+  MNS_MAINTENANCE_PASSWORD="$(cat /run/secrets/maintenance_password)"
+  export MNS_MIGRATION_PASSWORD="${MNS_MIGRATION_PASSWORD%"$carriage_return"}"
+  export MNS_RUNTIME_PASSWORD="${MNS_RUNTIME_PASSWORD%"$carriage_return"}"
+  export MNS_MAINTENANCE_PASSWORD="${MNS_MAINTENANCE_PASSWORD%"$carriage_return"}"
   test -n "$MNS_MIGRATION_PASSWORD"
   test -n "$MNS_RUNTIME_PASSWORD"
   test -n "$MNS_MAINTENANCE_PASSWORD"
