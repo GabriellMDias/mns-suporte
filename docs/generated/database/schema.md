@@ -4,6 +4,30 @@
 
 [Schema documentation policy](../../database/schema-documentation.md) · [Database principles](../../database/principles.md)
 
+## whatsapp_closure_preferences
+
+Most recent explicit closure notice consent per WhatsApp sender scope and verified GLPI requester.
+
+Owner: WhatsApp closure notifications. Classification: RESTRICTED.
+
+Lifecycle: An employee opts in or withdraws through WhatsApp. Withdrawal clears the delivery address. Re-enabling issues a new grant that cannot revive jobs under the previous grant.
+
+| Column | PostgreSQL type | Nullable | Default | Classification | Meaning | Null meaning | Unit |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `scope_key` | `text` | no | — | RESTRICTED | Stable hash binding the Meta business number and the sender scope. | — | — |
+| `glpi_user_id` | `bigint` | no | — | RESTRICTED | Verified GLPI requester who opted in. | — | — |
+| `grant_id` | `uuid` | no | — | INTERNAL | Unique consent epoch bound to eligible ticket watches and queued closure replies. | — | — |
+| `recipient` | `jsonb` | yes | — | RESTRICTED | Validated WhatsApp address for opted-in closure delivery. | The employee withdrew the grant and the address was cleared. | — |
+| `granted_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Time at which WhatsApp recorded the active or most recently withdrawn grant. | — | UTC instant |
+| `revoked_at` | `timestamp(3) with time zone` | yes | — | INTERNAL | Time at which the employee withdrew the grant. | The grant remains active. | UTC instant |
+
+### Constraints and indexes
+
+| Object | Physical definition | Purpose |
+| --- | --- | --- |
+| `whatsapp_closure_preferences_active_recipient` | `CHECK (((glpi_user_id > 0) AND ((revoked_at IS NULL) = (recipient IS NOT NULL))))` | Requires a verified positive GLPI ID and limits stored recipients to active grants. |
+| `whatsapp_closure_preferences_pkey` | `PRIMARY KEY (scope_key)` | Keeps a single latest grant per sender scope. |
+
 ## whatsapp_conversations
 
 Latest guided intake state and a resumable or confirmed draft for an authenticated WhatsApp sender scope.
@@ -108,13 +132,17 @@ Lifecycle: Starts when an employee confirms a draft. Confirmed ticket creation c
 | `claim_id` | `uuid` | yes | — | INTERNAL | Temporary worker ownership token that fences stale writes. | No worker holds a claim for the current step. | — |
 | `mutating` | `boolean` | no | `false` | INTERNAL | Durable evidence that a non-idempotent GLPI mutation may have been started. | — | — |
 | `updated_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Instant of the latest claim or durable progress transition. | — | — |
+| `closure_consent_id` | `uuid` | yes | — | INTERNAL | Active notice grant recorded when the employee confirmed the draft. | There was no eligible notice grant when this submission was queued. | — |
+| `closure_check_at` | `timestamp(3) with time zone` | yes | — | INTERNAL | Time of the next GLPI closure check or the deadline of its active claim. | The watch is unscheduled, retired or has created a closure reply. | — |
 
 ### Constraints and indexes
 
 | Object | Physical definition | Purpose |
 | --- | --- | --- |
+| `whatsapp_ticket_submissions_closure_watch` | `CHECK (((closure_check_at IS NULL) OR ((closure_consent_id IS NOT NULL) AND (ticket_id IS NOT NULL))))` | Requires a confirmed GLPI ticket and an explicit consent grant for any scheduled check. |
 | `whatsapp_ticket_submissions_pkey` | `PRIMARY KEY (draft_id)` | Prevents two jobs for the same verified draft. |
 | `whatsapp_ticket_submissions_progress_check` | `CHECK ((((attachment_count >= 0) AND (attachment_count <= 5)) AND ((next_attachment >= 0) AND (next_attachment <= attachment_count)) AND (attached_count >= 0) AND (uncertain_attachments >= 0) AND ((attached_count + uncertain_attachments) <= next_attachment) AND (attempts >= 0) AND ((state <> 'COMPLETED'::"WhatsAppTicketSubmissionState") OR ((ticket_id IS NOT NULL) AND (next_attachment = attachment_count))) AND ((state <> ALL (ARRAY['FAILED'::"WhatsAppTicketSubmissionState", 'UNCERTAIN'::"WhatsAppTicketSubmissionState"])) OR (ticket_id IS NULL)) AND ((NOT mutating) OR (claim_id IS NOT NULL))))` | Enforces consistent progress, result and claim counts. |
+| `whatsapp_ticket_submissions_closure_idx` | `CREATE INDEX whatsapp_ticket_submissions_closure_idx ON public.whatsapp_ticket_submissions USING btree (business_phone_id, closure_check_at, draft_id) WHERE (closure_check_at IS NOT NULL)` | Finds due ticket closure checks within one business number. |
 | `whatsapp_ticket_submissions_dispatch_idx` | `CREATE INDEX whatsapp_ticket_submissions_dispatch_idx ON public.whatsapp_ticket_submissions USING btree (business_phone_id, state, available_at, draft_id)` | Finds eligible jobs for one Meta business phone number. |
 
 ## whatsapp_troubleshooting_feedback
@@ -174,7 +202,7 @@ Lifecycle: Created before acknowledging the webhook. Redelivery preserves the or
 
 ## whatsapp_outbound_messages
 
-Durable intent and dispatch evidence for one free-form WhatsApp reply.
+Durable intent and dispatch evidence for one WhatsApp reply or closure notice.
 
 Owner: WhatsApp dispatch. Classification: RESTRICTED.
 
@@ -184,9 +212,9 @@ Lifecycle: Enqueued before dispatch. Retried only after an explicit provider thr
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `id` | `uuid` | no | — | INTERNAL | Caller-assigned immutable UUID for one reply intent and the opaque identifier echoed by Meta on delivery callbacks. | — | — |
 | `business_phone_id` | `text` | no | — | INTERNAL | Meta business phone number ID that owns and sends the reply. | — | — |
-| `payload` | `jsonb` | no | — | RESTRICTED | Immutable destination, validated text or interactive content and optional required GLPI recipient identity. | — | — |
+| `payload` | `jsonb` | no | — | RESTRICTED | Immutable destination, validated text or interactive content and optional verified identity and notice consent requirements. | — | — |
 | `state` | `"WhatsAppOutboundState"` | no | `'PENDING'::"WhatsAppOutboundState"` | INTERNAL | Current queue, provider acceptance or delivery evidence state. | — | — |
-| `expires_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Last allowed dispatch deadline under the inbound customer service window and any shorter lifetime required by the reply. | — | UTC instant |
+| `expires_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Last allowed dispatch deadline under the reply's service window or utility notice lifetime. | — | UTC instant |
 | `available_at` | `timestamp(3) with time zone` | no | `CURRENT_TIMESTAMP` | INTERNAL | Earliest eligible time for the next dispatch attempt. | — | UTC instant |
 | `attempt_started_at` | `timestamp(3) with time zone` | yes | — | INTERNAL | Most recent claim time used to detect an abandoned dispatch. | The queue has not claimed this reply. | UTC instant |
 | `attempts` | `integer` | no | `0` | INTERNAL | Number of claims recorded before making a provider request. | — | claims |

@@ -211,6 +211,25 @@ it("requires complete server-only credentials and protects the configured target
   ).toThrow("GLPI URL");
 });
 
+it.each([403, 503])(
+  "keeps a closure lookup retriable when GLPI returns %i for requester relations",
+  async (status) => {
+    const fetchGlpi = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(Response.json({ session_token: "test-session" }))
+      .mockResolvedValueOnce(page(1, [ticketRow(91, 6)]))
+      .mockResolvedValueOnce(glpiError("synthetic", status));
+    const client = createGlpiClient(config, fetchGlpi);
+    expect(
+      await client.readOwnedTickets(
+        37,
+        { kind: "detail", ticketId: 91 },
+        ticketSignal,
+      ),
+    ).toEqual({ kind: "unavailable" });
+  },
+);
+
 it("checks every page for one exact active email and ignores similar addresses", async () => {
   const fetchGlpi = vi
     .fn<typeof fetch>()

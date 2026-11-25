@@ -1,0 +1,44 @@
+{
+  "tables": {
+    "whatsapp_closure_preferences": {
+      "owner": "WhatsApp closure notifications",
+      "classification": "RESTRICTED",
+      "description": "Most recent explicit closure notice consent per WhatsApp sender scope and verified GLPI requester.",
+      "lifecycle": "An employee opts in or withdraws through WhatsApp. Withdrawal clears the delivery address. Re-enabling issues a new grant that cannot revive jobs under the previous grant.",
+      "columns": {
+        "scope_key": {
+          "description": "Stable hash binding the Meta business number and the sender scope.",
+          "classification": "RESTRICTED"
+        },
+        "glpi_user_id": {
+          "description": "Verified GLPI requester who opted in.",
+          "classification": "RESTRICTED"
+        },
+        "grant_id": {
+          "description": "Unique consent epoch bound to eligible ticket watches and queued closure replies.",
+          "classification": "INTERNAL"
+        },
+        "recipient": {
+          "description": "Validated WhatsApp address for opted-in closure delivery.",
+          "classification": "RESTRICTED",
+          "nullMeaning": "The employee withdrew the grant and the address was cleared."
+        },
+        "granted_at": {
+          "description": "Time at which WhatsApp recorded the active or most recently withdrawn grant.",
+          "classification": "INTERNAL",
+          "unit": "UTC instant"
+        },
+        "revoked_at": {
+          "description": "Time at which the employee withdrew the grant.",
+          "classification": "INTERNAL",
+          "nullMeaning": "The grant remains active.",
+          "unit": "UTC instant"
+        }
+      },
+      "objects": {
+        "whatsapp_closure_preferences_pkey": "Keeps a single latest grant per sender scope.",
+        "whatsapp_closure_preferences_active_recipient": "Requires a verified positive GLPI ID and limits stored recipients to active grants."
+      }
+    }
+  }
+}

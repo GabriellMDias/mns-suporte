@@ -4,6 +4,69 @@
     "title": "ADR-0007: Establish API Contract, OpenAPI, SDK, and Configuration Schema Strategy",
     "group": "Decisions",
     "kind": "repository",
+    "heading": "TypeScript SDK generation",
+    "anchor": "typescript-sdk-generation",
+    "text": "TypeScript SDK generation\nWhen an Orion application has a TypeScript consumer that benefits from a shared SDK, the default SDK generation strategy will use:\nOpenAPI\n    ↓\nopenapi-typescript\n    ↓\ngenerated TypeScript API types\n    ↓\nopenapi-fetch\n    ↓\nthin typed HTTP client\n\n`openapi-typescript` will generate TypeScript representations from the generated OpenAPI contract.\n`openapi-fetch` will provide the default thin typed HTTP client for TypeScript consumers.\nThe initial strategy intentionally favors generated types and a small generic HTTP runtime rather than generating a large application-specific client implementation.\nThe generated TypeScript client contract must depend on OpenAPI rather than importing server implementation types directly.\nTherefore, first-party web applications should not bypass the API boundary by importing server-side contract implementations merely because both applications reside in the same monorepo.\nThe intended dependency flow is:\nauthored contracts\n    ↓\nOpenAPI\n    ↓\ngenerated client types\n    ↓\ntyped HTTP client\n    ↓\nconsumer application\n\nThis keeps the API boundary continuously testable as a real interoperable contract.\n"
+  },
+  {
+    "id": "repository/docs/adr/0007-establish-api-contract-openapi-sdk-and-configuration-schema-strategy",
+    "title": "ADR-0007: Establish API Contract, OpenAPI, SDK, and Configuration Schema Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Other-language SDKs",
+    "anchor": "other-language-sdks",
+    "text": "Other-language SDKs\nOrion will not select a universal SDK generator for every programming language before concrete consumers exist.\nOpenAPI will remain the language-independent SDK input.\nIf a future application requires a Kotlin, Swift, C#, Python, Go, or other client, an appropriate generator may be selected for that consumer.\nThe choice of language-specific generator is not itself an architectural change as long as OpenAPI remains the canonical interoperable API description.\n"
+  },
+  {
+    "id": "repository/docs/adr/0007-establish-api-contract-openapi-sdk-and-configuration-schema-strategy",
+    "title": "ADR-0007: Establish API Contract, OpenAPI, SDK, and Configuration Schema Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Generated artifacts",
+    "anchor": "generated-artifacts",
+    "text": "Generated artifacts\nGenerated OpenAPI documents, SDK types, and other derived contract artifacts must be:\ndeterministic;\nreproducible;\ngenerated from canonical sources;\nnever manually edited.\nRepository validation should verify generated-artifact consistency once the corresponding artifacts exist.\nConceptually:\ncanonical contracts\n    ↓\ngenerate OpenAPI\n    ↓\ngenerate client artifacts\n    ↓\npnpm validate\n    ↓\nverify generated output is current\n\nWhether a particular generated artifact is committed to version control or generated during build or publication is an implementation decision and may depend on how that artifact is consumed.\nRegardless of storage strategy, generated artifacts must never become independent sources of truth.\n"
+  },
+  {
+    "id": "repository/docs/adr/0007-establish-api-contract-openapi-sdk-and-configuration-schema-strategy",
+    "title": "ADR-0007: Establish API Contract, OpenAPI, SDK, and Configuration Schema Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Client-side runtime validation",
+    "anchor": "client-side-runtime-validation",
+    "text": "Client-side runtime validation\nGenerated TypeScript SDKs will provide compile-time typing by default.\nThey will not automatically revalidate every successful server response at runtime.\nRuntime validation on clients may be introduced when a concrete trust boundary or reliability requirement justifies the additional execution and implementation cost.\nThe server remains responsible for validating requests and serializing responses according to its published contract.\n"
+  },
+  {
+    "id": "repository/docs/adr/0007-establish-api-contract-openapi-sdk-and-configuration-schema-strategy",
+    "title": "ADR-0007: Establish API Contract, OpenAPI, SDK, and Configuration Schema Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Configuration validation",
+    "anchor": "configuration-validation",
+    "text": "Configuration validation\nOrion will use **TypeBox as the default schema system for application bootstrap configuration**.\nExternal configuration sources, including environment variables, must be treated as untrusted input.\nThe intended configuration flow is:\nexternal configuration\n    ↓\nraw values\n    ↓\nexplicit parsing / normalization\n    ↓\nTypeBox validation\n    ↓\nvalidated typed configuration\n    ↓\napplication composition\n\nApplication code must not rely directly on arbitrary `process.env` access throughout the codebase.\nDirect environment access should be restricted to the configuration-loading or bootstrap boundary.\nAfter configuration has been parsed and validated, application components should receive typed configuration values rather than reading environment variables independently.\n"
+  },
+  {
+    "id": "repository/docs/adr/0007-establish-api-contract-openapi-sdk-and-configuration-schema-strategy",
+    "title": "ADR-0007: Establish API Contract, OpenAPI, SDK, and Configuration Schema Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Configuration parsing",
+    "anchor": "configuration-parsing",
+    "text": "Configuration parsing\nExternal representation and runtime representation are distinct.\nFor example:\nPORT=\"3000\"\n\nmust become:\nport: 3000\n\nthrough explicit parsing and validation.\nBoolean parsing must also be explicit.\nA raw value such as:\n\"false\"\n\nmust not be interpreted through generic JavaScript truthiness.\nParsing rules should be deterministic, narrow, and documented.\nExcessive implicit coercion should be avoided because it can hide configuration errors.\n"
+  },
+  {
+    "id": "repository/docs/adr/0007-establish-api-contract-openapi-sdk-and-configuration-schema-strategy",
+    "title": "ADR-0007: Establish API Contract, OpenAPI, SDK, and Configuration Schema Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Startup behavior",
+    "anchor": "startup-behavior",
+    "text": "Startup behavior\nRequired application configuration must be validated before the application begins accepting work.\nThe normal startup sequence is:\nprocess starts\n    ↓\nload configuration\n    ↓\nparse\n    ↓\nvalidate\n    ↓\ninvalid?\n  ↙       ↘\nyes       no\n ↓         ↓\nfail      compose application\nfast          ↓\n          begin serving work\n\nMissing or invalid required configuration is therefore a startup failure.\nApplications must not defer discovering invalid foundational configuration until the affected code path is first executed.\n"
+  },
+  {
+    "id": "repository/docs/adr/0007-establish-api-contract-openapi-sdk-and-configuration-schema-strategy",
+    "title": "ADR-0007: Establish API Contract, OpenAPI, SDK, and Configuration Schema Strategy",
+    "group": "Decisions",
+    "kind": "repository",
     "heading": "Runtime configuration",
     "anchor": "runtime-configuration",
     "text": "Runtime configuration\nValidated bootstrap configuration should be treated as **immutable during normal application execution**.\nDynamic application state such as:\nfeature flags;\ntenant settings;\nremote configuration;\nuser preferences;\nruntime business settings;\nis a separate concern and must not be conflated with application bootstrap configuration.\n"
@@ -1015,68 +1078,5 @@
     "heading": "Audit logging",
     "anchor": "audit-logging",
     "text": "Audit logging\nOperational observability is explicitly separate from business audit history.\nThe following are not automatically an audit trail:\nPino logs\nOpenTelemetry traces\nOpenTelemetry metrics\n\nA business audit requirement such as:\nwho changed an invoice\nwhat changed\nwhen it changed\nwhy it changed\n\nmay require dedicated persistent application data with its own rules for:\nintegrity;\nretention;\nauthorization;\nimmutability;\ndomain semantics;\nregulatory compliance.\nAn application must not rely on ordinary application logs as its only source of authoritative audit history.\n"
-  },
-  {
-    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
-    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Rationale",
-    "anchor": "rationale",
-    "text": "Rationale\nOpenTelemetry provides a vendor-neutral observability model that can represent traces, metrics, propagation, instrumentation, and telemetry export without forcing Orion applications to depend on a particular monitoring backend.\nThis fits Orion's goal of preserving infrastructure portability while still providing a strong production observability baseline.\nDistributed tracing is particularly valuable because large systems frequently spend significant time across multiple boundaries:\nHTTP\napplication behavior\ndatabase access\nexternal APIs\nbackground processing\nother services\n\nA trace allows those operations to be investigated as one causal workflow rather than as independent log records.\nMetrics complement traces by providing aggregate time-series information appropriate for:\ndashboards;\ncapacity monitoring;\nlatency distributions;\nrequest rates;\nfailure rates;\nalert conditions.\nPino remains the default logging implementation because it is already integrated naturally with Fastify and provides efficient structured logging.\nKeeping logging and tracing as separate but correlated responsibilities avoids making the application's log pipeline dependent on the maturity or deployment model of a specific OpenTelemetry log implementation.\nThe correlation model:\nPino log\n    +\ntrace_id\n    +\nspan_id\n\nprovides the practical operational benefit needed from the integration without requiring application logs and traces to use the same internal API.\nAn independent request identifier is retained because request-level operational correlation remains useful even when distributed tracing is unavailable or incomplete.\nOTLP is selected as the preferred telemetry transport because it preserves OpenTelemetry's vendor-neutral architecture between application processes and observability infrastructure.\nThe Collector is preferred for production systems that require centralized telemetry processing because it can move routing, transformation, batching, and backend-specific exporting out of application processes.\nHowever, making the Collector mandatory for every application would introduce infrastructure complexity that does not always provide sufficient value.\nTherefore direct OTLP export remains valid for simpler deployments.\nExplicit rules around redaction and cardinality are necessary because observability systems can themselves become security, privacy, reliability, or cost risks.\nUncontrolled logging may expose sensitive information.\nUnbounded metric attributes may create excessive time-series cardinality.\nExcessive tracing can generate unnecessary overhead and telemetry cost.\nThe strategy therefore treats observability as engineered production behavior rather than unconditional collection of all available information.\nNo error-reporting vendor is selected because the appropriate provider depends on deployment requirements.\nOrion preserves provider independence while allowing dedicated error-reporting tools to be added at technical boundaries when they provide concrete value.\nFinally, keeping operational telemetry separate from audit history prevents infrastructure logs from becoming an accidental and unreliable business record.\n"
-  },
-  {
-    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
-    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Alternatives Considered",
-    "anchor": "alternatives-considered",
-    "text": "Alternatives Considered\n"
-  },
-  {
-    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
-    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Vendor-Specific Observability SDK as the Foundation Standard",
-    "anchor": "vendor-specific-observability-sdk-as-the-foundation-standard",
-    "text": "Vendor-Specific Observability SDK as the Foundation Standard\nOrion could select a platform such as Datadog, New Relic, Honeycomb, or another APM provider and use its proprietary application SDK directly.\nThis could provide a highly integrated initial experience.\nIt was not selected because Orion is intended for many future applications and deployment environments.\nA globally selected vendor would create unnecessary infrastructure coupling and could complicate self-hosting, regulated deployments, cost optimization, or future vendor migration.\nOpenTelemetry provides a more portable instrumentation boundary.\n"
-  },
-  {
-    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
-    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "OpenTelemetry for Application Logging Instead of Pino",
-    "anchor": "opentelemetry-for-application-logging-instead-of-pino",
-    "text": "OpenTelemetry for Application Logging Instead of Pino\nOrion could standardize all logs directly through OpenTelemetry's logging APIs and SDK.\nThis would conceptually unify all telemetry signals.\nIt was not selected as the initial approach because Pino already provides a mature and efficient structured logging implementation that integrates naturally with the selected Fastify stack.\nThe practical requirement is correlation between logs and traces, not necessarily one API for all telemetry.\nPino therefore remains responsible for application logging while OpenTelemetry provides trace context and observability signals.\n"
-  },
-  {
-    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
-    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Direct Export from Every Application to a Specific Backend",
-    "anchor": "direct-export-from-every-application-to-a-specific-backend",
-    "text": "Direct Export from Every Application to a Specific Backend\nEach Orion service could embed the exporter required by its selected observability provider.\nThis can be simple in small deployments.\nIt was not selected as the preferred production architecture because backend-specific exporters create stronger application-to-vendor coupling and duplicate routing, authentication, batching, and transformation responsibilities across processes.\nDirect OTLP export remains acceptable for simple deployments, but a Collector is preferred when centralized telemetry processing provides operational value.\n"
-  },
-  {
-    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
-    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Mandatory OpenTelemetry Collector",
-    "anchor": "mandatory-opentelemetry-collector",
-    "text": "Mandatory OpenTelemetry Collector\nOrion could require every deployment to operate an OpenTelemetry Collector.\nThis would produce a uniform telemetry architecture.\nIt was not selected because small applications may not benefit enough from an additional deployed component.\nThe Collector is therefore preferred rather than mandatory.\n"
-  },
-  {
-    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
-    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Fixed Production Trace Sampling Rate",
-    "anchor": "fixed-production-trace-sampling-rate",
-    "text": "Fixed Production Trace Sampling Rate\nOrion could establish one default production value such as 10% trace sampling.\nThis would simplify configuration.\nIt was not selected because appropriate sampling depends heavily on traffic volume, telemetry cost, backend capabilities, and incident-response requirements.\nSampling therefore remains deployment-configurable.\n"
   }
 ]

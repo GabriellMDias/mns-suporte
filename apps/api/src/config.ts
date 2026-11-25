@@ -39,6 +39,9 @@ export const serverConfigSchema = Type.Object(
       Type.String({ pattern: "^\\S{16,2048}$" }),
     ),
     whatsappGraphApiVersion: Type.String({ pattern: "^v[1-9][0-9]{0,2}\\.0$" }),
+    whatsappClosureTemplateName: Type.Optional(
+      Type.String({ pattern: "^[a-z0-9_]{1,512}$" }),
+    ),
     glpiApiUrl: Type.Optional(Type.String({ pattern: "^\\S{1,2048}$" })),
     glpiAppToken: Type.Optional(Type.String({ pattern: "^[!-~]{16,512}$" })),
     glpiUserToken: Type.Optional(Type.String({ pattern: "^[!-~]{16,512}$" })),
@@ -76,6 +79,7 @@ export type GlpiConfig = Readonly<{
 export type WhatsAppOutboundConfig = Readonly<{
   accessToken: string;
   graphVersion: string;
+  closureTemplateName?: string;
 }>;
 export type VerificationSmtpConfig = Readonly<{
   host: string;
@@ -306,6 +310,18 @@ export const configReference = Object.freeze([
     purpose: "Graph API version used by WhatsApp outbound dispatch.",
   },
   {
+    key: "whatsappClosureTemplateName",
+    name: "WHATSAPP_CLOSURE_TEMPLATE_NAME",
+    type: "approved Meta utility template name",
+    required: false,
+    default: "",
+    visibility: "server",
+    classification: "INTERNAL",
+    secret: false,
+    purpose:
+      "Approved pt_BR utility template for closure notices outside the customer service window.",
+  },
+  {
     key: "glpiApiUrl",
     name: "GLPI_API_URL",
     type: "HTTPS URL",
@@ -502,6 +518,9 @@ export function parseServerConfig(
       ? {}
       : { whatsappAccessToken: env.WHATSAPP_ACCESS_TOKEN }),
     whatsappGraphApiVersion: env.WHATSAPP_GRAPH_API_VERSION ?? "v27.0",
+    ...(env.WHATSAPP_CLOSURE_TEMPLATE_NAME === undefined
+      ? {}
+      : { whatsappClosureTemplateName: env.WHATSAPP_CLOSURE_TEMPLATE_NAME }),
     ...(env.GLPI_API_URL === undefined ? {} : { glpiApiUrl: env.GLPI_API_URL }),
     ...(env.GLPI_APP_TOKEN === undefined
       ? {}
@@ -610,6 +629,10 @@ export function parseServerConfig(
     whatsapp.some((value) => !value)
   )
     throw new Error("Invalid API configuration: incomplete WhatsApp webhook");
+  if (candidate.whatsappClosureTemplateName && !candidate.whatsappAccessToken)
+    throw new Error(
+      "Invalid API configuration: WhatsApp closure template needs outbound dispatch",
+    );
   const glpi = [
     candidate.glpiApiUrl,
     candidate.glpiAppToken,
@@ -695,6 +718,9 @@ export function whatsappWebhookFrom(
             outbound: Object.freeze({
               accessToken: config.whatsappAccessToken,
               graphVersion: config.whatsappGraphApiVersion,
+              ...(config.whatsappClosureTemplateName
+                ? { closureTemplateName: config.whatsappClosureTemplateName }
+                : {}),
             }),
           }
         : {}),

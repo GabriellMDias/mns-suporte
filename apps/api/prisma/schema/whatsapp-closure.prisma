@@ -1,0 +1,10 @@
+model WhatsAppClosurePreference {
+  scopeKey   String    @id(map: "whatsapp_closure_preferences_pkey") @map("scope_key")
+  glpiUserId BigInt    @map("glpi_user_id")
+  grantId    String    @map("grant_id") @db.Uuid
+  recipient  Json?
+  grantedAt  DateTime  @map("granted_at") @db.Timestamptz(3)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(3)
+
+  @@map("whatsapp_closure_preferences")
+}

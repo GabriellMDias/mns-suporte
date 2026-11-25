@@ -4,6 +4,69 @@
     "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
     "group": "Decisions",
     "kind": "repository",
+    "heading": "Rationale",
+    "anchor": "rationale",
+    "text": "Rationale\nOpenTelemetry provides a vendor-neutral observability model that can represent traces, metrics, propagation, instrumentation, and telemetry export without forcing Orion applications to depend on a particular monitoring backend.\nThis fits Orion's goal of preserving infrastructure portability while still providing a strong production observability baseline.\nDistributed tracing is particularly valuable because large systems frequently spend significant time across multiple boundaries:\nHTTP\napplication behavior\ndatabase access\nexternal APIs\nbackground processing\nother services\n\nA trace allows those operations to be investigated as one causal workflow rather than as independent log records.\nMetrics complement traces by providing aggregate time-series information appropriate for:\ndashboards;\ncapacity monitoring;\nlatency distributions;\nrequest rates;\nfailure rates;\nalert conditions.\nPino remains the default logging implementation because it is already integrated naturally with Fastify and provides efficient structured logging.\nKeeping logging and tracing as separate but correlated responsibilities avoids making the application's log pipeline dependent on the maturity or deployment model of a specific OpenTelemetry log implementation.\nThe correlation model:\nPino log\n    +\ntrace_id\n    +\nspan_id\n\nprovides the practical operational benefit needed from the integration without requiring application logs and traces to use the same internal API.\nAn independent request identifier is retained because request-level operational correlation remains useful even when distributed tracing is unavailable or incomplete.\nOTLP is selected as the preferred telemetry transport because it preserves OpenTelemetry's vendor-neutral architecture between application processes and observability infrastructure.\nThe Collector is preferred for production systems that require centralized telemetry processing because it can move routing, transformation, batching, and backend-specific exporting out of application processes.\nHowever, making the Collector mandatory for every application would introduce infrastructure complexity that does not always provide sufficient value.\nTherefore direct OTLP export remains valid for simpler deployments.\nExplicit rules around redaction and cardinality are necessary because observability systems can themselves become security, privacy, reliability, or cost risks.\nUncontrolled logging may expose sensitive information.\nUnbounded metric attributes may create excessive time-series cardinality.\nExcessive tracing can generate unnecessary overhead and telemetry cost.\nThe strategy therefore treats observability as engineered production behavior rather than unconditional collection of all available information.\nNo error-reporting vendor is selected because the appropriate provider depends on deployment requirements.\nOrion preserves provider independence while allowing dedicated error-reporting tools to be added at technical boundaries when they provide concrete value.\nFinally, keeping operational telemetry separate from audit history prevents infrastructure logs from becoming an accidental and unreliable business record.\n"
+  },
+  {
+    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
+    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Alternatives Considered",
+    "anchor": "alternatives-considered",
+    "text": "Alternatives Considered\n"
+  },
+  {
+    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
+    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Vendor-Specific Observability SDK as the Foundation Standard",
+    "anchor": "vendor-specific-observability-sdk-as-the-foundation-standard",
+    "text": "Vendor-Specific Observability SDK as the Foundation Standard\nOrion could select a platform such as Datadog, New Relic, Honeycomb, or another APM provider and use its proprietary application SDK directly.\nThis could provide a highly integrated initial experience.\nIt was not selected because Orion is intended for many future applications and deployment environments.\nA globally selected vendor would create unnecessary infrastructure coupling and could complicate self-hosting, regulated deployments, cost optimization, or future vendor migration.\nOpenTelemetry provides a more portable instrumentation boundary.\n"
+  },
+  {
+    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
+    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "OpenTelemetry for Application Logging Instead of Pino",
+    "anchor": "opentelemetry-for-application-logging-instead-of-pino",
+    "text": "OpenTelemetry for Application Logging Instead of Pino\nOrion could standardize all logs directly through OpenTelemetry's logging APIs and SDK.\nThis would conceptually unify all telemetry signals.\nIt was not selected as the initial approach because Pino already provides a mature and efficient structured logging implementation that integrates naturally with the selected Fastify stack.\nThe practical requirement is correlation between logs and traces, not necessarily one API for all telemetry.\nPino therefore remains responsible for application logging while OpenTelemetry provides trace context and observability signals.\n"
+  },
+  {
+    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
+    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Direct Export from Every Application to a Specific Backend",
+    "anchor": "direct-export-from-every-application-to-a-specific-backend",
+    "text": "Direct Export from Every Application to a Specific Backend\nEach Orion service could embed the exporter required by its selected observability provider.\nThis can be simple in small deployments.\nIt was not selected as the preferred production architecture because backend-specific exporters create stronger application-to-vendor coupling and duplicate routing, authentication, batching, and transformation responsibilities across processes.\nDirect OTLP export remains acceptable for simple deployments, but a Collector is preferred when centralized telemetry processing provides operational value.\n"
+  },
+  {
+    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
+    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Mandatory OpenTelemetry Collector",
+    "anchor": "mandatory-opentelemetry-collector",
+    "text": "Mandatory OpenTelemetry Collector\nOrion could require every deployment to operate an OpenTelemetry Collector.\nThis would produce a uniform telemetry architecture.\nIt was not selected because small applications may not benefit enough from an additional deployed component.\nThe Collector is therefore preferred rather than mandatory.\n"
+  },
+  {
+    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
+    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Fixed Production Trace Sampling Rate",
+    "anchor": "fixed-production-trace-sampling-rate",
+    "text": "Fixed Production Trace Sampling Rate\nOrion could establish one default production value such as 10% trace sampling.\nThis would simplify configuration.\nIt was not selected because appropriate sampling depends heavily on traffic volume, telemetry cost, backend capabilities, and incident-response requirements.\nSampling therefore remains deployment-configurable.\n"
+  },
+  {
+    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
+    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
+    "group": "Decisions",
+    "kind": "repository",
     "heading": "Log Bodies and Complete Request Data for Maximum Diagnostics",
     "anchor": "log-bodies-and-complete-request-data-for-maximum-diagnostics",
     "text": "Log Bodies and Complete Request Data for Maximum Diagnostics\nOrion could log complete requests, responses, headers, and payloads to maximize debugging information.\nIt was not selected because doing so would create substantial security and privacy risk and could significantly increase storage and processing cost.\nStructured observability should record intentional diagnostic context rather than indiscriminately duplicate application data.\n"
@@ -1267,113 +1330,5 @@
     "heading": "Operational or Migration Impact",
     "anchor": "operational-or-migration-impact",
     "text": "Operational or Migration Impact\nThis changes the derivation contract and the manifest schema incompatibly, which [foundation versioning](../versioning.md#compatibility-meaning) classifies as a MAJOR foundation change.\nProjects derived under ADR-0014 have a schema version 1 manifest; `pnpm orion:check` refuses it with directions to the migration steps in the [derivation guide](../project-derivation.md#migrate-a-project-from-schema-version-1).\n"
-  },
-  {
-    "id": "repository/docs/adr/0017-start-derived-projects-from-a-clean-foundation-baseline",
-    "title": "ADR-0017: Start Derived Projects from a Clean Foundation Baseline",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "References",
-    "anchor": "references",
-    "text": "References\n[Project derivation and Orion upgrades](../project-derivation.md)\n[ADR-0014: derive projects through Git ancestry](0014-derive-projects-from-orion-through-git-ancestry-with-recorded-provenance.md)\n[Foundation versioning](../versioning.md)\n[API modules](../../apps/api/README.md#modules) and [web modules](../../apps/web/README.md#modules)\n"
-  },
-  {
-    "id": "repository/docs/adr/0018-isolate-internal-documentation-from-product-distribution",
-    "title": "ADR-0018: Isolate Internal Documentation from Product Distribution",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "ADR-0018: Isolate Internal Documentation from Product Distribution",
-    "anchor": "adr-0018-isolate-internal-documentation-from-product-distribution",
-    "text": "ADR-0018: Isolate Internal Documentation from Product Distribution\n**Status:** accepted\n**Date:** 2026-10-23\n"
-  },
-  {
-    "id": "repository/docs/adr/0018-isolate-internal-documentation-from-product-distribution",
-    "title": "ADR-0018: Isolate Internal Documentation from Product Distribution",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Context",
-    "anchor": "context",
-    "text": "Context\nThe owner requires a complete engineering knowledge system for developers and AI agents while separating it from product UI and public documentation. The existing portal uses the React/Vite application, deterministic generated references, a lazy UI import, local search, and synthetic previews. Lazy loading still emits its entire internal catalog and downloads into production artifacts. Removing navigation or adding a browser route guard would leave those files downloadable.\nADR-0008 already selects Vite and code splitting. Development-only identity behavior already uses build-time exclusion. ADR-0017 retains the portal and its sources in projects and makes composition and brand assets project-owned; it does not require shipping engineering assets in product builds. This decision complements that source-retention contract by defining distribution and publication explicitly. These mechanisms can support the requested separation without selecting another framework, authentication provider, or deployment topology.\n"
-  },
-  {
-    "id": "repository/docs/adr/0018-isolate-internal-documentation-from-product-distribution",
-    "title": "ADR-0018: Isolate Internal Documentation from Product Distribution",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Decision",
-    "anchor": "decision",
-    "text": "Decision\nRetain the full internal source catalog, generators, local `/docs` routes, search, previews, and AI-readable references. Treat the portal as a development tool. Exclude its routes, imports, UI styles, generated pages, search assets and reference downloads from every default production web build, in Orion and derived projects. Fail the product build if an accidental included import bypasses that boundary.\nAllow explicit internal builds only with an operator acknowledgement that a trusted external host enforces access to the entire artifact. This build selection grants no permission and supplies no authentication. A real internal deployment requires authorization and verified host controls over assets and downloads as well as routes; API controls remain unchanged.\nProduct documentation belongs to the product's UI, audience, ownership and release process. Public API documentation uses a separately approved source inventory, including referenced schemas and examples. Neither public surface inherits or filters the internal catalog automatically. The foundation does not introduce a public publisher in this change.\nKeep portal layout/navigation/styles inside its optional import boundary. Applications retain control of their shell, home, modules, brand and documentation presentation. Preserve the existing toolchain, repository/manifest contract, local URLs, and generated-source ownership.\n"
-  },
-  {
-    "id": "repository/docs/adr/0018-isolate-internal-documentation-from-product-distribution",
-    "title": "ADR-0018: Isolate Internal Documentation from Product Distribution",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Rationale",
-    "anchor": "rationale",
-    "text": "Rationale\nCompile-time selection removes actual emitted bytes and reuses Vite rather than introducing an application boundary solely for packaging. Independent publication sources prevent an internal addition from becoming a public disclosure. Retaining complete generation keeps engineering discovery and agent context intact. External hosting enforcement accommodates an explicitly authorized internal deployment without inventing a provider or pretending static client checks protect downloads.\n"
-  },
-  {
-    "id": "repository/docs/adr/0018-isolate-internal-documentation-from-product-distribution",
-    "title": "ADR-0018: Isolate Internal Documentation from Product Distribution",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Alternatives Considered",
-    "anchor": "alternatives-considered",
-    "text": "Alternatives Considered\n"
-  },
-  {
-    "id": "repository/docs/adr/0018-isolate-internal-documentation-from-product-distribution",
-    "title": "ADR-0018: Isolate Internal Documentation from Product Distribution",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Hide links or require a browser login",
-    "anchor": "hide-links-or-require-a-browser-login",
-    "text": "Hide links or require a browser login\nThis changes navigation but leaves static references and search content downloadable. It does not establish the required distribution or trust boundary.\n"
-  },
-  {
-    "id": "repository/docs/adr/0018-isolate-internal-documentation-from-product-distribution",
-    "title": "ADR-0018: Isolate Internal Documentation from Product Distribution",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Remove the portal and internal sources during derivation",
-    "anchor": "remove-the-portal-and-internal-sources-during-derivation",
-    "text": "Remove the portal and internal sources during derivation\nThis reduces product bytes but also removes developer and agent capabilities, generated-reference validation, and a reusable engineering workflow.\n"
-  },
-  {
-    "id": "repository/docs/adr/0018-isolate-internal-documentation-from-product-distribution",
-    "title": "ADR-0018: Isolate Internal Documentation from Product Distribution",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Introduce a separate documentation application immediately",
-    "anchor": "introduce-a-separate-documentation-application-immediately",
-    "text": "Introduce a separate documentation application immediately\nA separate application may be justified by future independent hosting requirements. It is unnecessary for current build exclusion and would add workspace, routing, and validation responsibilities before a concrete deployment exists.\n"
-  },
-  {
-    "id": "repository/docs/adr/0018-isolate-internal-documentation-from-product-distribution",
-    "title": "ADR-0018: Isolate Internal Documentation from Product Distribution",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Consequences",
-    "anchor": "consequences",
-    "text": "Consequences\n"
-  },
-  {
-    "id": "repository/docs/adr/0018-isolate-internal-documentation-from-product-distribution",
-    "title": "ADR-0018: Isolate Internal Documentation from Product Distribution",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Positive",
-    "anchor": "positive",
-    "text": "Positive\nDefault products contain no internal portal or generated documentation assets.\nLocal engineering workflows and canonical AI-readable knowledge remain available.\nProduct and public documentation can evolve independently of engineering navigation and branding.\nArtifact and browser tests cover exclusion, explicit inclusion, accidental imports, and existing local behavior.\n"
-  },
-  {
-    "id": "repository/docs/adr/0018-isolate-internal-documentation-from-product-distribution",
-    "title": "ADR-0018: Isolate Internal Documentation from Product Distribution",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Negative",
-    "anchor": "negative",
-    "text": "Negative\nInternal deployment operators must explicitly select and protect a distinct artifact; the build cannot verify their real host's access controls.\nProducts that previously used `/docs` as end-user help must migrate those links and content.\nPublic documentation requires an approved source inventory and a product-owned publication implementation when needed.\n"
   }
 ]

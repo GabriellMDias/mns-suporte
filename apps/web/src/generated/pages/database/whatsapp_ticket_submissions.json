@@ -205,9 +205,34 @@
       "Meaning": "Instant of the latest claim or durable progress transition.",
       "Null meaning": "—",
       "Unit": "—"
+    },
+    {
+      "Column": "closure_consent_id",
+      "PostgreSQL type": "uuid",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Active notice grant recorded when the employee confirmed the draft.",
+      "Null meaning": "There was no eligible notice grant when this submission was queued.",
+      "Unit": "—"
+    },
+    {
+      "Column": "closure_check_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Time of the next GLPI closure check or the deadline of its active claim.",
+      "Null meaning": "The watch is unscheduled, retired or has created a closure reply.",
+      "Unit": "—"
     }
   ],
   "constraints": [
+    {
+      "Object": "whatsapp_ticket_submissions_closure_watch",
+      "Physical definition": "CHECK (((closure_check_at IS NULL) OR ((closure_consent_id IS NOT NULL) AND (ticket_id IS NOT NULL))))",
+      "Purpose": "Requires a confirmed GLPI ticket and an explicit consent grant for any scheduled check."
+    },
     {
       "Object": "whatsapp_ticket_submissions_pkey",
       "Physical definition": "PRIMARY KEY (draft_id)",
@@ -217,6 +242,11 @@
       "Object": "whatsapp_ticket_submissions_progress_check",
       "Physical definition": "CHECK ((((attachment_count >= 0) AND (attachment_count <= 5)) AND ((next_attachment >= 0) AND (next_attachment <= attachment_count)) AND (attached_count >= 0) AND (uncertain_attachments >= 0) AND ((attached_count + uncertain_attachments) <= next_attachment) AND (attempts >= 0) AND ((state <> 'COMPLETED'::\"WhatsAppTicketSubmissionState\") OR ((ticket_id IS NOT NULL) AND (next_attachment = attachment_count))) AND ((state <> ALL (ARRAY['FAILED'::\"WhatsAppTicketSubmissionState\", 'UNCERTAIN'::\"WhatsAppTicketSubmissionState\"])) OR (ticket_id IS NULL)) AND ((NOT mutating) OR (claim_id IS NOT NULL))))",
       "Purpose": "Enforces consistent progress, result and claim counts."
+    },
+    {
+      "Object": "whatsapp_ticket_submissions_closure_idx",
+      "Physical definition": "CREATE INDEX whatsapp_ticket_submissions_closure_idx ON public.whatsapp_ticket_submissions USING btree (business_phone_id, closure_check_at, draft_id) WHERE (closure_check_at IS NOT NULL)",
+      "Purpose": "Finds due ticket closure checks within one business number."
     },
     {
       "Object": "whatsapp_ticket_submissions_dispatch_idx",

@@ -85,6 +85,7 @@ type Draft = Static<typeof draftSchema>;
 export type ConversationInput = Static<typeof inboxContent>;
 type Reply = OutboundPayload["content"];
 export type IdentityAction = "request_code" | "confirm_code";
+export type ClosurePreferenceAction = "disable" | { requesterId: number };
 export type TroubleshootingFeedback = {
   draftId: string;
   guidanceId: GuidanceId;
@@ -95,6 +96,7 @@ export type ConversationMove = {
   reply?: Reply;
   action?: IdentityAction | "query_tickets";
   feedback?: TroubleshootingFeedback;
+  closurePreference?: ClosurePreferenceAction;
   submission?: TicketSubmission;
 };
 
@@ -122,7 +124,7 @@ const pendingReply = text(
   "Rascunho confirmado. Vou enviar o chamado ao GLPI e avisar quando houver um resultado.",
 );
 const menu = buttons(
-  "Como posso ajudar? Você pode retomar um rascunho em *Abrir chamado*.",
+  "Como posso ajudar? Você pode retomar um rascunho em *Abrir chamado* ou digitar *Avisos* para gerenciar avisos de encerramento.",
   ["menu:open", "Abrir chamado"],
   ["menu:tickets", "Meus chamados"],
   ["menu:it", "Falar com a TI"],
@@ -194,6 +196,10 @@ const aliases: Readonly<Record<string, string>> = {
   "ir para o chamado": "draft:skip-guide",
   reenviar: "auth:retry",
   "limpar anexos": "draft:clear-media",
+  avisos: "closure:options",
+  "ativar avisos": "closure:enable",
+  "desativar avisos": "closure:disable",
+  "parar avisos": "closure:disable",
 };
 
 function withDraft(
@@ -487,6 +493,12 @@ export function routeConversation(
       state,
       reply: text("Fale com a equipe de TI por " + supportContact + "."),
     };
+  if (command === "closure:disable")
+    return {
+      state,
+      closurePreference: "disable",
+      reply: text("Avisos de encerramento desativados neste WhatsApp."),
+    };
 
   if (userId === undefined) {
     const draft = state.draft;
@@ -516,8 +528,27 @@ export function routeConversation(
 
   const draft = state.draft?.ownerId === userId ? state.draft : undefined;
   const menuState = withDraft("menu", draft);
+  const currentState = withDraft(state.phase, draft);
+  if (command === "closure:options")
+    return {
+      state: currentState,
+      reply: buttons(
+        "O MNS Suporte pode enviar um aviso neste WhatsApp quando um chamado futuro for encerrado. Para cancelar depois, digite *Parar avisos*.",
+        ["closure:enable", "Ativar avisos"],
+        ["closure:disable", "Desativar avisos"],
+        ["menu", "Menu"],
+      ),
+    };
+  if (command === "closure:enable")
+    return {
+      state: currentState,
+      closurePreference: { requesterId: userId },
+      reply: text(
+        "Avisos ativados para os próximos chamados que você confirmar. Para cancelar, digite *Parar avisos*.",
+      ),
+    };
   if (readTicketQuery(input, state.phase === "menu"))
-    return { state: withDraft(state.phase, draft), action: "query_tickets" };
+    return { state: currentState, action: "query_tickets" };
   if (draft?.uncertainSubmission) {
     if (command !== "draft:new") return uncertainTicket(draft, supportContact);
     return intake({

@@ -105,8 +105,8 @@ export function isTicketRequester(
   payload: unknown,
   ticketId: number,
   requesterId: number,
-): boolean {
-  if (!Value.Check(actors, payload)) return false;
+): boolean | undefined {
+  if (!Value.Check(actors, payload)) return undefined;
   return (
     payload.every((actor) => positiveId(actor.tickets_id) === ticketId) &&
     payload.some(

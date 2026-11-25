@@ -26,6 +26,8 @@ model WhatsAppTicketSubmission {
   claimId              String?                       @map("claim_id") @db.Uuid
   mutating             Boolean                       @default(false)
   updatedAt            DateTime                      @map("updated_at") @db.Timestamptz(3)
+  closureConsentId     String?                       @map("closure_consent_id") @db.Uuid
+  closureCheckAt       DateTime?                     @map("closure_check_at") @db.Timestamptz(3)
 
   @@index([businessPhoneId, state, availableAt, draftId], map: "whatsapp_ticket_submissions_dispatch_idx")
   @@map("whatsapp_ticket_submissions")
