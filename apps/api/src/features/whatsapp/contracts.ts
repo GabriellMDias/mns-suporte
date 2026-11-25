@@ -64,7 +64,7 @@ export const webhookOperations = [
     url,
     operationId: "receiveWhatsAppWebhook",
     description:
-      "Verify Meta's HMAC over the original request bytes. Acknowledge after the supported incoming messages commit to the inbox.",
+      "Verify Meta's HMAC over the original request bytes. Acknowledge after supported incoming messages and tracked outbound delivery updates commit.",
     schema: {
       headers: Type.Object({
         "x-hub-signature-256": Type.String({

@@ -1,0 +1,152 @@
+{
+  "kind": "database",
+  "name": "whatsapp_outbound_messages",
+  "description": "Durable intent and dispatch evidence for one free-form WhatsApp reply.",
+  "owner": "WhatsApp dispatch",
+  "classification": "RESTRICTED",
+  "lifecycle": "Enqueued before dispatch. Retried only after an explicit provider throttle rejection and while the service window remains open. An unresolved attempt enters UNCERTAIN for reconciliation. Automated retention is release-plan work.",
+  "columns": [
+    {
+      "Column": "id",
+      "PostgreSQL type": "uuid",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Caller-assigned immutable UUID for one reply intent and the opaque identifier echoed by Meta on delivery callbacks.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "business_phone_id",
+      "PostgreSQL type": "text",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Meta business phone number ID that owns and sends the reply.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "payload",
+      "PostgreSQL type": "jsonb",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Immutable destination and validated text or interactive reply content.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "state",
+      "PostgreSQL type": "\"WhatsAppOutboundState\"",
+      "Nullable": "no",
+      "Default": "'PENDING'::\"WhatsAppOutboundState\"",
+      "Classification": "INTERNAL",
+      "Meaning": "Current queue, provider acceptance or delivery evidence state.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "expires_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Last allowed dispatch deadline from the current inbound customer service window.",
+      "Null meaning": "—",
+      "Unit": "UTC instant"
+    },
+    {
+      "Column": "available_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "no",
+      "Default": "CURRENT_TIMESTAMP",
+      "Classification": "INTERNAL",
+      "Meaning": "Earliest eligible time for the next dispatch attempt.",
+      "Null meaning": "—",
+      "Unit": "UTC instant"
+    },
+    {
+      "Column": "attempt_started_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Most recent claim time used to detect an abandoned dispatch.",
+      "Null meaning": "The queue has not claimed this reply.",
+      "Unit": "UTC instant"
+    },
+    {
+      "Column": "attempts",
+      "PostgreSQL type": "integer",
+      "Nullable": "no",
+      "Default": "0",
+      "Classification": "INTERNAL",
+      "Meaning": "Number of claims recorded before making a provider request.",
+      "Null meaning": "—",
+      "Unit": "claims"
+    },
+    {
+      "Column": "provider_message_id",
+      "PostgreSQL type": "text",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Meta message identifier returned on acceptance or on a correlated delivery callback.",
+      "Null meaning": "Provider acceptance or delivery has not supplied an identifier.",
+      "Unit": "—"
+    },
+    {
+      "Column": "provider_error_code",
+      "PostgreSQL type": "integer",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Integer Graph error code from an explicit rejection or delivery failure.",
+      "Null meaning": "The current evidence has no provider error code.",
+      "Unit": "—"
+    },
+    {
+      "Column": "delivery_status_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Provider timestamp of the accepted delivery status update.",
+      "Null meaning": "No delivery callback has advanced this reply.",
+      "Unit": "UTC instant"
+    },
+    {
+      "Column": "created_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "no",
+      "Default": "CURRENT_TIMESTAMP",
+      "Classification": "INTERNAL",
+      "Meaning": "Database timestamp when the reply intent was first enqueued.",
+      "Null meaning": "—",
+      "Unit": "UTC instant"
+    }
+  ],
+  "constraints": [
+    {
+      "Object": "whatsapp_outbound_messages_attempts_nonnegative",
+      "Physical definition": "CHECK ((attempts >= 0))",
+      "Purpose": "Rejects invalid negative dispatch attempt counts."
+    },
+    {
+      "Object": "whatsapp_outbound_messages_pkey",
+      "Physical definition": "PRIMARY KEY (id)",
+      "Purpose": "Prevents another reply intent with the same durable identifier."
+    },
+    {
+      "Object": "whatsapp_outbound_messages_dispatch_idx",
+      "Physical definition": "CREATE INDEX whatsapp_outbound_messages_dispatch_idx ON public.whatsapp_outbound_messages USING btree (business_phone_id, state, available_at)",
+      "Purpose": "Supports finding due messages for a configured sender and tracking current states."
+    },
+    {
+      "Object": "whatsapp_outbound_messages_provider_key",
+      "Physical definition": "CREATE UNIQUE INDEX whatsapp_outbound_messages_provider_key ON public.whatsapp_outbound_messages USING btree (business_phone_id, provider_message_id)",
+      "Purpose": "Correlates delivery by provider message ID within one business phone number and prevents conflicting associations."
+    }
+  ]
+}

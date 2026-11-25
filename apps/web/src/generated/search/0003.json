@@ -4,6 +4,96 @@
     "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
     "group": "Decisions",
     "kind": "repository",
+    "heading": "OIDC for future privileged workflows",
+    "anchor": "oidc-for-future-privileged-workflows",
+    "text": "OIDC for future privileged workflows\nFuture workflows that need to authenticate to supported cloud providers or publishing systems should prefer short-lived identity federation through OpenID Connect when practical.\nLong-lived cloud credentials stored as GitHub secrets should not be the preferred Orion pattern.\nThe intended model is:\nGitHub Actions identity\n    ↓\nOIDC\n    ↓\nshort-lived provider credential\n\nrather than:\nGitHub secret\n    ↓\nlong-lived cloud access key\n\nActual deployment authentication is outside the scope of this ADR and will be decided when deployment targets exist.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Dependency automation",
+    "anchor": "dependency-automation",
+    "text": "Dependency automation\nOrion will use **Renovate as its primary dependency-update automation tool**.\nRenovate will manage relevant repository dependencies including, where supported:\nnpm/pnpm dependencies;\ndevelopment dependencies;\nruntime dependencies;\nGitHub Actions references;\ntoolchain versions represented in supported files;\nother machine-readable dependency declarations introduced later.\nDependabot version-update pull requests will not be enabled alongside Renovate for the same dependency ecosystem.\nRunning two competing version-update systems would create redundant pull requests and overlapping configuration.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Renovate configuration",
+    "anchor": "renovate-configuration",
+    "text": "Renovate configuration\nRenovate configuration will be stored in the repository and treated as repository policy.\nThe configuration should begin from Renovate's recommended baseline and be customized deliberately.\nA **Dependency Dashboard** will be enabled to provide a machine-maintained overview of:\npending updates;\ndeferred updates;\nmajor upgrades;\ndeprecated dependencies;\ndependency-maintenance state.\nThis provides both human contributors and AI agents with an explicit view of dependency debt.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Dependency update cadence",
+    "anchor": "dependency-update-cadence",
+    "text": "Dependency update cadence\nRoutine dependency updates will be grouped and scheduled to reduce unnecessary pull-request noise.\nThe initial approach will favor a **weekly routine update cadence** for ordinary dependency updates.\nSecurity remediation updates should not be intentionally delayed to the routine maintenance window when Renovate identifies them as security-related.\nUpdate frequency may later be adjusted based on repository activity and risk.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Dependency grouping",
+    "anchor": "dependency-grouping",
+    "text": "Dependency grouping\nRelated dependency families may be grouped when they are expected to evolve together.\nExamples may include ecosystems such as:\nReact ecosystem\nTanStack ecosystem\nPrisma ecosystem\nOpenTelemetry ecosystem\nFastify ecosystem\nVitest ecosystem\nPlaywright ecosystem\n\nGrouping should reduce update noise without creating large unrelated upgrade pull requests.\nA generic \"update every dependency\" mega-group will not be the default.\nThe objective is:\ncoherent upgrade units\n\nrather than:\nminimum possible number of pull requests\n\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Major dependency upgrades",
+    "anchor": "major-dependency-upgrades",
+    "text": "Major dependency upgrades\nMajor-version upgrades require deliberate review.\nRenovate should expose pending major upgrades and may require Dependency Dashboard approval before opening selected major-upgrade pull requests when that improves signal.\nA major version must not be ignored indefinitely merely to keep automation quiet.\nMajor upgrades should remain visible even when they are intentionally deferred.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Dependency automerge",
+    "anchor": "dependency-automerge",
+    "text": "Dependency automerge\nAutomatic merging of dependency updates will be **disabled by default initially**.\nPassing CI is necessary but does not prove that every dependency change is semantically harmless.\nSelective automerge may later be enabled for explicitly identified low-risk dependency classes when sufficient repository experience demonstrates that doing so is safe.\nExamples might eventually include narrowly scoped patch updates to development-only tooling.\nThere will be no blanket:\npatch update\n    → automerge\n\nrule initially.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Lockfile maintenance",
+    "anchor": "lockfile-maintenance",
+    "text": "Lockfile maintenance\nAutomated dependency updates must keep the shared pnpm lockfile synchronized with package manifests.\nThe lockfile remains committed repository state.\nDependency automation must not create manifest changes without the corresponding deterministic lockfile update.\nPeriodic lockfile maintenance may be enabled if it produces concrete value.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Dependency security alerts",
+    "anchor": "dependency-security-alerts",
+    "text": "Dependency security alerts\nOrion will enable GitHub's dependency graph and **Dependabot vulnerability alerts** where supported.\nThis use of Dependabot is distinct from Dependabot version-update automation.\nThe responsibility split is:\nRenovate\n    → routine/version dependency updates\n\nDependabot alerts / GitHub advisory data\n    → vulnerability visibility\n\nSecurity findings should result in explicit remediation, acceptance, or documented exception rather than being silently ignored.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Dependency review",
+    "anchor": "dependency-review",
+    "text": "Dependency review\nWhere the repository's GitHub feature entitlement supports it, Orion will enable the GitHub dependency review capability for pull requests.\nDependency review should prevent newly introduced vulnerable dependencies from entering unnoticed.\nThe initial enforcement threshold should block newly introduced vulnerabilities rated **high or critical**, unless an explicitly reviewed exception exists.\nThe policy may become stricter for applications with higher risk or regulatory requirements.\nDependency review is an additional guardrail and does not replace repository tests or dependency update automation.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
     "heading": "Static security analysis",
     "anchor": "static-security-analysis",
     "text": "Static security analysis\nWhere available for the repository, Orion will enable **GitHub CodeQL for JavaScript and TypeScript security analysis**.\nCode scanning should be represented by repository-visible configuration when customization is required.\nThe initial objective is to detect actionable security defects without making a paid GitHub security product a mandatory dependency of the Orion architecture.\nIf CodeQL is unavailable for a particular private repository, the absence of that GitHub entitlement does not invalidate the Orion foundation.\nA different SAST implementation may be introduced when the risk profile of that application requires one.\n"
@@ -1303,77 +1393,5 @@
     "heading": "Diagnostics and consumer behavior",
     "anchor": "diagnostics-and-consumer-behavior",
     "text": "Diagnostics and consumer behavior\nReport an unexpected occurrence once at its authoritative boundary. Preserve useful internal causal evidence only within [redaction rules](../security/telemetry-redaction.md); preservation never authorizes raw exception-message or stack export. The current runtime records allowlisted diagnostic fields rather than arbitrary error content. Expected validation, business, and access failures may contribute to safe metrics/security/audit signals without becoming unexpected incidents.\nClients and SDKs must preserve structured error semantics and correlation, and provide a safe fallback for unknown codes. Application consumers should not depend on framework-specific transport exceptions for business meaning. Product code decides whether to display safe server copy or localized client text; it must not parse that copy. The current thin SDK exposes generated response/error typing without adding a separate error-class hierarchy.\nCode meaning, status mappings, details, categories where consumed, and retry behavior require [compatibility review](versioning.md). Adding a code can break exhaustive consumers; renaming/removing a code or changing meaning is potentially breaking. Optional details are only additive if actual clients tolerate them.\n"
-  },
-  {
-    "id": "repository/docs/api/error-contract",
-    "title": "API Error Contract",
-    "group": "API guides",
-    "kind": "repository",
-    "heading": "Change and verification checklist",
-    "anchor": "change-and-verification-checklist",
-    "text": "Change and verification checklist\nInspect the registry, similar conditions, owning operation, actual consumers, authorization/disclosure policy, and compatibility commitments.\nDefine the safe semantic mapping and outcome/retry behavior. Add details only when needed, with explicit schema and size limits.\nVerify the real transport envelope, status, code, safe message, correlation, hidden-resource handling, and relevant failure paths. Test absent/invalid/expired credentials and other lifecycle states only where that mechanism exists.\nInject unexpected failures and assert that secrets, SQL, provider data, input values, stacks, and internal paths do not escape. Verify one appropriate diagnostic event and safe retry metadata if present.\nRegenerate and check the registry/OpenAPI/SDK references through [validation](../validation.md). Preserve current checks for registered unique codes, operation declarations, and freshness; extend checks for any new detail schemas or released compatibility obligations.\n"
-  },
-  {
-    "id": "repository/docs/api/principles",
-    "title": "API Principles",
-    "group": "API guides",
-    "kind": "repository",
-    "heading": "API Principles",
-    "anchor": "api-principles",
-    "text": "API Principles\n[Task index](../README.md) · [Error contract](error-contract.md) · [Compatibility](versioning.md) · [Validation](../validation.md)\nThis policy owns API boundary design. [ADR-0004](../adr/0004-select-fastify-as-the-backend-http-framework.md) selects Fastify; [ADR-0007](../adr/0007-establish-api-contract-openapi-sdk-and-configuration-schema-strategy.md) selects executable TypeBox wire contracts, generated OpenAPI, and the thin TypeScript SDK. These are implemented. Module-specific behavior belongs to each module's business specification and implementation conventions; [Orion's reference implementation](../project-derivation.md#orions-reference-implementation) shows a complete example.\n"
-  },
-  {
-    "id": "repository/docs/api/principles",
-    "title": "API Principles",
-    "group": "API guides",
-    "kind": "repository",
-    "heading": "Locate the authoritative source",
-    "anchor": "locate-the-authoritative-source",
-    "text": "Locate the authoritative source\nTask\nStart here\nChange an operation, request, response, or expected error\nThe owning [module](../../apps/api/README.md#modules)'s TypeBox contracts, then its application operation and tests\nInspect health contracts\n[Health schemas](../../apps/api/src/health-contracts.ts) and [health policy](../reliability/health-checks.md)\nInspect the interoperable API\n[Generated OpenAPI](../generated/api/openapi.json); author changes in executable contracts\nChange a public error\n[Error registry and envelope](../../apps/api/src/errors.ts) and [error policy](error-contract.md)\nChange a consumer\n[SDK public surface](../../packages/sdk/README.md) and [web guide](../../apps/web/README.md)\nRegenerate derived artifacts\n[Artifact workflow](../architecture/backend-execution-and-generated-artifacts.md)\n"
-  },
-  {
-    "id": "repository/docs/api/principles",
-    "title": "API Principles",
-    "group": "API guides",
-    "kind": "repository",
-    "heading": "Ownership and transport boundaries",
-    "anchor": "ownership-and-transport-boundaries",
-    "text": "Ownership and transport boundaries\nAn API exposes an owned application capability, not an arbitrary database table. Each operation needs a clear domain owner, consumer, and canonical contract. Resources and explicit commands are both appropriate when they express real behavior; do not generate CRUD or generic updates for every persisted entity.\nTransport adapters own routing, request validation, authentication integration, safe request context, protocol/error mapping, and response serialization. Application operations and domain rules should not depend on HTTP objects, headers, status codes, or framework APIs unless the behavior itself is transport-specific. Pass only the trusted context an operation needs.\nPersistence records, domain entities, API payloads, events, and UI models have distinct responsibilities. Reuse a representation only when its semantics genuinely match. Explicitly map allowed inputs and outputs: never pass an untrusted body directly to persistence or serialize internal objects merely because they are available. This prevents mass assignment and accidental disclosure while allowing internal refactoring without consumer breakage.\n"
-  },
-  {
-    "id": "repository/docs/api/principles",
-    "title": "API Principles",
-    "group": "API guides",
-    "kind": "repository",
-    "heading": "Canonical API Contract",
-    "anchor": "canonical-api-contract",
-    "text": "Canonical API Contract\nMaintain wire-oriented TypeBox schemas and route metadata as the authored source. Fastify uses them for validation and serialization; generated OpenAPI 3.1 describes the interoperable boundary; `openapi-typescript` and `openapi-fetch` provide the default typed client. Every exposed operation must have a stable, unique `operationId`.\nDefine request/response shapes, constraints, authentication, expected errors, and non-structural semantics deliberately before exposing behavior. Do not separately maintain equivalent runtime validators, TypeScript interfaces, OpenAPI schemas, SDK types, or reference tables. Generated artifacts are reproducible representations and must not be hand-edited. Ordinary internal types need not become TypeBox schemas.\nThe API owns its contracts. Extract a shared contract package only for genuine shared ownership. Such a package must not depend on persistence, backend framework implementation, server secrets, or UI code. First-party consumers use the generated SDK and must not import server implementations or database types. The SDK may provide transport, types, credential hooks, and error decoding; it must not own backend business authorization or persistence. Successful-response runtime revalidation is not automatic; introduce it only for a demonstrated trust or reliability requirement.\n"
-  },
-  {
-    "id": "repository/docs/api/principles",
-    "title": "API Principles",
-    "group": "API guides",
-    "kind": "repository",
-    "heading": "Validation",
-    "anchor": "validation",
-    "text": "Validation\nTreat bodies, query/path parameters, headers, cookies, uploads, webhooks, and client identifiers as untrusted. Validate structural input at the trusted boundary before application logic relies on it. Structural validation, domain validity, authentication, and authorization remain separate checks.\nFor each field, define meaning, required/optional status, omission versus explicit `null`, type, format, bounds, allowed values, classification, and exposure. Normalize only when domain semantics require it; do not silently modify user content for convenience. Unknown-field behavior must be deliberate and compatible with the consumer contract. Separate create, replacement, partial-update, summary, detail, and privileged schemas where their semantics differ instead of building one universally optional model.\nUse meaningful text and numeric limits based on product needs and resource cost. Bounded states should use explicit enums; consider extensibility under [versioning](versioning.md). Distinguish instants, calendar dates, local times, time zones, and durations. Money requires currency, units, and precision; exact financial amounts must not rely on ambiguous floating-point representations. Use clear English names and canonical descriptions, positive boolean semantics where practical, and established domain terminology. Product localization does not change machine identifiers.\n"
-  },
-  {
-    "id": "repository/docs/api/principles",
-    "title": "API Principles",
-    "group": "API guides",
-    "kind": "repository",
-    "heading": "Identifiers",
-    "anchor": "identifiers",
-    "text": "Identifiers\nPublic identifiers represent stable resource identity. They may coincide with storage keys when that is an intentional contract, but must not expose sensitive structure or grant authority. Treat opaque identifiers as opaque. Client-generated IDs are allowed only when explicitly designed for an actual offline, distributed, or idempotency need. Changing storage must not accidentally change public identity.\n"
-  },
-  {
-    "id": "repository/docs/api/principles",
-    "title": "API Principles",
-    "group": "API guides",
-    "kind": "repository",
-    "heading": "Authentication",
-    "anchor": "authentication",
-    "text": "Authentication\nProtected operations derive identity and capabilities from the [trusted authentication boundary](../security/authentication.md) and enforce [authorization](../security/authorization.md) on the server. Caller-supplied roles, owner IDs, permissions, tenant IDs, feature flags, or UI visibility cannot grant access. A tenant path alone does not establish membership. Public operations must be explicitly public; administrative/debug capabilities require deliberate privilege, output, and environment controls.\nMake operation security requirements discoverable. Apply stronger controls where credentials, personal data, finances, or administration require them. Hidden resources may deliberately share not-found semantics with absent resources; preserve and test the disclosure policy. Keep bearer credentials out of URLs except for an explicitly designed protocol requiring a short-lived capability. Gateway authentication never replaces application authorization.\n"
   }
 ]

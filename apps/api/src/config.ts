@@ -34,16 +34,25 @@ export const serverConfigSchema = Type.Object(
     whatsappPhoneNumberId: Type.Optional(
       Type.String({ pattern: "^[0-9]{1,20}$" }),
     ),
+    whatsappAccessToken: Type.Optional(
+      Type.String({ pattern: "^\\S{16,2048}$" }),
+    ),
+    whatsappGraphApiVersion: Type.String({ pattern: "^v[1-9][0-9]{0,2}\\.0$" }),
   },
   { additionalProperties: false },
 );
 
 export type ServerConfig = Readonly<Static<typeof serverConfigSchema>>;
 export type ClientConfig = Readonly<Record<string, never>>;
+export type WhatsAppOutboundConfig = Readonly<{
+  accessToken: string;
+  graphVersion: string;
+}>;
 export type WhatsAppWebhookConfig = Readonly<{
   appSecret: string;
   verifyToken: string;
   phoneNumberId: string;
+  outbound?: WhatsAppOutboundConfig;
 }>;
 
 type ConfigMetadata = {
@@ -227,6 +236,28 @@ export const configReference = Object.freeze([
     secret: false,
     purpose: "Meta business phone number ID accepted by the webhook.",
   },
+  {
+    key: "whatsappAccessToken",
+    name: "WHATSAPP_ACCESS_TOKEN",
+    type: "secret string",
+    required: false,
+    default: "",
+    visibility: "server",
+    classification: "RESTRICTED",
+    secret: true,
+    purpose: "Meta system user token that enables WhatsApp outbound dispatch.",
+  },
+  {
+    key: "whatsappGraphApiVersion",
+    name: "WHATSAPP_GRAPH_API_VERSION",
+    type: "Graph API version",
+    required: false,
+    default: "v27.0",
+    visibility: "server",
+    classification: "INTERNAL",
+    secret: false,
+    purpose: "Graph API version used by WhatsApp outbound dispatch.",
+  },
 ] as const satisfies readonly ConfigMetadata[]);
 
 function numberFromEnv(value: string | undefined, fallback: number): number {
@@ -270,6 +301,10 @@ export function parseServerConfig(
     ...(env.WHATSAPP_PHONE_NUMBER_ID === undefined
       ? {}
       : { whatsappPhoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID }),
+    ...(env.WHATSAPP_ACCESS_TOKEN === undefined
+      ? {}
+      : { whatsappAccessToken: env.WHATSAPP_ACCESS_TOKEN }),
+    whatsappGraphApiVersion: env.WHATSAPP_GRAPH_API_VERSION ?? "v27.0",
   };
   if (!Value.Check(serverConfigSchema, candidate)) {
     throw new Error("Invalid API configuration");
@@ -344,7 +379,10 @@ export function parseServerConfig(
     candidate.whatsappVerifyToken,
     candidate.whatsappPhoneNumberId,
   ];
-  if (whatsapp.some(Boolean) && whatsapp.some((value) => !value))
+  if (
+    (whatsapp.some(Boolean) || candidate.whatsappAccessToken) &&
+    whatsapp.some((value) => !value)
+  )
     throw new Error("Invalid API configuration: incomplete WhatsApp webhook");
   return Object.freeze(candidate);
 }
@@ -359,6 +397,14 @@ export function whatsappWebhookFrom(
       appSecret: whatsappAppSecret,
       verifyToken: whatsappVerifyToken,
       phoneNumberId: whatsappPhoneNumberId,
+      ...(config.whatsappAccessToken
+        ? {
+            outbound: Object.freeze({
+              accessToken: config.whatsappAccessToken,
+              graphVersion: config.whatsappGraphApiVersion,
+            }),
+          }
+        : {}),
     });
   return undefined;
 }

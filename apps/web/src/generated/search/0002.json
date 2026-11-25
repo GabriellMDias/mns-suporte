@@ -4,6 +4,60 @@
     "title": "ADR-0008: Select React, Vite, and TanStack for Web Applications",
     "group": "Decisions",
     "kind": "repository",
+    "heading": "State ownership",
+    "anchor": "state-ownership",
+    "text": "State ownership\nOrion will distinguish between different categories of frontend state.\nThe default model is:\nserver state\n    → TanStack Query\n\nnavigation/shareable state\n    → TanStack Router / URL\n\nlocal interaction state\n    → React state\n\nlimited shared UI state\n    → React Context where appropriate\n\nExamples of local interaction state include:\nmodal visibility;\ntemporary selections;\nexpanded sections;\nlocal editing state;\ntransient interaction state.\nA general-purpose global state library such as Redux, Zustand, MobX, or an equivalent will **not be part of the initial Orion foundation**.\nSuch a library may be introduced when a concrete class of client state cannot be represented cleanly through React state, context, URL state, or TanStack Query.\nA global state library must solve a demonstrated state-ownership problem rather than serve as the default destination for arbitrary application data.\n"
+  },
+  {
+    "id": "repository/docs/adr/0008-select-react-vite-and-tanstack-for-web-applications",
+    "title": "ADR-0008: Select React, Vite, and TanStack for Web Applications",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "API integration",
+    "anchor": "api-integration",
+    "text": "API integration\nWeb applications will consume the generated TypeScript API integration established by ADR-0007.\nThe normal flow is:\nTypeBox contracts\n    ↓\ngenerated OpenAPI\n    ↓\nopenapi-typescript\n    ↓\nopenapi-fetch\n    ↓\nTanStack Query\n    ↓\nReact UI\n\nWeb applications must not import Prisma types, Fastify transport types, database models, or other backend-internal representations.\nDirect imports of authored server contract implementations should also not replace the generated OpenAPI boundary when the purpose is to consume the HTTP API.\nThis keeps the first-party web application subject to the same externally interoperable contract as other clients.\n"
+  },
+  {
+    "id": "repository/docs/adr/0008-select-react-vite-and-tanstack-for-web-applications",
+    "title": "ADR-0008: Select React, Vite, and TanStack for Web Applications",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Performance strategy",
+    "anchor": "performance-strategy",
+    "text": "Performance strategy\nOrion will treat frontend performance as a system property rather than a framework benchmark.\nPerformance work should consider, where relevant:\nJavaScript bundle size;\nroute-level code splitting;\nlazy loading;\nAPI latency;\nrequest waterfalls;\nunnecessary network requests;\nserver-state caching;\nlarge DOM trees;\nlist and table virtualization;\nexpensive rendering;\nimage and asset delivery;\nunnecessary component updates;\nclient-side computation;\nmemory usage;\nbrowser profiling results.\nPerformance optimizations that materially increase code complexity should normally be supported by profiling or other evidence.\nThe selected framework does not remove the need for performance budgets, profiling, observability, or careful UI architecture in large applications.\n"
+  },
+  {
+    "id": "repository/docs/adr/0008-select-react-vite-and-tanstack-for-web-applications",
+    "title": "ADR-0008: Select React, Vite, and TanStack for Web Applications",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "UI libraries and design systems",
+    "anchor": "ui-libraries-and-design-systems",
+    "text": "UI libraries and design systems\nThis ADR does not select a component library or design system.\nUI component systems, styling approaches, accessibility primitives, charting libraries, data grids, form libraries, and similar product-facing dependencies should be selected when their concrete requirements are understood.\nShared UI code should be introduced only when it represents a genuine reusable responsibility.\n"
+  },
+  {
+    "id": "repository/docs/adr/0008-select-react-vite-and-tanstack-for-web-applications",
+    "title": "ADR-0008: Select React, Vite, and TanStack for Web Applications",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Rationale",
+    "anchor": "rationale",
+    "text": "Rationale\nReact provides the strongest overall fit for Orion when runtime performance is considered together with ecosystem maturity, TypeScript support, tooling availability, library compatibility, organizational scalability, testing support, and long-term maintainability.\nOther UI frameworks can provide lower rendering overhead in specific benchmarks.\nOrion does not treat framework rendering benchmarks as the sole measure of application performance.\nIn large business applications, user-perceived performance is also heavily influenced by network behavior, data fetching, bundle composition, large data visualizations, DOM size, rendering architecture, server latency, and application-specific computation.\nReact provides sufficient runtime performance while offering a particularly broad ecosystem for the kinds of capabilities large Orion applications may require.\nThese may include:\ncomplex data grids;\nvirtualization;\ncharts;\nrich editors;\naccessibility libraries;\ndrag-and-drop interfaces;\nforms;\ntesting tools;\nmonitoring integrations;\ncomponent systems;\nmobile ecosystem interoperability.\nReact also has a large body of conventions, documentation, examples, and production experience.\nThis improves discoverability for both human contributors and AI agents and reduces the likelihood that Orion must build custom integrations for common application requirements.\nReact Compiler further improves the fit by providing a compile-time optimization path for components and hooks.\nThis allows Orion to begin with clear code rather than making widespread manual memoization part of its normal development style.\nVite is selected because it provides a fast and comparatively narrow development and build layer without imposing an application architecture.\nThis matches the same principle used when selecting Fastify:\nOrion\n    → owns application architecture\n\ntooling\n    → implements focused infrastructure responsibilities\n\nVite therefore provides web tooling without becoming a second full-stack architecture.\nTanStack Router is selected because Orion places strong value on TypeScript correctness and explicit state ownership.\nRouting is not merely a mapping between strings and components in large applications.\nURLs frequently encode meaningful application state such as filtering, sorting, pagination, selected views, and identifiers.\nType-safe paths, parameters, search state, and navigation reduce errors and make large route trees easier to refactor safely.\nTanStack Query is selected because server state has different ownership and lifecycle semantics from local UI state.\nRemote data must account for caching, synchronization, invalidation, mutations, stale data, asynchronous errors, and background updates.\nTreating those concerns as ordinary React component state encourages repeated application-specific implementations.\nA dedicated server-state system provides a clearer responsibility boundary.\nThe separation:\nTanStack Query\n    → server state\n\nTanStack Router\n    → URL/navigation state\n\nReact\n    → local UI state\n\nreduces the need for a universal global state container.\nThis provides a smaller initial foundation while leaving specialized client-state libraries available when a real requirement appears.\nThe client-first SPA model is selected because Orion's expected reference applications are application-oriented and already have an explicit authoritative Fastify backend.\nIntroducing a full-stack React framework by default would add another server-side execution environment and create opportunities for backend responsibilities to become duplicated across the API and web applications.\nServer rendering remains available when a product's actual delivery requirements justify the additional architecture.\n"
+  },
+  {
+    "id": "repository/docs/adr/0008-select-react-vite-and-tanstack-for-web-applications",
+    "title": "ADR-0008: Select React, Vite, and TanStack for Web Applications",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Alternatives Considered",
+    "anchor": "alternatives-considered",
+    "text": "Alternatives Considered\n"
+  },
+  {
+    "id": "repository/docs/adr/0008-select-react-vite-and-tanstack-for-web-applications",
+    "title": "ADR-0008: Select React, Vite, and TanStack for Web Applications",
+    "group": "Decisions",
+    "kind": "repository",
     "heading": "SolidJS",
     "anchor": "solidjs",
     "text": "SolidJS\nSolidJS provides fine-grained reactive updates and can achieve very low runtime UI overhead.\nIt is a strong choice when minimizing reactive and rendering overhead is a dominant requirement.\nIt was not selected because Orion must optimize for more than framework runtime performance.\nReact provides a substantially broader ecosystem, more third-party integrations, more established enterprise usage patterns, stronger availability of specialized UI libraries, and greater familiarity across developers and AI tooling.\nThe expected performance advantage of SolidJS does not currently outweigh those ecosystem and long-term maintenance considerations for Orion's general-purpose foundation.\nSolidJS may still be appropriate for a specialized future application whose measured requirements strongly favor its rendering model.\n"
@@ -1069,95 +1123,5 @@
     "heading": "CI secrets",
     "anchor": "ci-secrets",
     "text": "CI secrets\nOrdinary validation should require as few secrets as possible.\nTests should use ephemeral test credentials and local container infrastructure instead of external production-like credentials where practical.\nCI secrets must:\nfollow least privilege;\nbe scoped narrowly;\nnot be printed;\nnot be copied into artifacts;\nnot be required for unrelated validation jobs.\n"
-  },
-  {
-    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
-    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "OIDC for future privileged workflows",
-    "anchor": "oidc-for-future-privileged-workflows",
-    "text": "OIDC for future privileged workflows\nFuture workflows that need to authenticate to supported cloud providers or publishing systems should prefer short-lived identity federation through OpenID Connect when practical.\nLong-lived cloud credentials stored as GitHub secrets should not be the preferred Orion pattern.\nThe intended model is:\nGitHub Actions identity\n    ↓\nOIDC\n    ↓\nshort-lived provider credential\n\nrather than:\nGitHub secret\n    ↓\nlong-lived cloud access key\n\nActual deployment authentication is outside the scope of this ADR and will be decided when deployment targets exist.\n"
-  },
-  {
-    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
-    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Dependency automation",
-    "anchor": "dependency-automation",
-    "text": "Dependency automation\nOrion will use **Renovate as its primary dependency-update automation tool**.\nRenovate will manage relevant repository dependencies including, where supported:\nnpm/pnpm dependencies;\ndevelopment dependencies;\nruntime dependencies;\nGitHub Actions references;\ntoolchain versions represented in supported files;\nother machine-readable dependency declarations introduced later.\nDependabot version-update pull requests will not be enabled alongside Renovate for the same dependency ecosystem.\nRunning two competing version-update systems would create redundant pull requests and overlapping configuration.\n"
-  },
-  {
-    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
-    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Renovate configuration",
-    "anchor": "renovate-configuration",
-    "text": "Renovate configuration\nRenovate configuration will be stored in the repository and treated as repository policy.\nThe configuration should begin from Renovate's recommended baseline and be customized deliberately.\nA **Dependency Dashboard** will be enabled to provide a machine-maintained overview of:\npending updates;\ndeferred updates;\nmajor upgrades;\ndeprecated dependencies;\ndependency-maintenance state.\nThis provides both human contributors and AI agents with an explicit view of dependency debt.\n"
-  },
-  {
-    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
-    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Dependency update cadence",
-    "anchor": "dependency-update-cadence",
-    "text": "Dependency update cadence\nRoutine dependency updates will be grouped and scheduled to reduce unnecessary pull-request noise.\nThe initial approach will favor a **weekly routine update cadence** for ordinary dependency updates.\nSecurity remediation updates should not be intentionally delayed to the routine maintenance window when Renovate identifies them as security-related.\nUpdate frequency may later be adjusted based on repository activity and risk.\n"
-  },
-  {
-    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
-    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Dependency grouping",
-    "anchor": "dependency-grouping",
-    "text": "Dependency grouping\nRelated dependency families may be grouped when they are expected to evolve together.\nExamples may include ecosystems such as:\nReact ecosystem\nTanStack ecosystem\nPrisma ecosystem\nOpenTelemetry ecosystem\nFastify ecosystem\nVitest ecosystem\nPlaywright ecosystem\n\nGrouping should reduce update noise without creating large unrelated upgrade pull requests.\nA generic \"update every dependency\" mega-group will not be the default.\nThe objective is:\ncoherent upgrade units\n\nrather than:\nminimum possible number of pull requests\n\n"
-  },
-  {
-    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
-    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Major dependency upgrades",
-    "anchor": "major-dependency-upgrades",
-    "text": "Major dependency upgrades\nMajor-version upgrades require deliberate review.\nRenovate should expose pending major upgrades and may require Dependency Dashboard approval before opening selected major-upgrade pull requests when that improves signal.\nA major version must not be ignored indefinitely merely to keep automation quiet.\nMajor upgrades should remain visible even when they are intentionally deferred.\n"
-  },
-  {
-    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
-    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Dependency automerge",
-    "anchor": "dependency-automerge",
-    "text": "Dependency automerge\nAutomatic merging of dependency updates will be **disabled by default initially**.\nPassing CI is necessary but does not prove that every dependency change is semantically harmless.\nSelective automerge may later be enabled for explicitly identified low-risk dependency classes when sufficient repository experience demonstrates that doing so is safe.\nExamples might eventually include narrowly scoped patch updates to development-only tooling.\nThere will be no blanket:\npatch update\n    → automerge\n\nrule initially.\n"
-  },
-  {
-    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
-    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Lockfile maintenance",
-    "anchor": "lockfile-maintenance",
-    "text": "Lockfile maintenance\nAutomated dependency updates must keep the shared pnpm lockfile synchronized with package manifests.\nThe lockfile remains committed repository state.\nDependency automation must not create manifest changes without the corresponding deterministic lockfile update.\nPeriodic lockfile maintenance may be enabled if it produces concrete value.\n"
-  },
-  {
-    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
-    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Dependency security alerts",
-    "anchor": "dependency-security-alerts",
-    "text": "Dependency security alerts\nOrion will enable GitHub's dependency graph and **Dependabot vulnerability alerts** where supported.\nThis use of Dependabot is distinct from Dependabot version-update automation.\nThe responsibility split is:\nRenovate\n    → routine/version dependency updates\n\nDependabot alerts / GitHub advisory data\n    → vulnerability visibility\n\nSecurity findings should result in explicit remediation, acceptance, or documented exception rather than being silently ignored.\n"
-  },
-  {
-    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
-    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Dependency review",
-    "anchor": "dependency-review",
-    "text": "Dependency review\nWhere the repository's GitHub feature entitlement supports it, Orion will enable the GitHub dependency review capability for pull requests.\nDependency review should prevent newly introduced vulnerable dependencies from entering unnoticed.\nThe initial enforcement threshold should block newly introduced vulnerabilities rated **high or critical**, unless an explicitly reviewed exception exists.\nThe policy may become stricter for applications with higher risk or regulatory requirements.\nDependency review is an additional guardrail and does not replace repository tests or dependency update automation.\n"
   }
 ]
