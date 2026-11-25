@@ -4,6 +4,114 @@
     "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
     "group": "Decisions",
     "kind": "repository",
+    "heading": "Runtime versions",
+    "anchor": "runtime-versions",
+    "text": "Runtime versions\nCI must use repository-pinned runtime and package-manager versions.\nThe CI workflow must not independently choose a different Node.js or pnpm release from the versions established by repository configuration.\nConceptually:\nrepository\n├── Node version policy / pin\n└── packageManager → pnpm version\n        ↓\nCI consumes those versions\n\nThis avoids situations where:\nlocal development\n→ Node A / pnpm A\n\nCI\n→ Node B / pnpm B\n\nsilently creates environment-dependent behavior.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Dependency installation",
+    "anchor": "dependency-installation",
+    "text": "Dependency installation\nCI will install dependencies using the committed pnpm lockfile in frozen mode.\nThe intended requirement is equivalent to:\npnpm install --frozen-lockfile\n\nCI must fail when package manifests and the committed lockfile disagree.\nCI must not automatically rewrite the lockfile to make a validation run succeed.\nDependency changes belong in the source change being reviewed.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "CI caching",
+    "anchor": "ci-caching",
+    "text": "CI caching\nCaching is an optimization, not a correctness requirement.\nThe initial CI strategy may cache the pnpm package store using the committed lockfile as part of the cache identity.\n`node_modules` will not be treated as a portable canonical build artifact.\nA cache miss must produce the same correct result as a cache hit.\nCI must never depend on cached state that cannot be reconstructed from canonical repository inputs.\nTask-output or build caching will not be introduced globally until repository scale demonstrates a meaningful need.\nIf Orion later adopts a monorepo task runner or remote cache, the existing repository commands must remain the validation interface.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Full validation before affected-project optimization",
+    "anchor": "full-validation-before-affected-project-optimization",
+    "text": "Full validation before affected-project optimization\nOrion will initially favor complete required validation over sophisticated affected-project analysis.\nPath-based skipping, dependency-graph selective testing, incremental CI, and remote execution may eventually reduce CI cost substantially.\nThey also add complexity and create the risk that an incorrect dependency graph allows a relevant validation step to be skipped.\nTherefore:\nfull deterministic validation first\n    ↓\nmeasure CI cost\n    ↓\nintroduce selective execution when justified\n\nAffected-project optimization should only be introduced when the repository is large enough for the saved execution time to justify the additional correctness machinery.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Pull-request concurrency",
+    "anchor": "pull-request-concurrency",
+    "text": "Pull-request concurrency\nSuperseded validation runs for the same pull request should be cancelled when practical.\nWhen a contributor pushes a new commit to a pull request, continuing expensive validation for an obsolete commit normally provides little value.\nThis is particularly relevant for:\nintegration tests;\nbrowser tests;\nE2E tests;\nlarge builds.\nPrimary-branch validation should not be cancelled merely because another commit is pushed unless the workflow semantics explicitly make doing so safe.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Integration-test infrastructure",
+    "anchor": "integration-test-infrastructure",
+    "text": "Integration-test infrastructure\nCI integration tests will use the strategy established by ADR-0009.\nWhere tests require PostgreSQL:\nGitHub Actions runner\n    ↓\nTestcontainers\n    ↓\nreal PostgreSQL\n    ↓\ncommitted migrations\n    ↓\nVitest integration tests\n\nCI must not use a simplified database substitute merely to make CI configuration easier.\nContainer infrastructure is a testing implementation detail and does not establish Docker or a particular container platform as Orion's application deployment strategy.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Browser testing",
+    "anchor": "browser-testing",
+    "text": "Browser testing\nBrowser-dependent component tests will use the Vitest Browser Mode strategy established by ADR-0009.\nFull browser E2E tests will use Playwright Test.\nChromium remains the initial routine browser.\nAdditional browser matrices should be introduced according to product support requirements.\nCI may later shard browser or E2E suites when execution time justifies doing so.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Test artifacts",
+    "anchor": "test-artifacts",
+    "text": "Test artifacts\nDiagnostic test artifacts may be retained when they materially improve failure investigation.\nExamples include:\nPlaywright traces;\nscreenshots;\nvideos;\ncoverage reports;\nstructured test reports.\nArtifact retention should remain bounded.\nArtifacts must follow Orion's security and data-classification policies and must not become an uncontrolled channel for exposing secrets or sensitive test data.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "GitHub Actions security",
+    "anchor": "github-actions-security",
+    "text": "GitHub Actions security\nGitHub Actions workflows must follow least-privilege principles.\nWorkflow and job permissions must be declared explicitly when access beyond the minimal default is required.\nOrdinary validation jobs should normally require no repository write permission.\nThe expected baseline is conceptually:\nrepository contents\n    → read\n\nrepository modification\n    → none\n\nunless a job has an explicit responsibility requiring greater access.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Action pinning",
+    "anchor": "action-pinning",
+    "text": "Action pinning\nExternal GitHub Actions will be pinned to **full-length immutable commit SHAs**.\nReadable release/version information should remain present as an adjacent comment or equivalent maintainability aid where useful.\nConceptually:\nuses: actions/checkout@<full-commit-sha> # vX.Y.Z\n\nrather than:\nuses: actions/checkout@vX\n\nas the canonical Orion security posture.\nDependency automation will keep these action pins current.\nThis requirement applies to GitHub-maintained actions as well as third-party actions when they are referenced externally.\nRepository-local actions remain controlled by repository history.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Third-party Actions",
+    "anchor": "third-party-actions",
+    "text": "Third-party Actions\nThird-party GitHub Actions must not be introduced merely for convenience when a small repository-owned command provides the same capability with lower supply-chain exposure.\nWhen a third-party action provides meaningful value, its:\npublisher;\nmaintenance status;\npermissions;\ninputs;\nsupply-chain exposure;\nshould be reviewed.\nThe number of privileged workflow dependencies should remain intentionally small.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Untrusted pull requests",
+    "anchor": "untrusted-pull-requests",
+    "text": "Untrusted pull requests\nUntrusted pull-request code must not execute with privileged credentials.\nValidation workflows triggered by pull requests should be designed so that code under review cannot obtain:\ndeployment credentials;\nproduction secrets;\nprivileged repository tokens;\nunrelated infrastructure access.\nOrion will avoid using `pull_request_target` for ordinary build or validation execution of untrusted pull-request code.\nIf that event is ever required for a metadata-only workflow, untrusted pull-request contents must not be checked out and executed with privileged context.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
     "heading": "CI secrets",
     "anchor": "ci-secrets",
     "text": "CI secrets\nOrdinary validation should require as few secrets as possible.\nTests should use ephemeral test credentials and local container infrastructure instead of external production-like credentials where practical.\nCI secrets must:\nfollow least privilege;\nbe scoped narrowly;\nnot be printed;\nnot be copied into artifacts;\nnot be required for unrelated validation jobs.\n"
@@ -1321,77 +1429,5 @@
     "heading": "Documentation Instructions",
     "anchor": "documentation-instructions",
     "text": "Documentation Instructions\nUse [the task index](README.md) to locate the owner of the information being changed. Read [contributing guidance](contributing.md) when creating, moving, or maintaining documentation.\nPreserve normative meaning, exceptions, and the distinction between requirements, examples, accepted decisions, and implementation availability. Check governing ADRs before treating a choice as unresolved.\nKeep one authoritative policy for each concern. Use links and scoped reading routes rather than copying policy into indexes or agent instructions.\nWhen moving content, retain every unique requirement at an explicit destination and update references. Check local links and section anchors after restructuring.\nKeep numbered accepted ADRs substantively intact. Follow the additional instructions in `adr/AGENTS.md` for ADR work and `runbooks/AGENTS.md` for runbook work.\nUse only available [validation](validation.md); do not describe planned generators, commands, applications, or procedures as implemented.\nClassify documentation by [audience and publication](architecture/living-documentation.md#documentation-audiences-and-publication). Inclusion in the internal catalog never approves public distribution; preserve canonical engineering sources when changing build exposure.\n"
-  },
-  {
-    "id": "repository/docs/api/error-contract",
-    "title": "API Error Contract",
-    "group": "API guides",
-    "kind": "repository",
-    "heading": "API Error Contract",
-    "anchor": "api-error-contract",
-    "text": "API Error Contract\n[Task index](../README.md) · [API principles](principles.md) · [Error handling](../architecture/error-handling.md) · [Compatibility](versioning.md)\nThis policy owns public failure semantics. The API's [shared error registry, envelope schema, and responder](../../apps/api/src/errors.ts) and each composed module's registered codes are canonical; the [public registry composition](../../apps/api/src/error-registry.ts) gives each code exactly one owner and rejects any duplicate, even an identical definition, and the [generated error reference](../generated/api/errors.md) lists implemented codes, messages, categories, HTTP statuses, and retry classifications. Module route contracts declare expected operation errors. Follow [ADR-0007](../adr/0007-establish-api-contract-openapi-sdk-and-configuration-schema-strategy.md) when generating OpenAPI and SDK representations.\n"
-  },
-  {
-    "id": "repository/docs/api/error-contract",
-    "title": "API Error Contract",
-    "group": "API guides",
-    "kind": "repository",
-    "heading": "Error Envelope",
-    "anchor": "error-envelope",
-    "text": "Error Envelope\nThe implemented API envelope has a top-level `error` object with required `code`, `message`, and `requestId`, plus optional `traceId` and `errorId`. The schema prohibits additional fields. A synthetic example is:\n{\n  \"error\": {\n    \"code\": \"RESOURCE_VERSION_CONFLICT\",\n    \"message\": \"The request changed; reload it before trying again.\",\n    \"requestId\": \"req_00000000-0000-4000-8000-000000000001\"\n  }\n}\n\nThe runtime generates fresh request IDs, adds trace correlation when available, and assigns unexpected failures an error occurrence ID. These are opaque support references, not credentials; knowing one must not grant telemetry access. See [request handling](../../apps/api/src/app.ts) for construction and reporting.\nThe current envelope has **no field-level `details` or retry object**. Registry `retryable` metadata is documentation/classification, not a serialized promise that any write is safe to repeat. Rate limiting uses the HTTP `Retry-After` header. The extension rules below apply when consumers need additional structured information; do not implement hypothetical fields merely because examples in a policy mention them.\n[Health probes](../../apps/api/src/health-contracts.ts) use their own documented status response, including when unavailable; do not confuse a probe status with an application error envelope.\n"
-  },
-  {
-    "id": "repository/docs/api/error-contract",
-    "title": "API Error Contract",
-    "group": "API guides",
-    "kind": "repository",
-    "heading": "Error Code Format",
-    "anchor": "error-code-format",
-    "text": "Error Code Format\nPublic codes use stable semantic `UPPER_SNAKE_CASE` names. Clients branch on codes and deliberately defined structured fields, never on message text or internal exception classes. Messages are safe human explanations and may change for clarity or product localization without changing the code's meaning. Canonical repository descriptions remain English.\nInfrastructure identifiers such as SQLSTATE, ORM codes, provider exceptions, filesystem paths, or runtime class names are not public semantics. Map failures to the condition consumers need to understand. Reuse an existing code for the same meaning; do not create a code for every code path, collapse materially different consumer actions into one generic code, or reuse a retired code for a new meaning.\n"
-  },
-  {
-    "id": "repository/docs/api/error-contract",
-    "title": "API Error Contract",
-    "group": "API guides",
-    "kind": "repository",
-    "heading": "Error Code Ownership",
-    "anchor": "error-code-ownership",
-    "text": "Error Code Ownership\nThe feature/application owner defines business failures; the API boundary owns cross-cutting public mappings. The registry provides one canonical definition, and operation metadata refers to it. The registry enumerates stable public conditions, not every possible database/network/library exception. Do not maintain an independent manual registry in prose or generated clients.\nFor a new code, determine its semantic owner, expected/unexpected category, public disclosure safety, consumer action, status mapping, retry implications, optional details, and compatibility impact. Update canonical code, operation declarations, tests, and generated references together. Each module's implementation conventions explain its authorization-sensitive classification order.\n"
-  },
-  {
-    "id": "repository/docs/api/error-contract",
-    "title": "API Error Contract",
-    "group": "API guides",
-    "kind": "repository",
-    "heading": "Validation Errors",
-    "anchor": "validation-errors",
-    "text": "Validation Errors\nThe implemented validation response is `400 VALIDATION_FAILED` with the common envelope. Do not expose validator exceptions or echo submitted values. Structural validation is distinct from a valid request that conflicts with current domain state.\nIf field-level details become useful, add an explicit bounded schema to the canonical contract. Identify fields using a stable public request-path convention, never internal database/ORM paths; use stable reason codes where clients need to act and safe human text for explanation. Define multiple-failure bounds and unknown-field behavior. Returning every issue in an attacker-controlled payload must not create an unbounded response.\n"
-  },
-  {
-    "id": "repository/docs/api/error-contract",
-    "title": "API Error Contract",
-    "group": "API guides",
-    "kind": "repository",
-    "heading": "Mapping and disclosure",
-    "anchor": "mapping-and-disclosure",
-    "text": "Mapping and disclosure\nHTTP status conveys broad protocol meaning; public codes convey application semantics. The [generated registry](../generated/api/errors.md) is the current status mapping. Validation uses `400`, authentication `401`, permission denial `403`, absent/hidden resources `404`, state/version conflicts `409`, rate limiting `429`, unexpected failures `500`, and service unavailability `503` where declared.\nAuthentication and authorization failures follow their [security policies](../security/authentication.md). Avoid account enumeration and disclosure of hidden resource existence, cross-tenant data, claims, or policy internals. An absent and inaccessible resource may deliberately share `404`; test that behavior.\nExpected domain conflicts, stale versions, and incompatible idempotency-key reuse are explicit outcomes. Distinguish safe replay from a conflicting new intent. They should not become internal incidents simply because code represents them as exceptions.\nTranslate known database constraints at the persistence/application boundary according to business meaning. Unexpected database failures stay unexpected; do not disguise every exception as invalid user input.\nTranslate provider business rejection separately from dependency unavailability, configuration failure, or unknown outcome. Expose vendor-specific distinctions only when consumers need them, never raw provider content.\nUse a safe generic error for unexpected failures. Never serialize arbitrary exceptions, stack traces, SQL, secret values, internal paths/hostnames, or diagnostic dumps. Do not return ordinary API failures as hidden error objects inside `200` responses.\nPublic status is not internal severity: expected denials may matter to security monitoring, and a transient dependency failure may be operationally serious. [Error reporting](../reliability/error-reporting.md) owns that distinction.\n"
-  },
-  {
-    "id": "repository/docs/api/error-contract",
-    "title": "API Error Contract",
-    "group": "API guides",
-    "kind": "repository",
-    "heading": "Unknown Outcome",
-    "anchor": "unknown-outcome",
-    "text": "Unknown Outcome\nA timeout, disconnect, or commit error may leave the caller uncertain whether a write or external effect occurred. Retryability cannot be inferred from HTTP status or transient infrastructure failure alone. Define whether the operation is known not to have occurred, safely replayable, or requires state reconciliation. Introduce a distinct public unknown-outcome code only when consumers need different handling.\nA public retry hint, if introduced, must be machine-readable, bounded, and accurate for the operation. Rate-limit guidance must not disclose anti-abuse internals. Never imply a non-idempotent write is safe to repeat merely because the registry classifies a failure as transient. Each module's recovery conventions own its create replay and mutation reconciliation behavior.\n"
-  },
-  {
-    "id": "repository/docs/api/error-contract",
-    "title": "API Error Contract",
-    "group": "API guides",
-    "kind": "repository",
-    "heading": "Details and additional delivery modes",
-    "anchor": "details-and-additional-delivery-modes",
-    "text": "Details and additional delivery modes\nEvery public details object needs a typed schema and a consumer purpose. Include only information safe for that caller; omit record dumps, protected resource/tenant identifiers, authorization evaluation, credentials, and provider payloads. Cross-cutting correlation/retry metadata should remain distinguishable from domain details. Once consumed, field meaning and shape are compatibility-sensitive.\nWhen additional modes are introduced:\nMode\nError requirement\nWebhook or upload\nFollow the operation/provider contract while minimizing signature-validation or scanning details. Bound and classify upload failures explicitly.\nAsynchronous work\nA successful acceptance response does not guarantee eventual success. Externally visible job status maps worker failures to stable public semantics, never worker exceptions.\nBatch/partial success\nDefine atomic versus partial processing and item identity in an operation-specific result. Do not ambiguously overload the ordinary single-error envelope.\n"
   }
 ]

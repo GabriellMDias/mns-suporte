@@ -4,6 +4,60 @@
 
 [Schema documentation policy](../../database/schema-documentation.md) · [Database principles](../../database/principles.md)
 
+## whatsapp_identity_events
+
+Durable inbound identity receipts and short-lived challenge reservations scoped to a WhatsApp sender.
+
+Owner: WhatsApp employee verification. Classification: RESTRICTED.
+
+Lifecycle: A reserved challenge stays active until it is replaced, consumed, expires or exhausts its attempts. Code digests are removed when the challenge is deactivated. Historical records support deduplication and hourly limits. Retention is release-plan work.
+
+| Column | PostgreSQL type | Nullable | Default | Classification | Meaning | Null meaning | Unit |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `event_key` | `text` | no | — | RESTRICTED | Hash of the business-scoped sender and provider message ID, used to recognize replay. | — | — |
+| `scope_key` | `text` | no | — | RESTRICTED | Stable hash of the business phone ID and preferred sender identity. | — | — |
+| `mailbox_key` | `text` | yes | — | RESTRICTED | Keyed digest of the normalized corporate address for cross-sender limits. | The receipt carries no eligible mailbox. | — |
+| `created_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Clock instant when the event receipt was recorded. | — | — |
+| `expires_at` | `timestamp(3) with time zone` | yes | — | INTERNAL | Deadline for redemption of the reserved challenge. | The receipt did not reserve a challenge. | — |
+| `active` | `boolean` | no | `false` | INTERNAL | Whether the reservation is the most recent active challenge for this sender. | — | — |
+| `attempts_left` | `integer` | no | `0` | INTERNAL | Remaining comparisons allowed for this challenge. | — | — |
+| `glpi_user_id` | `bigint` | yes | — | RESTRICTED | GLPI user identified by a unique active directory match. | The challenge has no verified directory candidate or has been deactivated. | — |
+| `code_digest` | `text` | yes | — | RESTRICTED | Keyed digest of the short-lived verification code and sender scope. | The event has no prepared code or its challenge was cleared. | — |
+
+### Constraints and indexes
+
+| Object | Physical definition | Purpose |
+| --- | --- | --- |
+| `whatsapp_identity_events_active` | `CHECK (((NOT active) OR ((expires_at IS NOT NULL) AND (attempts_left > 0))))` | Requires an expiration and an available attempt for an active challenge. |
+| `whatsapp_identity_events_attempts` | `CHECK (((attempts_left >= 0) AND (attempts_left <= 5)))` | Bounds challenge comparisons to the configured maximum of five. |
+| `whatsapp_identity_events_code` | `CHECK (((code_digest IS NULL) OR (active AND (glpi_user_id IS NOT NULL) AND (glpi_user_id > 0) AND (code_digest ~ '^[a-f0-9]{64}$'::text))))` | Requires a canonical digest and a valid directory candidate for a prepared active challenge. |
+| `whatsapp_identity_events_pkey` | `PRIMARY KEY (event_key)` | Prevents one signed inbound message from starting or confirming verification twice for a sender. |
+| `whatsapp_identity_events_mailbox_idx` | `CREATE INDEX whatsapp_identity_events_mailbox_idx ON public.whatsapp_identity_events USING btree (mailbox_key, created_at)` | Supports the rolling hourly quota shared by all senders targeting a mailbox. |
+| `whatsapp_identity_events_scope_idx` | `CREATE INDEX whatsapp_identity_events_scope_idx ON public.whatsapp_identity_events USING btree (scope_key, created_at)` | Supports sender-scoped quotas and challenge selection. |
+
+## whatsapp_verified_identities
+
+Current proof of corporate mailbox control for a WhatsApp sender and its GLPI identity.
+
+Owner: WhatsApp employee verification. Classification: RESTRICTED.
+
+Lifecycle: Created or replaced only as a challenge is consumed. Proof expires after thirty days and requires a new challenge. Retention is release-plan work.
+
+| Column | PostgreSQL type | Nullable | Default | Classification | Meaning | Null meaning | Unit |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `scope_key` | `text` | no | — | RESTRICTED | Stable hash of the business phone ID and preferred sender identity. | — | — |
+| `glpi_user_id` | `bigint` | no | — | RESTRICTED | GLPI directory identity established by mailbox verification. | — | — |
+| `verified_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Time the matching challenge was consumed. | — | — |
+| `expires_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Time after which the link cannot authorize work. | — | — |
+
+### Constraints and indexes
+
+| Object | Physical definition | Purpose |
+| --- | --- | --- |
+| `whatsapp_verified_identities_expiration` | `CHECK ((expires_at > verified_at))` | Requires verification to precede expiration. |
+| `whatsapp_verified_identities_pkey` | `PRIMARY KEY (scope_key)` | Maintains one current verified GLPI identity for a WhatsApp sender scope. |
+| `whatsapp_verified_identities_user` | `CHECK ((glpi_user_id > 0))` | Requires a positive GLPI directory identity. |
+
 ## whatsapp_inbound_messages
 
 Durable intake of supported and authenticated Meta messages for the configured business number.
@@ -20,7 +74,7 @@ Lifecycle: Created before acknowledging the webhook. Redelivery preserves the or
 | `sender_phone` | `text` | yes | — | RESTRICTED | Sender number supplied by Meta to support directory linking and routing. | Meta supplied a business-scoped sender identifier without a phone number. | — |
 | `occurred_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Timestamp reported by Meta as the message time. | — | UTC instant |
 | `received_at` | `timestamp(3) with time zone` | no | `CURRENT_TIMESTAMP` | INTERNAL | Database timestamp of the first accepted delivery. | — | UTC instant |
-| `content` | `jsonb` | no | — | RESTRICTED | Normalized text, action identifier or media reference consumed by the conversation flow. | — | — |
+| `content` | `jsonb` | no | — | RESTRICTED | Normalized text, action identifier, media reference or protected verification-code digest consumed by the conversation flow. | — | — |
 
 ### Constraints and indexes
 

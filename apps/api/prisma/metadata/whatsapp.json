@@ -35,7 +35,7 @@
           "unit": "UTC instant"
         },
         "content": {
-          "description": "Normalized text, action identifier or media reference consumed by the conversation flow.",
+          "description": "Normalized text, action identifier, media reference or protected verification-code digest consumed by the conversation flow.",
           "classification": "RESTRICTED"
         }
       },

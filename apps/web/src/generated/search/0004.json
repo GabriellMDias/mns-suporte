@@ -4,6 +4,78 @@
     "title": "API Error Contract",
     "group": "API guides",
     "kind": "repository",
+    "heading": "API Error Contract",
+    "anchor": "api-error-contract",
+    "text": "API Error Contract\n[Task index](../README.md) · [API principles](principles.md) · [Error handling](../architecture/error-handling.md) · [Compatibility](versioning.md)\nThis policy owns public failure semantics. The API's [shared error registry, envelope schema, and responder](../../apps/api/src/errors.ts) and each composed module's registered codes are canonical; the [public registry composition](../../apps/api/src/error-registry.ts) gives each code exactly one owner and rejects any duplicate, even an identical definition, and the [generated error reference](../generated/api/errors.md) lists implemented codes, messages, categories, HTTP statuses, and retry classifications. Module route contracts declare expected operation errors. Follow [ADR-0007](../adr/0007-establish-api-contract-openapi-sdk-and-configuration-schema-strategy.md) when generating OpenAPI and SDK representations.\n"
+  },
+  {
+    "id": "repository/docs/api/error-contract",
+    "title": "API Error Contract",
+    "group": "API guides",
+    "kind": "repository",
+    "heading": "Error Envelope",
+    "anchor": "error-envelope",
+    "text": "Error Envelope\nThe implemented API envelope has a top-level `error` object with required `code`, `message`, and `requestId`, plus optional `traceId` and `errorId`. The schema prohibits additional fields. A synthetic example is:\n{\n  \"error\": {\n    \"code\": \"RESOURCE_VERSION_CONFLICT\",\n    \"message\": \"The request changed; reload it before trying again.\",\n    \"requestId\": \"req_00000000-0000-4000-8000-000000000001\"\n  }\n}\n\nThe runtime generates fresh request IDs, adds trace correlation when available, and assigns unexpected failures an error occurrence ID. These are opaque support references, not credentials; knowing one must not grant telemetry access. See [request handling](../../apps/api/src/app.ts) for construction and reporting.\nThe current envelope has **no field-level `details` or retry object**. Registry `retryable` metadata is documentation/classification, not a serialized promise that any write is safe to repeat. Rate limiting uses the HTTP `Retry-After` header. The extension rules below apply when consumers need additional structured information; do not implement hypothetical fields merely because examples in a policy mention them.\n[Health probes](../../apps/api/src/health-contracts.ts) use their own documented status response, including when unavailable; do not confuse a probe status with an application error envelope.\n"
+  },
+  {
+    "id": "repository/docs/api/error-contract",
+    "title": "API Error Contract",
+    "group": "API guides",
+    "kind": "repository",
+    "heading": "Error Code Format",
+    "anchor": "error-code-format",
+    "text": "Error Code Format\nPublic codes use stable semantic `UPPER_SNAKE_CASE` names. Clients branch on codes and deliberately defined structured fields, never on message text or internal exception classes. Messages are safe human explanations and may change for clarity or product localization without changing the code's meaning. Canonical repository descriptions remain English.\nInfrastructure identifiers such as SQLSTATE, ORM codes, provider exceptions, filesystem paths, or runtime class names are not public semantics. Map failures to the condition consumers need to understand. Reuse an existing code for the same meaning; do not create a code for every code path, collapse materially different consumer actions into one generic code, or reuse a retired code for a new meaning.\n"
+  },
+  {
+    "id": "repository/docs/api/error-contract",
+    "title": "API Error Contract",
+    "group": "API guides",
+    "kind": "repository",
+    "heading": "Error Code Ownership",
+    "anchor": "error-code-ownership",
+    "text": "Error Code Ownership\nThe feature/application owner defines business failures; the API boundary owns cross-cutting public mappings. The registry provides one canonical definition, and operation metadata refers to it. The registry enumerates stable public conditions, not every possible database/network/library exception. Do not maintain an independent manual registry in prose or generated clients.\nFor a new code, determine its semantic owner, expected/unexpected category, public disclosure safety, consumer action, status mapping, retry implications, optional details, and compatibility impact. Update canonical code, operation declarations, tests, and generated references together. Each module's implementation conventions explain its authorization-sensitive classification order.\n"
+  },
+  {
+    "id": "repository/docs/api/error-contract",
+    "title": "API Error Contract",
+    "group": "API guides",
+    "kind": "repository",
+    "heading": "Validation Errors",
+    "anchor": "validation-errors",
+    "text": "Validation Errors\nThe implemented validation response is `400 VALIDATION_FAILED` with the common envelope. Do not expose validator exceptions or echo submitted values. Structural validation is distinct from a valid request that conflicts with current domain state.\nIf field-level details become useful, add an explicit bounded schema to the canonical contract. Identify fields using a stable public request-path convention, never internal database/ORM paths; use stable reason codes where clients need to act and safe human text for explanation. Define multiple-failure bounds and unknown-field behavior. Returning every issue in an attacker-controlled payload must not create an unbounded response.\n"
+  },
+  {
+    "id": "repository/docs/api/error-contract",
+    "title": "API Error Contract",
+    "group": "API guides",
+    "kind": "repository",
+    "heading": "Mapping and disclosure",
+    "anchor": "mapping-and-disclosure",
+    "text": "Mapping and disclosure\nHTTP status conveys broad protocol meaning; public codes convey application semantics. The [generated registry](../generated/api/errors.md) is the current status mapping. Validation uses `400`, authentication `401`, permission denial `403`, absent/hidden resources `404`, state/version conflicts `409`, rate limiting `429`, unexpected failures `500`, and service unavailability `503` where declared.\nAuthentication and authorization failures follow their [security policies](../security/authentication.md). Avoid account enumeration and disclosure of hidden resource existence, cross-tenant data, claims, or policy internals. An absent and inaccessible resource may deliberately share `404`; test that behavior.\nExpected domain conflicts, stale versions, and incompatible idempotency-key reuse are explicit outcomes. Distinguish safe replay from a conflicting new intent. They should not become internal incidents simply because code represents them as exceptions.\nTranslate known database constraints at the persistence/application boundary according to business meaning. Unexpected database failures stay unexpected; do not disguise every exception as invalid user input.\nTranslate provider business rejection separately from dependency unavailability, configuration failure, or unknown outcome. Expose vendor-specific distinctions only when consumers need them, never raw provider content.\nUse a safe generic error for unexpected failures. Never serialize arbitrary exceptions, stack traces, SQL, secret values, internal paths/hostnames, or diagnostic dumps. Do not return ordinary API failures as hidden error objects inside `200` responses.\nPublic status is not internal severity: expected denials may matter to security monitoring, and a transient dependency failure may be operationally serious. [Error reporting](../reliability/error-reporting.md) owns that distinction.\n"
+  },
+  {
+    "id": "repository/docs/api/error-contract",
+    "title": "API Error Contract",
+    "group": "API guides",
+    "kind": "repository",
+    "heading": "Unknown Outcome",
+    "anchor": "unknown-outcome",
+    "text": "Unknown Outcome\nA timeout, disconnect, or commit error may leave the caller uncertain whether a write or external effect occurred. Retryability cannot be inferred from HTTP status or transient infrastructure failure alone. Define whether the operation is known not to have occurred, safely replayable, or requires state reconciliation. Introduce a distinct public unknown-outcome code only when consumers need different handling.\nA public retry hint, if introduced, must be machine-readable, bounded, and accurate for the operation. Rate-limit guidance must not disclose anti-abuse internals. Never imply a non-idempotent write is safe to repeat merely because the registry classifies a failure as transient. Each module's recovery conventions own its create replay and mutation reconciliation behavior.\n"
+  },
+  {
+    "id": "repository/docs/api/error-contract",
+    "title": "API Error Contract",
+    "group": "API guides",
+    "kind": "repository",
+    "heading": "Details and additional delivery modes",
+    "anchor": "details-and-additional-delivery-modes",
+    "text": "Details and additional delivery modes\nEvery public details object needs a typed schema and a consumer purpose. Include only information safe for that caller; omit record dumps, protected resource/tenant identifiers, authorization evaluation, credentials, and provider payloads. Cross-cutting correlation/retry metadata should remain distinguishable from domain details. Once consumed, field meaning and shape are compatibility-sensitive.\nWhen additional modes are introduced:\nMode\nError requirement\nWebhook or upload\nFollow the operation/provider contract while minimizing signature-validation or scanning details. Bound and classify upload failures explicitly.\nAsynchronous work\nA successful acceptance response does not guarantee eventual success. Externally visible job status maps worker failures to stable public semantics, never worker exceptions.\nBatch/partial success\nDefine atomic versus partial processing and item identity in an operation-specific result. Do not ambiguously overload the ordinary single-error envelope.\n"
+  },
+  {
+    "id": "repository/docs/api/error-contract",
+    "title": "API Error Contract",
+    "group": "API guides",
+    "kind": "repository",
     "heading": "Diagnostics and consumer behavior",
     "anchor": "diagnostics-and-consumer-behavior",
     "text": "Diagnostics and consumer behavior\nReport an unexpected occurrence once at its authoritative boundary. Preserve useful internal causal evidence only within [redaction rules](../security/telemetry-redaction.md); preservation never authorizes raw exception-message or stack export. The current runtime records allowlisted diagnostic fields rather than arbitrary error content. Expected validation, business, and access failures may contribute to safe metrics/security/audit signals without becoming unexpected incidents.\nClients and SDKs must preserve structured error semantics and correlation, and provide a safe fallback for unknown codes. Application consumers should not depend on framework-specific transport exceptions for business meaning. Product code decides whether to display safe server copy or localized client text; it must not parse that copy. The current thin SDK exposes generated response/error typing without adding a separate error-class hierarchy.\nCode meaning, status mappings, details, categories where consumed, and retry behavior require [compatibility review](versioning.md). Adding a code can break exhaustive consumers; renaming/removing a code or changing meaning is potentially breaking. Optional details are only additive if actual clients tolerate them.\n"
@@ -853,32 +925,5 @@
     "heading": "Information architecture",
     "anchor": "information-architecture",
     "text": "Information architecture\nRoute\nResponsibility\n`/docs`\nOverview and starting routes for contributors\n`/docs/api` and `/docs/api/<operationId>`\nOperation catalog, request/response contracts, local OpenAPI download, and explicit API exploration\n`/docs/database` and `/docs/database/<table>`\nTable catalog, ownership, classification, lifecycle, columns, and physical constraints\n`/docs/components` and `/docs/components/<export>`\nComponent properties, usage, accessibility, states, and live synthetic examples\n`/docs/repository/<repository-path-without-md>`\nLocally rendered repository Markdown; parent paths are navigable collections\n`/docs/search?q=<query>&scope=<kind>`\nFull-text results across authored and generated knowledge; links identify the matching page/section\nThe shell provides section navigation, breadcrumbs, responsive navigation, search, per-page outlines, focused route changes, and recoverable missing/loading/error states. Collections show at most 24 folders and document entries combined per page, with folder counts computed in one pass. Page IDs derive from repository paths, stable operation IDs, table names, or component names; titles can evolve without changing those IDs. A file move changes its path-based route and requires updating references. Repository hierarchy is derived rather than maintained in a second navigation inventory.\nAll Markdown under `docs/`, and repository `README.md`/`AGENTS.md` files, are included. Relative links between those documents and their heading anchors stay in the local portal. OpenAPI links lead to the local API artifact section. Links to code and other source-only files may open the repository host at the `repository` recorded in [`.orion/project.json`](../../.orion/project.json), so a derived project links to its own repository; normal documentation reading does not require the host. Existing Markdown/JSON artifacts remain directly available to AI agents and repository readers.\n"
-  },
-  {
-    "id": "repository/docs/architecture/living-documentation",
-    "title": "Living Documentation",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Sources and representations",
-    "anchor": "sources-and-representations",
-    "text": "Sources and representations\nThe navigation brand displays the Orion foundation revision. At Vite startup/build, [build metadata](../../apps/web/scripts/foundation-version.ts) reads stable Git tags reachable from the foundation checkout; later or modified revisions are marked `unreleased`. Derived projects display their recorded baseline SHA instead of interpreting product tags as Orion releases. Missing Git history is shown as `Version unavailable`. This metadata is embedded in the build, requires no browser network request, and does not duplicate the canonical tag in tracked generated files.\nSubject\nCanonical source\nDerived representation\nRepository knowledge\nAuthored Markdown under `docs/` and local README/instruction files\nSafe rendered page JSON, headings, catalog summaries, and searchable sections\nAPI\nExecutable TypeBox contracts, route metadata, and error registry, through generated OpenAPI/errors\nOperation detail pages with full schemas and referenced components; error-registry document; generated SDK remains a separate consumer\nDatabase\nMigrated PostgreSQL and schema-adjacent semantic metadata in `apps/api/prisma/metadata/`, through generated database Markdown\nTable dictionary pages and complete physical/semantic reference, including enums\nComponents\n[Actual exports](../../apps/web/src/components.tsx) and [owned examples/metadata](../../apps/web/src/components.docs.json)\nComponent detail pages, safe previews, and [AI-readable Markdown](../generated/components/web.md)\nConfiguration\nAPI TypeBox schema and [reference metadata](../../apps/api/src/config.ts)\nLocally readable [safe configuration reference](../generated/configuration/api.md); no environment values\nAuthored guidance owns intent, constraints, rationale, and procedures. The portal may summarize, index, or render those sources but must not invent missing meaning. Accepted ADRs retain decision-time context and status. Repository policy, current implementation, and deliberately conditional capabilities remain distinguishable.\n"
-  },
-  {
-    "id": "repository/docs/architecture/living-documentation",
-    "title": "Living Documentation",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Generation and drift protection",
-    "anchor": "generation-and-drift-protection",
-    "text": "Generation and drift protection\nComponent architecture and the extensible category/ownership/reuse contract are owned by [component policy](web-components.md). Root and co-located feature metadata normalize into the existing manifest, detail JSON and Markdown reference. Source/export verification uses the installed TypeScript parser, follows local re-exports, and documents only curated shared exports or explicitly registered feature components. Legacy fields, component URLs and registered live examples remain compatible; code-only examples never execute. The catalog and search remain internal under the distribution boundary above.\nThe [generator entry point](../../tooling/documentation/generate.mjs) delegates discovery/output handling, Markdown rendering, and reference transformation to small tooling modules. It emits `apps/web/src/generated/manifest.json`, individual JSON files under `pages/`, bounded search assets under `search/`, and the component Markdown reference. The manifest contains navigation metadata, not the repository body text. Repository outlines load with their page. The browser loads only the selected page; the application workflow lazy-loads the documentation UI separately.\nDiscovery uses Git's tracked and non-ignored new files, constrained to the documented source scope. Dependencies, ignored local files, runtime environment, databases, and arbitrary filesystem paths are not publication inputs. Symlinks and paths escaping the repository are rejected. Files, IDs, headings, search records, and serialized outputs have deterministic ordering; output contains no clock, host path, or environment-dependent values. Line endings normalize before comparison.\n`pnpm docs:references:write` deliberately regenerates owned output and removes obsolete generated files. `pnpm docs:references:check` detects missing, stale, or orphaned generated output without repairing it. Component metadata completeness, supported schema metadata, duplicate identifiers, referenced schemas, local links, and known secret patterns are checked at their owning layers. Test fixtures exercise malicious Markdown, links, identifiers, drift, and larger document inventories. These controls do not prove authored meaning is correct or detect every secret; review remains required.\nThe database introspector supports current ordinary application tables, columns, non-primary constraints/indexes, and enums. Extend it before introducing uncovered PostgreSQL object kinds; [schema documentation](../database/schema-documentation.md) retains the broader physical-truth requirement. The portal does not reinterpret an absent catalog object as permission to omit it.\n"
-  },
-  {
-    "id": "repository/docs/architecture/living-documentation",
-    "title": "Living Documentation",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Safe local reading and API exploration",
-    "anchor": "safe-local-reading-and-api-exploration",
-    "text": "Safe local reading and API exploration\nMarkdown is rendered at generation time with raw HTML disabled. Unsafe protocols and escaping local paths are rejected; links are rewritten from known repository paths. Images do not initiate automatic external requests. Browser insertion is limited to this generated, tested HTML; runtime API responses are rendered as text, never HTML. Keep the generator's escaping and URL rules covered by regression tests.\nReading documentation, searching, and component previews need no API, identity provider, token, database, or external service. Search queries remain local browser work; no third-party search provider receives repository content. Component previews keep synthetic input local and never connect identities or perform domain requests.\nThe API explorer is an intentionally generic OpenAPI consumer: it uses the generated operation contract to build explicit same-origin HTTP requests. Product workflows continue to use the typed workspace SDK; the explorer imports no API implementation and duplicates no business authorization. A raw HTTP boundary is appropriate here because inspecting rejection and unsupported future operations is part of the tool, not typed product orchestration. It introduces no replacement SDK or new application boundary.\nThe configured browser API base must be a safe same-origin path. OpenAPI server URLs and user-provided hosts cannot redirect execution elsewhere. Path and header controls reject traversal, encoded separators, protected headers, and unsupported encodings.\nNothing executes on page load or navigation. The user fills declared parameters/JSON, supplies an in-memory bearer token when required, and explicitly sends. Writes require acknowledgement that the request can change real data.\nTokens never enter URLs, storage, logs, generated assets, or copied examples. Execution omits ambient cookies and referrers, rejects redirects, and disables request caching. Navigation, clearing, and unmount release sensitive state and abort pending work.\nRequests have a bounded timeout and cancellation. Cancellation or a network failure cannot prove a mutation was rolled back; inspect actual state and follow the operation's idempotency/concurrency contract before retrying. The explorer does not retry automatically.\nResponse display is bounded and masks known credential fields and the supplied bearer value. It displays status, duration, safe headers, and text/JSON without executing content. This is not a general data-loss prevention system; use appropriate local/test data and access.\nUnsupported authentication, media types, or parameter serialization remain inspectable with an explicit execution limitation. The server continues to enforce authentication, authorization, validation, concurrency, and rate limits.\n"
   }
 ]

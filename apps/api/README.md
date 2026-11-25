@@ -60,6 +60,18 @@ The adapter is covered by [synthetic contract and transport tests](test/glpi/cli
 
 [GLPI REST v1 reference](https://github.com/glpi-project/glpi/blob/10.0/bugfixes/apirest.md) · [GLPI User search fields](https://github.com/glpi-project/glpi/blob/10.0/bugfixes/src/User.php)
 
+## Employee email verification
+
+The [identity service](src/features/whatsapp/identity-service.ts) establishes mailbox control for a WhatsApp sender and one GLPI user. It queries the directory only for configured corporate domains and issues a code only after a unique active match. The sender scope includes the WhatsApp business phone ID and prefers the Meta business-scoped sender ID. Phone-only senders use their phone identifier. A changed sender scope requires verification.
+
+One reservation permits one SMTP submission. A code has the prefix `MNS-` and expires after ten minutes. Each challenge permits five attempts. The sender and mailbox each allow three reservations in a rolling hour. Repeated inbound message IDs cannot consume another attempt or trigger another email. Reserving a new challenge supersedes the previous one. Consuming a code and creating the verified link commit together. The link expires after thirty days.
+
+The webhook stores a keyed digest for a standalone verification code and removes complete code mentions from other message text. Challenges and mailbox quotas also use keyed digests. Rotating the key invalidates pending codes and starts new mailbox quota counters. Issuing the code and querying GLPI happen outside database locks. The conversation flow must durably enqueue the same neutral acknowledgement before doing any directory or mail work. That rule keeps mailbox eligibility and SMTP outcomes out of the response. A failed or unconfirmed relay response does not cause an automatic resend. The employee can make a new request within the quota.
+
+Configure the seven `IDENTITY_*` settings as a group with [GLPI](#glpi-integration). Generate the 32-byte secret with a cryptographically secure random generator and place it with the relay credentials in the server secret store. The [SMTP adapter](src/integrations/mail/verification.ts) uses implicit TLS on port 465 and requires STARTTLS on other ports, with normal certificate verification. Keep the identity service internal. The bot menu and processing of the stored verification event remain tracked in the [V1 plan](../../docs/project/implementation-plan.md#v1-work).
+
+[Identity integration tests](test/whatsapp/identity.test.ts) · [SMTP transport test](test/whatsapp/verification-mail.test.ts) · [Nodemailer SMTP](https://nodemailer.com/smtp)
+
 ## Local commands
 
 Use [setup](../../docs/setup.md) for the frozen install, generated Prisma client, environment loading, containers, and startup order. `pnpm -C apps/api dev` loads the ignored root `.env.local` when present; `start` runs emitted code and expects its process environment without loading that file.

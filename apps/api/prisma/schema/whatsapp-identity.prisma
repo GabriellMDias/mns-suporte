@@ -1,0 +1,24 @@
+model WhatsAppIdentityEvent {
+  eventKey    String    @id(map: "whatsapp_identity_events_pkey") @map("event_key")
+  scopeKey    String    @map("scope_key")
+  mailboxKey  String?   @map("mailbox_key")
+  createdAt   DateTime  @map("created_at") @db.Timestamptz(3)
+  expiresAt   DateTime? @map("expires_at") @db.Timestamptz(3)
+  active      Boolean   @default(false)
+  attemptsLeft Int      @default(0) @map("attempts_left")
+  glpiUserId  BigInt?   @map("glpi_user_id")
+  codeDigest  String?   @map("code_digest")
+
+  @@index([scopeKey, createdAt], map: "whatsapp_identity_events_scope_idx")
+  @@index([mailboxKey, createdAt], map: "whatsapp_identity_events_mailbox_idx")
+  @@map("whatsapp_identity_events")
+}
+
+model WhatsAppVerifiedIdentity {
+  scopeKey   String   @id(map: "whatsapp_verified_identities_pkey") @map("scope_key")
+  glpiUserId BigInt   @map("glpi_user_id")
+  verifiedAt DateTime @map("verified_at") @db.Timestamptz(3)
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(3)
+
+  @@map("whatsapp_verified_identities")
+}

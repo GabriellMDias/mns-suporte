@@ -26,7 +26,7 @@ The workspace has only the legacy integration copy. Issue a dedicated test servi
 
 **Status** Pending for live testing. **Owner** MNS mail administrator.
 
-Grant relay access or provide a service credential and verified From address for employee verification email. The workspace has no delegated corporate mail service. Verify delivery of a synthetic challenge to an approved test mailbox. Affects PJ-10 and PJ-17.
+Grant relay access or provide a service credential and verified From address for employee verification email. The workspace has no delegated corporate mail service. Verify delivery of a synthetic challenge to an approved test mailbox. Local employee verification has a synthetic transport. The real relay is required for the external pilot under PJ-17.
 
 ## PH-10
 

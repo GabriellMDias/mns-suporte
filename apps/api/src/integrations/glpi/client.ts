@@ -1,12 +1,8 @@
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import type { GlpiConfig } from "../../config.js";
-import {
-  directoryQuery,
-  normalizeEmail,
-  positiveId,
-  readDirectoryPage,
-} from "./directory.js";
+import { normalizeEmail } from "../../email-address.js";
+import { directoryQuery, positiveId, readDirectoryPage } from "./directory.js";
 
 type IoFailure = "timeout" | "transport" | "invalid_response";
 type RequestFailure = IoFailure | "permission";
