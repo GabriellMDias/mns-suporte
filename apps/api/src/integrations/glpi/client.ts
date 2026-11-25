@@ -21,6 +21,8 @@ type CreateTicketResult =
   | { kind: "not_sent"; reason: RequestFailure | "invalid_input" }
   | { kind: "rejected"; reason: "session" | "permission" | "invalid_input" }
   | { kind: "uncertain"; reason: IoFailure };
+type MutationFailure = Exclude<CreateTicketResult, { kind: "created" }>;
+type UploadResult = MutationFailure | { kind: "attached" };
 
 type Ticket = Readonly<{
   requesterId: number;
@@ -29,11 +31,17 @@ type Ticket = Readonly<{
 }>;
 type Operation =
   | { path: "search/User"; query: URLSearchParams }
-  | { path: "Ticket"; input: object };
+  | { path: `Ticket/${number}`; query: URLSearchParams }
+  | { path: "Ticket"; input: object }
+  | { path: "Document"; input: FormData };
 const tokenSchema = Type.Object({
   session_token: Type.String({ pattern: "^[A-Za-z0-9._~+/=-]{1,256}$" }),
 });
-const createdTicketSchema = Type.Object({ id: Type.Unknown() });
+const createdItemSchema = Type.Object({ id: Type.Unknown() });
+const documentListSchema = Type.Object({
+  id: Type.Unknown(),
+  _documents: Type.Array(createdItemSchema),
+});
 const permissionErrors = new Set([
   "ERROR_RIGHT_MISSING",
   "ERROR_NOT_ALLOWED_IP",
@@ -75,6 +83,33 @@ function responseFailure(result: HttpResult): RequestFailure {
     return "permission";
   if (result.status >= 500 || result.status === 429) return "transport";
   return "invalid_response";
+}
+
+function mutationResult(
+  reply: OperationResult,
+): MutationFailure | { kind: "created"; id: number } {
+  if (reply.kind === "not_sent") return reply;
+  if (reply.kind === "request_failed")
+    return { kind: "uncertain", reason: reply.reason };
+  if (reply.status === 201 && Value.Check(createdItemSchema, reply.body)) {
+    const id = positiveId(reply.body.id);
+    if (id) return { kind: "created", id };
+  }
+  const code = protocolCode(reply);
+  if (sessionExpired(reply)) return { kind: "rejected", reason: "session" };
+  if (code && permissionErrors.has(code))
+    return { kind: "rejected", reason: "permission" };
+  if (
+    reply.status === 400 &&
+    (code === "ERROR_BAD_ARRAY" ||
+      code === "ERROR_UPLOAD_FILE_TOO_BIG_POST_MAX_SIZE")
+  )
+    return { kind: "rejected", reason: "invalid_input" };
+  // A gateway or GLPI extension can fail after the database writes.
+  return {
+    kind: "uncertain",
+    reason: reply.status >= 500 ? "transport" : "invalid_response",
+  };
 }
 
 function ticketInput(ticket: Ticket) {
@@ -129,7 +164,8 @@ export function createGlpiClient(config: GlpiConfig, fetchGlpi = fetch) {
     input?: object,
     budget?: AbortSignal,
   ): Promise<HttpResult> {
-    const requestTimeout = AbortSignal.timeout(3500);
+    const multipart = input instanceof FormData;
+    const requestTimeout = AbortSignal.timeout(multipart ? 16_000 : 3500);
     const signal = budget
       ? AbortSignal.any([requestTimeout, budget])
       : requestTimeout;
@@ -139,11 +175,13 @@ export function createGlpiClient(config: GlpiConfig, fetchGlpi = fetch) {
         method: input === undefined ? "GET" : "POST",
         headers: {
           accept: "application/json",
-          "content-type": "application/json",
+          ...(multipart ? {} : { "content-type": "application/json" }),
           "app-token": config.appToken,
           ...authHeaders,
         },
-        ...(input === undefined ? {} : { body: JSON.stringify({ input }) }),
+        ...(input === undefined
+          ? {}
+          : { body: multipart ? input : JSON.stringify({ input }) }),
         redirect: "error",
         signal,
       });
@@ -192,9 +230,8 @@ export function createGlpiClient(config: GlpiConfig, fetchGlpi = fetch) {
     budget: AbortSignal,
   ): Promise<OperationResult> {
     const url = new URL(operation.path, baseUrl);
-    if (operation.path === "search/User")
-      url.search = operation.query.toString();
-    const attempts = operation.path === "search/User" ? 2 : 1;
+    if ("query" in operation) url.search = operation.query.toString();
+    const attempts = "query" in operation ? 2 : 1;
     for (let attempt = 0; ; attempt++) {
       if (budget.aborted) return { kind: "not_sent", reason: "timeout" };
       const session = await ensureSession();
@@ -204,7 +241,7 @@ export function createGlpiClient(config: GlpiConfig, fetchGlpi = fetch) {
       const reply = await request(
         url,
         { "session-token": session.session.token },
-        operation.path === "Ticket" ? operation.input : undefined,
+        "input" in operation ? operation.input : undefined,
         budget,
       );
       if (!sessionExpired(reply)) return reply;
@@ -269,34 +306,72 @@ export function createGlpiClient(config: GlpiConfig, fetchGlpi = fetch) {
       return { kind: "unavailable", reason: "directory_limit" };
     },
 
-    async createTicket(ticket: Ticket): Promise<CreateTicketResult> {
+    async createTicket(
+      ticket: Ticket,
+      signal?: AbortSignal,
+    ): Promise<CreateTicketResult> {
       const input = ticketInput(ticket);
       if (!input) return { kind: "not_sent", reason: "invalid_input" };
-      const reply = await run(
-        { path: "Ticket", input },
-        AbortSignal.timeout(8000),
+      const timeout = AbortSignal.timeout(8000);
+      const result = mutationResult(
+        await run(
+          { path: "Ticket", input },
+          signal ? AbortSignal.any([signal, timeout]) : timeout,
+        ),
       );
-      if (reply.kind === "not_sent") return reply;
-      if (reply.kind === "request_failed")
-        return { kind: "uncertain", reason: reply.reason };
+      return result.kind === "created"
+        ? { kind: "created", ticketId: result.id }
+        : result;
+    },
+
+    async attachDocument(
+      ticketId: number,
+      filename: string,
+      file: Blob,
+      signal: AbortSignal,
+    ): Promise<UploadResult> {
       if (
-        reply.status === 201 &&
-        Value.Check(createdTicketSchema, reply.body)
-      ) {
-        const ticketId = positiveId(reply.body.id);
-        if (ticketId) return { kind: "created", ticketId };
-      }
-      const code = protocolCode(reply);
-      if (sessionExpired(reply)) return { kind: "rejected", reason: "session" };
-      if (code && permissionErrors.has(code))
-        return { kind: "rejected", reason: "permission" };
-      if (reply.status === 400 && code === "ERROR_BAD_ARRAY")
-        return { kind: "rejected", reason: "invalid_input" };
-      // A gateway or GLPI extension can fail after the database writes.
-      return {
-        kind: "uncertain",
-        reason: reply.status >= 500 ? "transport" : "invalid_response",
-      };
+        !positiveId(ticketId) ||
+        !/^[a-z0-9-]{1,100}\.[a-z0-9]{2,5}$/.test(filename)
+      )
+        return { kind: "not_sent", reason: "invalid_input" };
+      const upload = new FormData();
+      upload.set(
+        "uploadManifest",
+        JSON.stringify({
+          input: {
+            name: filename,
+            _filename: [filename],
+            itemtype: "Ticket",
+            items_id: ticketId,
+          },
+        }),
+      );
+      upload.set("filename[0]", file, filename);
+      const budget = AbortSignal.any([signal, AbortSignal.timeout(22_000)]);
+      const result = mutationResult(
+        await run({ path: "Document", input: upload }, budget),
+      );
+      if (result.kind !== "created") return result;
+      const reply = await run(
+        {
+          path: `Ticket/${ticketId}`,
+          query: new URLSearchParams({
+            with_documents: "true",
+            get_hateoas: "false",
+          }),
+        },
+        budget,
+      );
+      if (
+        reply.kind === "response" &&
+        reply.status === 200 &&
+        Value.Check(documentListSchema, reply.body) &&
+        positiveId(reply.body.id) === ticketId &&
+        reply.body._documents.some(({ id }) => positiveId(id) === result.id)
+      )
+        return { kind: "attached" };
+      return { kind: "uncertain", reason: "invalid_response" };
     },
   };
 }

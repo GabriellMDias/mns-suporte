@@ -78,6 +78,45 @@ Lifecycle: Created or replaced only as a challenge is consumed. Proof expires af
 | `whatsapp_verified_identities_pkey` | `PRIMARY KEY (scope_key)` | Maintains one current verified GLPI identity for a WhatsApp sender scope. |
 | `whatsapp_verified_identities_user` | `CHECK ((glpi_user_id > 0))` | Requires a positive GLPI directory identity. |
 
+## whatsapp_ticket_submissions
+
+Durable work and outcome for one verified, confirmed WhatsApp draft submitted to GLPI.
+
+Owner: WhatsApp ticket submission. Classification: RESTRICTED.
+
+Lifecycle: Starts when an employee confirms a draft. Confirmed ticket creation clears the work summary. Terminal results clear the active reply address and media references. Retain durable outcomes for reconciliation and deduplication under the project retention policy.
+
+| Column | PostgreSQL type | Nullable | Default | Classification | Meaning | Null meaning | Unit |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `draft_id` | `uuid` | no | — | INTERNAL | Unique opaque identifier of the confirmed draft and GLPI reconciliation reference. | — | — |
+| `business_phone_id` | `text` | no | — | INTERNAL | Meta business phone number ID owning the submission job. | — | — |
+| `scope_key` | `text` | no | — | RESTRICTED | Verified sender scope used to update the correct conversation. | — | — |
+| `requester_id` | `bigint` | no | — | RESTRICTED | Verified GLPI requester chosen at confirmation. | — | — |
+| `recipient` | `jsonb` | yes | — | RESTRICTED | WhatsApp address for the eventual response. Cleared at the terminal outcome. | The submission no longer needs its reply address. | — |
+| `reply_expires_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Deadline of the customer service window associated with confirmation. | — | — |
+| `title` | `text` | yes | — | RESTRICTED | Ticket title derived from the confirmed category. Cleared after creation or terminal failure. | The title is no longer needed for creation. | — |
+| `description` | `text` | yes | — | RESTRICTED | Confirmed ticket summary with its opaque reconciliation reference. Cleared after creation or terminal failure. | The summary is no longer needed for creation. | — |
+| `media_ids` | `jsonb` | no | — | RESTRICTED | Ordered Meta media identifiers to resolve at delivery time. Cleared when processing ends. | — | — |
+| `attachment_count` | `integer` | no | — | INTERNAL | Number of media references in the confirmed draft. | — | — |
+| `next_attachment` | `integer` | no | `0` | INTERNAL | Zero-based position of the next media reference to process. | — | — |
+| `attached_count` | `integer` | no | `0` | INTERNAL | Number of documents whose association to the ticket was confirmed. | — | — |
+| `uncertain_attachments` | `integer` | no | `0` | INTERNAL | Number of document writes whose association or outcome could not be confirmed. | — | — |
+| `ticket_id` | `bigint` | yes | — | RESTRICTED | Authoritative GLPI ticket ID returned by successful creation. | GLPI has not confirmed a ticket for the draft. | — |
+| `state` | `"WhatsAppTicketSubmissionState"` | no | `'PENDING'::"WhatsAppTicketSubmissionState"` | INTERNAL | Current dispatch or terminal state for the confirmed draft. | — | — |
+| `attempts` | `integer` | no | `0` | INTERNAL | Number of worker claims for the current ticket or attachment step. | — | — |
+| `available_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Earliest retry instant or deadline of the active worker claim. | — | — |
+| `claim_id` | `uuid` | yes | — | INTERNAL | Temporary worker ownership token that fences stale writes. | No worker holds a claim for the current step. | — |
+| `mutating` | `boolean` | no | `false` | INTERNAL | Durable evidence that a non-idempotent GLPI mutation may have been started. | — | — |
+| `updated_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Instant of the latest claim or durable progress transition. | — | — |
+
+### Constraints and indexes
+
+| Object | Physical definition | Purpose |
+| --- | --- | --- |
+| `whatsapp_ticket_submissions_pkey` | `PRIMARY KEY (draft_id)` | Prevents two jobs for the same verified draft. |
+| `whatsapp_ticket_submissions_progress_check` | `CHECK ((((attachment_count >= 0) AND (attachment_count <= 5)) AND ((next_attachment >= 0) AND (next_attachment <= attachment_count)) AND (attached_count >= 0) AND (uncertain_attachments >= 0) AND ((attached_count + uncertain_attachments) <= next_attachment) AND (attempts >= 0) AND ((state <> 'COMPLETED'::"WhatsAppTicketSubmissionState") OR ((ticket_id IS NOT NULL) AND (next_attachment = attachment_count))) AND ((state <> ALL (ARRAY['FAILED'::"WhatsAppTicketSubmissionState", 'UNCERTAIN'::"WhatsAppTicketSubmissionState"])) OR (ticket_id IS NULL)) AND ((NOT mutating) OR (claim_id IS NOT NULL))))` | Enforces consistent progress, result and claim counts. |
+| `whatsapp_ticket_submissions_dispatch_idx` | `CREATE INDEX whatsapp_ticket_submissions_dispatch_idx ON public.whatsapp_ticket_submissions USING btree (business_phone_id, state, available_at, draft_id)` | Finds eligible jobs for one Meta business phone number. |
+
 ## whatsapp_troubleshooting_feedback
 
 A single employee response to a versioned static troubleshooting guide offered during ticket intake.
@@ -169,4 +208,5 @@ Lifecycle: Enqueued before dispatch. Retried only after an explicit provider thr
 | --- | --- | --- |
 | `WhatsAppConversationAction` | REQUEST_CODE, CONFIRM_CODE | Identity operation to request or confirm an employee email code after committing the preceding conversation move. |
 | `WhatsAppOutboundState` | PENDING, SENDING, ACCEPTED, SENT, DELIVERED, READ, FAILED, UNCERTAIN, EXPIRED | Tracks work from pending and claimed through acceptance, delivery, read, known failure, uncertainty, or service-window expiry. |
+| `WhatsAppTicketSubmissionState` | PENDING, COMPLETED, FAILED, UNCERTAIN | PENDING covers dispatch and bounded retries. COMPLETED confirms a ticket and records attachment outcomes. FAILED confirms no ticket was created. UNCERTAIN requires checking GLPI before a repeat. |
 | `WhatsAppTroubleshootingOutcome` | RESOLVED, NOT_RESOLVED, SKIPPED | Employee response to optional guidance. RESOLVED closes the draft. NOT_RESOLVED and SKIPPED keep the draft for review. |

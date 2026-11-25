@@ -55,6 +55,8 @@ const draftSchema = Type.Object({
   impact: Type.Optional(Type.String({ maxLength: fieldLimits.impact })),
   attachments: Type.Array(attachment, { maxItems: 5 }),
   confirmedAt: Type.Optional(Type.String()),
+  submissionVersion: Type.Optional(Type.Literal(1)),
+  uncertainSubmission: Type.Optional(Type.Literal(true)),
   guidanceId: Type.Optional(guidanceIdSchema),
 });
 const conversationSchema = Type.Object({
@@ -92,6 +94,15 @@ export type ConversationMove = {
   reply?: Reply;
   action?: IdentityAction;
   feedback?: TroubleshootingFeedback;
+  submission?: TicketSubmission;
+};
+
+export type TicketSubmission = {
+  draftId: string;
+  requesterId: number;
+  title: string;
+  description: string;
+  mediaIds: string[];
 };
 
 const text = (body: string): Reply => ({ type: "text", body });
@@ -107,7 +118,7 @@ const codePrompt = text(
   "Se o e-mail puder ser verificado, você receberá um código. Envie apenas o código completo, começando com MNS-. Para informar o e-mail novamente, digite *Reenviar*.",
 );
 const pendingReply = text(
-  "O rascunho está confirmado e salvo. O registro no GLPI ainda está em preparação.",
+  "Rascunho confirmado. Vou enviar o chamado ao GLPI e avisar quando houver um resultado.",
 );
 const menu = buttons(
   "Como posso ajudar? Você pode retomar um rascunho em *Abrir chamado*.",
@@ -131,7 +142,7 @@ function draftButtons(
 function mediaPrompt(draft: Draft): Reply {
   return draftButtons(
     draft,
-    "Envie fotos, áudios ou documentos, até cinco anexos. Quando terminar, selecione *Revisar rascunho*.",
+    "Envie até cinco anexos de até 10 MB cada. Aceitamos fotos JPEG/PNG, áudios OGG/MP3/AAC/MP4/AMR e documentos PDF. Selecione *Revisar rascunho* quando terminar.",
     ["review", "Revisar rascunho"],
     ["cancel", "Cancelar"],
   );
@@ -175,6 +186,7 @@ const aliases: Readonly<Record<string, string>> = {
   "revisar rascunho": "draft:review",
   pular: "draft:review",
   confirmar: "draft:confirm",
+  "novo chamado": "draft:new",
   editar: "draft:edit",
   resolveu: "draft:resolved",
   "ainda preciso de ajuda": "draft:unresolved",
@@ -293,8 +305,24 @@ function routeDraft(
           state: withDraft("menu", {
             ...draft,
             confirmedAt: now.toISOString(),
+            submissionVersion: 1,
           }),
           reply: pendingReply,
+          submission: {
+            draftId: draft.id,
+            requesterId: draft.ownerId,
+            title:
+              "Suporte via WhatsApp — " +
+              draft.category?.replace(/\p{Cc}+/gu, " "),
+            description: [
+              "Categoria: " + draft.category,
+              "Unidade ou setor: " + draft.unit,
+              "Descrição: " + draft.description,
+              "Impacto: " + draft.impact,
+              "Referência MNS: " + draft.id,
+            ].join("\n"),
+            mediaIds: draft.attachments.map(({ mediaId }) => mediaId),
+          },
         };
       return intake(draft);
     case "edit": {
@@ -387,6 +415,39 @@ export function readConversationState(value: unknown): Conversation {
   return value;
 }
 
+export function reopenTicketReview(draft: Draft): ConversationMove {
+  const {
+    confirmedAt: _confirmation,
+    submissionVersion: _version,
+    uncertainSubmission: _uncertain,
+    ...fields
+  } = draft;
+  return intake({ ...fields, step: "review", revision: draft.revision + 1 });
+}
+
+export function uncertainTicket(
+  draft: Draft,
+  supportContact: string,
+): ConversationMove {
+  return {
+    state: withDraft("menu", {
+      ...draft,
+      uncertainSubmission: true,
+      attachments: [],
+    }),
+    reply: draftButtons(
+      draft,
+      "O GLPI não confirmou se o chamado foi aberto. Para verificar antes de reenviar este problema, contate a TI por " +
+        supportContact +
+        " e informe a referência " +
+        draft.id +
+        ".",
+      ["new", "Novo chamado"],
+      ["menu:it", "Falar com a TI"],
+    ),
+  };
+}
+
 export function readConversationInput(
   input: unknown,
 ): ConversationInput | undefined {
@@ -457,9 +518,29 @@ export function routeConversation(
 
   const draft = state.draft?.ownerId === userId ? state.draft : undefined;
   const menuState = withDraft("menu", draft);
+  if (draft?.uncertainSubmission) {
+    if (command !== "draft:new") return uncertainTicket(draft, supportContact);
+    return intake({
+      id: context.draftId,
+      ownerId: userId,
+      step: "category",
+      revision: 1,
+      editing: false,
+      attachments: [],
+    });
+  }
   if (command === "menu") return { state: menuState, reply: menu };
+  if (
+    draft?.confirmedAt &&
+    !draft.submissionVersion &&
+    command !== "draft:cancel"
+  )
+    return reopenTicketReview(draft);
+  if (draft?.submissionVersion && command === "draft:confirm")
+    return { state: menuState, reply: pendingReply };
   if (command === "draft:cancel") {
-    if (draft?.confirmedAt) return { state: menuState, reply: pendingReply };
+    if (draft?.submissionVersion)
+      return { state: menuState, reply: pendingReply };
     return {
       state: { phase: "menu" },
       reply: buttons(

@@ -141,6 +141,16 @@
       "file": "pages/database/whatsapp_outbound_messages.json"
     },
     {
+      "id": "database/whatsapp_ticket_submissions",
+      "kind": "database",
+      "title": "whatsapp_ticket_submissions",
+      "group": "WhatsApp ticket submission",
+      "source": "docs/generated/database/schema.md",
+      "summary": "Durable work and outcome for one verified, confirmed WhatsApp draft submitted to GLPI.",
+      "headings": [],
+      "file": "pages/database/whatsapp_ticket_submissions.json"
+    },
+    {
       "id": "database/whatsapp_troubleshooting_feedback",
       "kind": "database",
       "title": "whatsapp_troubleshooting_feedback",
@@ -1067,19 +1077,19 @@
     "shards": [
       {
         "file": "search/0000.json",
-        "count": 68,
+        "count": 59,
         "kinds": ["api", "component", "database", "repository"]
       },
-      { "file": "search/0001.json", "count": 109, "kinds": ["repository"] },
+      { "file": "search/0001.json", "count": 110, "kinds": ["repository"] },
       { "file": "search/0002.json", "count": 120, "kinds": ["repository"] },
       { "file": "search/0003.json", "count": 153, "kinds": ["repository"] },
-      { "file": "search/0004.json", "count": 114, "kinds": ["repository"] },
-      { "file": "search/0005.json", "count": 114, "kinds": ["repository"] },
-      { "file": "search/0006.json", "count": 98, "kinds": ["repository"] },
-      { "file": "search/0007.json", "count": 101, "kinds": ["repository"] },
-      { "file": "search/0008.json", "count": 94, "kinds": ["repository"] },
-      { "file": "search/0009.json", "count": 12, "kinds": ["repository"] }
+      { "file": "search/0004.json", "count": 115, "kinds": ["repository"] },
+      { "file": "search/0005.json", "count": 115, "kinds": ["repository"] },
+      { "file": "search/0006.json", "count": 95, "kinds": ["repository"] },
+      { "file": "search/0007.json", "count": 93, "kinds": ["repository"] },
+      { "file": "search/0008.json", "count": 108, "kinds": ["repository"] },
+      { "file": "search/0009.json", "count": 19, "kinds": ["repository"] }
     ],
-    "count": 983
+    "count": 987
   }
 }

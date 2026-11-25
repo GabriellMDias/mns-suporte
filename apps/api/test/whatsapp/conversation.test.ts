@@ -378,9 +378,13 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
       expect(edited.body).toContain("após reiniciar");
       await send(metaButton(oldConfirm));
       expect((await draftState()).draft?.confirmedAt).toBeUndefined();
-      expect((await send(metaText("Confirmar"))).reply.body).toContain(
-        "rascunho está confirmado",
-      );
+      const confirmed = await send(metaText("Confirmar"));
+      expect(confirmed.reply.body).toContain("Rascunho confirmado");
+      expect((await app.inject(confirmed.request)).statusCode).toBe(200);
+      await send(metaText("Confirmar"));
+      expect(await database.whatsAppTicketSubmission.findMany()).toMatchObject([
+        { draftId, requesterId: 37n, mediaIds: ["10002"], state: "PENDING" },
+      ]);
       expect((await draftState()).draft).toMatchObject({
         ownerId: 37,
         description: "Impressora travou mesmo após reiniciar.",
@@ -402,13 +406,103 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
           where: { conversationProcessedAt: null },
         }),
       ).toBe(0);
-      // Enable the real module wiring for a second business number. Only
-      // the provider transport is stubbed, so both workers run normally.
+      // Exercise the real module wiring for a second number and stub only provider HTTP.
       const wiredPhone = "20202";
-      const accepted = Response.json({
-        messages: [{ id: "wamid.synthetic-runtime-reply" }],
+      const wiredScope = scopeOf({ ...sender, businessPhoneId: wiredPhone })!;
+      await database.whatsAppVerifiedIdentity.create({
+        data: {
+          scopeKey: wiredScope,
+          glpiUserId: 37,
+          verifiedAt: clock(),
+          expiresAt: new Date(now + 86_400_000),
+        },
       });
-      const fakeFetch = vi.fn<typeof fetch>().mockResolvedValue(accepted);
+      const wiredDraftId = "00000000-0000-4000-8000-000000000001";
+      await database.whatsAppConversation.create({
+        data: {
+          scopeKey: wiredScope,
+          state: {
+            phase: "intake",
+            draft: {
+              id: wiredDraftId,
+              ownerId: 37,
+              step: "review",
+              revision: 8,
+              editing: false,
+              category: "Equipamentos",
+              unit: "Loja Centro",
+              description: "Impressora <travou>.",
+              impact: "Um caixa afetado",
+              attachments: [{ type: "image", mediaId: "10003" }],
+            },
+          },
+          updatedAt: clock(),
+        },
+      });
+      const replies: string[] = [];
+      const fakeFetch = vi.fn<typeof fetch>(async (input, init) => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith("/messages")) {
+          const body = JSON.parse(String(init?.body)) as {
+            text: { body: string };
+          };
+          replies.push(body.text.body);
+          return Response.json({
+            messages: [{ id: "wamid.synthetic-runtime-" + replies.length }],
+          });
+        }
+        if (url.pathname.endsWith("/initSession"))
+          return Response.json({ session_token: "synthetic-session" });
+        if (url.pathname.endsWith("/Ticket")) {
+          expect(init?.method).toBe("POST");
+          expect(JSON.parse(String(init?.body))).toEqual({
+            input: {
+              name: "Suporte via WhatsApp — Equipamentos",
+              content:
+                "Categoria: Equipamentos<br>Unidade ou setor: Loja Centro<br>Descrição: Impressora &lt;travou&gt;.<br>Impacto: Um caixa afetado<br>Referência MNS: " +
+                wiredDraftId,
+              _users_id_requester: 37,
+            },
+          });
+          return Response.json({ id: 112 }, { status: 201 });
+        }
+        if (url.pathname.endsWith("/10003")) {
+          expect(url.searchParams.get("phone_number_id")).toBe(wiredPhone);
+          return Response.json({
+            id: "10003",
+            url: "https://lookaside.fbsbx.com/whatsapp_business/attachments/?mid=10003",
+            mime_type: "image/jpeg",
+            file_size: 3,
+          });
+        }
+        if (url.hostname === "lookaside.fbsbx.com")
+          return new Response(new Uint8Array([255, 216, 255]), {
+            headers: { "content-type": "image/jpeg" },
+          });
+        if (url.pathname.endsWith("/Document")) {
+          const multipart = init?.body;
+          if (!(multipart instanceof FormData))
+            throw new Error("Expected GLPI multipart payload");
+          const filename = "mns-" + wiredDraftId + "-1.jpg";
+          expect(
+            JSON.parse(String(multipart.get("uploadManifest"))),
+          ).toMatchObject({
+            input: { _filename: [filename], itemtype: "Ticket", items_id: 112 },
+          });
+          const file = multipart.get("filename[0]");
+          if (!(file instanceof File)) throw new Error("Expected a file");
+          expect(file.name).toBe(filename);
+          expect(new Uint8Array(await file.arrayBuffer())).toEqual(
+            new Uint8Array([255, 216, 255]),
+          );
+          return Response.json({ id: "19" }, { status: 201 });
+        }
+        if (url.pathname.endsWith("/Ticket/112")) {
+          expect(url.searchParams.get("with_documents")).toBe("true");
+          return Response.json({ id: 112, _documents: [{ id: 19 }] });
+        }
+        throw new Error("Unexpected provider request");
+      });
       vi.stubGlobal("fetch", fakeFetch);
       const wiredApp = createApp(logger, undefined, {
         modules: activateModules(
@@ -451,25 +545,38 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
         const incoming = delivery(
           now,
           "wamid.runtime-guided",
-          metaText("Falar com a TI"),
+          metaButton("draft:confirm:" + wiredDraftId + ":8"),
           wiredPhone,
         );
         expect((await wiredApp.inject(incoming)).statusCode).toBe(200);
         await vi.waitFor(
           async () => {
-            const sent = await database.whatsAppOutboundMessage.findFirst({
+            const sent = await database.whatsAppOutboundMessage.findMany({
               where: { businessPhoneId: wiredPhone, state: "ACCEPTED" },
             });
-            expect(sent?.payload).toMatchObject({
-              content: {
-                type: "text",
-                body: "Fale com a equipe de TI por " + supportContact + ".",
-              },
-            });
+            expect(sent.map(({ payload }) => payload)).toContainEqual(
+              expect.objectContaining({
+                content: {
+                  type: "text",
+                  body: "Chamado *#112* aberto no GLPI.\nAnexos incluídos: 1.",
+                },
+              }),
+            );
           },
           { timeout: 6000 },
         );
-        expect(fakeFetch).toHaveBeenCalledTimes(1);
+        expect(replies).toHaveLength(2);
+        expect(
+          await database.whatsAppTicketSubmission.findUniqueOrThrow({
+            where: { draftId: wiredDraftId },
+          }),
+        ).toMatchObject({
+          state: "COMPLETED",
+          ticketId: 112n,
+          attachedCount: 1,
+          mediaIds: [],
+          recipient: null,
+        });
       } finally {
         await wiredApp.close();
         vi.unstubAllGlobals();

@@ -1,0 +1,32 @@
+enum WhatsAppTicketSubmissionState {
+  PENDING
+  COMPLETED
+  FAILED
+  UNCERTAIN
+}
+
+model WhatsAppTicketSubmission {
+  draftId              String                        @id(map: "whatsapp_ticket_submissions_pkey") @map("draft_id") @db.Uuid
+  businessPhoneId      String                        @map("business_phone_id")
+  scopeKey             String                        @map("scope_key")
+  requesterId          BigInt                        @map("requester_id")
+  recipient            Json?
+  replyExpiresAt       DateTime                      @map("reply_expires_at") @db.Timestamptz(3)
+  title                String?
+  description          String?
+  mediaIds             Json                          @map("media_ids")
+  attachmentCount      Int                           @map("attachment_count")
+  nextAttachment       Int                           @default(0) @map("next_attachment")
+  attachedCount        Int                           @default(0) @map("attached_count")
+  uncertainAttachments Int                           @default(0) @map("uncertain_attachments")
+  ticketId             BigInt?                       @map("ticket_id")
+  state                WhatsAppTicketSubmissionState @default(PENDING)
+  attempts             Int                           @default(0)
+  availableAt          DateTime                      @map("available_at") @db.Timestamptz(3)
+  claimId              String?                       @map("claim_id") @db.Uuid
+  mutating             Boolean                       @default(false)
+  updatedAt            DateTime                      @map("updated_at") @db.Timestamptz(3)
+
+  @@index([businessPhoneId, state, availableAt, draftId], map: "whatsapp_ticket_submissions_dispatch_idx")
+  @@map("whatsapp_ticket_submissions")
+}

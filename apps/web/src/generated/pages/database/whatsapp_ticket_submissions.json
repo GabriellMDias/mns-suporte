@@ -1,0 +1,227 @@
+{
+  "kind": "database",
+  "name": "whatsapp_ticket_submissions",
+  "description": "Durable work and outcome for one verified, confirmed WhatsApp draft submitted to GLPI.",
+  "owner": "WhatsApp ticket submission",
+  "classification": "RESTRICTED",
+  "lifecycle": "Starts when an employee confirms a draft. Confirmed ticket creation clears the work summary. Terminal results clear the active reply address and media references. Retain durable outcomes for reconciliation and deduplication under the project retention policy.",
+  "columns": [
+    {
+      "Column": "draft_id",
+      "PostgreSQL type": "uuid",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Unique opaque identifier of the confirmed draft and GLPI reconciliation reference.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "business_phone_id",
+      "PostgreSQL type": "text",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Meta business phone number ID owning the submission job.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "scope_key",
+      "PostgreSQL type": "text",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Verified sender scope used to update the correct conversation.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "requester_id",
+      "PostgreSQL type": "bigint",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Verified GLPI requester chosen at confirmation.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "recipient",
+      "PostgreSQL type": "jsonb",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "WhatsApp address for the eventual response. Cleared at the terminal outcome.",
+      "Null meaning": "The submission no longer needs its reply address.",
+      "Unit": "—"
+    },
+    {
+      "Column": "reply_expires_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Deadline of the customer service window associated with confirmation.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "title",
+      "PostgreSQL type": "text",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Ticket title derived from the confirmed category. Cleared after creation or terminal failure.",
+      "Null meaning": "The title is no longer needed for creation.",
+      "Unit": "—"
+    },
+    {
+      "Column": "description",
+      "PostgreSQL type": "text",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Confirmed ticket summary with its opaque reconciliation reference. Cleared after creation or terminal failure.",
+      "Null meaning": "The summary is no longer needed for creation.",
+      "Unit": "—"
+    },
+    {
+      "Column": "media_ids",
+      "PostgreSQL type": "jsonb",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Ordered Meta media identifiers to resolve at delivery time. Cleared when processing ends.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "attachment_count",
+      "PostgreSQL type": "integer",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Number of media references in the confirmed draft.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "next_attachment",
+      "PostgreSQL type": "integer",
+      "Nullable": "no",
+      "Default": "0",
+      "Classification": "INTERNAL",
+      "Meaning": "Zero-based position of the next media reference to process.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "attached_count",
+      "PostgreSQL type": "integer",
+      "Nullable": "no",
+      "Default": "0",
+      "Classification": "INTERNAL",
+      "Meaning": "Number of documents whose association to the ticket was confirmed.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "uncertain_attachments",
+      "PostgreSQL type": "integer",
+      "Nullable": "no",
+      "Default": "0",
+      "Classification": "INTERNAL",
+      "Meaning": "Number of document writes whose association or outcome could not be confirmed.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "ticket_id",
+      "PostgreSQL type": "bigint",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Authoritative GLPI ticket ID returned by successful creation.",
+      "Null meaning": "GLPI has not confirmed a ticket for the draft.",
+      "Unit": "—"
+    },
+    {
+      "Column": "state",
+      "PostgreSQL type": "\"WhatsAppTicketSubmissionState\"",
+      "Nullable": "no",
+      "Default": "'PENDING'::\"WhatsAppTicketSubmissionState\"",
+      "Classification": "INTERNAL",
+      "Meaning": "Current dispatch or terminal state for the confirmed draft.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "attempts",
+      "PostgreSQL type": "integer",
+      "Nullable": "no",
+      "Default": "0",
+      "Classification": "INTERNAL",
+      "Meaning": "Number of worker claims for the current ticket or attachment step.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "available_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Earliest retry instant or deadline of the active worker claim.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "claim_id",
+      "PostgreSQL type": "uuid",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Temporary worker ownership token that fences stale writes.",
+      "Null meaning": "No worker holds a claim for the current step.",
+      "Unit": "—"
+    },
+    {
+      "Column": "mutating",
+      "PostgreSQL type": "boolean",
+      "Nullable": "no",
+      "Default": "false",
+      "Classification": "INTERNAL",
+      "Meaning": "Durable evidence that a non-idempotent GLPI mutation may have been started.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "updated_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Instant of the latest claim or durable progress transition.",
+      "Null meaning": "—",
+      "Unit": "—"
+    }
+  ],
+  "constraints": [
+    {
+      "Object": "whatsapp_ticket_submissions_pkey",
+      "Physical definition": "PRIMARY KEY (draft_id)",
+      "Purpose": "Prevents two jobs for the same verified draft."
+    },
+    {
+      "Object": "whatsapp_ticket_submissions_progress_check",
+      "Physical definition": "CHECK ((((attachment_count >= 0) AND (attachment_count <= 5)) AND ((next_attachment >= 0) AND (next_attachment <= attachment_count)) AND (attached_count >= 0) AND (uncertain_attachments >= 0) AND ((attached_count + uncertain_attachments) <= next_attachment) AND (attempts >= 0) AND ((state <> 'COMPLETED'::\"WhatsAppTicketSubmissionState\") OR ((ticket_id IS NOT NULL) AND (next_attachment = attachment_count))) AND ((state <> ALL (ARRAY['FAILED'::\"WhatsAppTicketSubmissionState\", 'UNCERTAIN'::\"WhatsAppTicketSubmissionState\"])) OR (ticket_id IS NULL)) AND ((NOT mutating) OR (claim_id IS NOT NULL))))",
+      "Purpose": "Enforces consistent progress, result and claim counts."
+    },
+    {
+      "Object": "whatsapp_ticket_submissions_dispatch_idx",
+      "Physical definition": "CREATE INDEX whatsapp_ticket_submissions_dispatch_idx ON public.whatsapp_ticket_submissions USING btree (business_phone_id, state, available_at, draft_id)",
+      "Purpose": "Finds eligible jobs for one Meta business phone number."
+    }
+  ]
+}

@@ -5,7 +5,8 @@ export function registerWhatsAppDispatchWorker(
   dispatch: (signal: AbortSignal) => Promise<boolean>,
   failureEvent:
     | "whatsapp_dispatch_unavailable"
-    | "whatsapp_conversation_unavailable" = "whatsapp_dispatch_unavailable",
+    | "whatsapp_conversation_unavailable"
+    | "whatsapp_ticket_submission_unavailable" = "whatsapp_dispatch_unavailable",
 ): void {
   const controller = new AbortController();
   let timer: NodeJS.Timeout | undefined;

@@ -1,5 +1,95 @@
 [
   {
+    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
+    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Log Bodies and Complete Request Data for Maximum Diagnostics",
+    "anchor": "log-bodies-and-complete-request-data-for-maximum-diagnostics",
+    "text": "Log Bodies and Complete Request Data for Maximum Diagnostics\nOrion could log complete requests, responses, headers, and payloads to maximize debugging information.\nIt was not selected because doing so would create substantial security and privacy risk and could significantly increase storage and processing cost.\nStructured observability should record intentional diagnostic context rather than indiscriminately duplicate application data.\n"
+  },
+  {
+    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
+    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Global Sentry or Equivalent Error Reporting Provider",
+    "anchor": "global-sentry-or-equivalent-error-reporting-provider",
+    "text": "Global Sentry or Equivalent Error Reporting Provider\nOrion could select a dedicated error-reporting service as part of the foundation.\nThis would provide a ready-made error monitoring experience.\nIt was not selected because provider requirements differ by application and deployment.\nStructured logging and tracing provide the provider-neutral foundation, while a dedicated error-reporting service may be added when required.\n"
+  },
+  {
+    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
+    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Logs as Business Audit History",
+    "anchor": "logs-as-business-audit-history",
+    "text": "Logs as Business Audit History\nOrion could use structured application logs to answer business audit questions.\nThis appears simple because many relevant operations already produce logs.\nIt was not selected because operational logs generally do not provide the persistence, integrity, authorization, retention, or domain guarantees required for authoritative audit history.\nAudit history remains a separate application responsibility.\n"
+  },
+  {
+    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
+    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Browser OpenTelemetry Instrumentation as a Baseline",
+    "anchor": "browser-opentelemetry-instrumentation-as-a-baseline",
+    "text": "Browser OpenTelemetry Instrumentation as a Baseline\nOrion could instrument React applications with OpenTelemetry from the beginning to create end-to-end traces from browser interactions to database queries.\nThis could provide useful distributed diagnostics.\nIt was not selected as part of the initial baseline because browser observability has different operational, privacy, performance, and maturity considerations from server-side instrumentation.\nFrontend observability will be introduced when real application requirements justify it.\n"
+  },
+  {
+    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
+    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Consequences",
+    "anchor": "consequences",
+    "text": "Consequences\n"
+  },
+  {
+    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
+    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Positive",
+    "anchor": "positive",
+    "text": "Positive\nOrion receives a vendor-neutral observability foundation.\nTraces and metrics use one broadly interoperable telemetry standard.\nPino remains a focused and mature structured logging implementation.\nLogs can be correlated with distributed traces through `trace_id` and `span_id`.\nIndependent request IDs remain available for straightforward request correlation.\nFastify and Prisma can participate in distributed traces through supported instrumentation.\nStandard trace propagation allows future distributed services to preserve causal traces.\nOTLP reduces coupling between applications and observability backends.\nThe OpenTelemetry Collector can centralize production telemetry concerns when needed.\nApplications can change observability vendors without rewriting domain or application behavior.\nProduction logs are machine-readable structured JSON.\nRedaction requirements reduce accidental secret and sensitive-data exposure.\nMetric-cardinality rules reduce observability-system reliability and cost risks.\nSampling remains tunable according to real deployment characteristics.\nError-reporting providers can be introduced without becoming global foundation dependencies.\nOperational telemetry remains clearly distinct from authoritative audit history.\nBrowser observability can evolve independently when real requirements become known.\n"
+  },
+  {
+    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
+    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Negative",
+    "anchor": "negative",
+    "text": "Negative\nThe observability stack contains multiple complementary technologies rather than one unified telemetry API.\nContributors must understand the distinction between logs, traces, metrics, and audit records.\nOpenTelemetry instrumentation adds runtime and configuration overhead.\nTracing can increase CPU, memory, network, and storage consumption.\nExcessive spans can increase telemetry cost and reduce signal quality.\nMetrics require disciplined attribute design to avoid cardinality problems.\nTrace/log correlation depends on correctly propagated asynchronous context.\nA production Collector introduces another infrastructure component when deployed.\nVendor neutrality does not eliminate backend-specific configuration in deployment infrastructure.\nDirect stdout logging relies on the execution environment to collect and persist logs appropriately.\nRedaction configuration requires maintenance as request structures and integrations evolve.\nBrowser observability is not solved by the initial foundation.\nDedicated business audit requirements will require separate application design.\n"
+  },
+  {
+    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
+    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Operational or Migration Impact",
+    "anchor": "operational-or-migration-impact",
+    "text": "Operational or Migration Impact\nOrion already selected Pino as the Fastify runtime logger, so structured logging implementation does not require replacement.\nThe initial observability implementation should introduce OpenTelemetry before instrumented infrastructure is initialized.\nServer bootstrap should follow an ordering compatible with:\nconfiguration\n    ↓\nobservability initialization\n    ↓\ninstrumentation registration\n    ↓\nPrisma / Fastify / HTTP infrastructure\n    ↓\napplication composition\n\nFastify instrumentation should use `@fastify/otel`.\nPrisma tracing should use the supported Prisma OpenTelemetry instrumentation compatible with the repository's selected Prisma version.\nHTTP instrumentation must support distributed context propagation for inbound and outbound calls.\nPino tracing correlation should inject active `trace_id` and `span_id` values centrally rather than requiring manual fields at each logging call.\nPino configuration must establish production JSON logging and centralized redaction.\nThe initial server-side telemetry export should support OTLP through configuration.\nProduction deployments may send OTLP either:\napplication\n    → Collector\n    → backend\n\nor, for simpler environments:\napplication\n    → compatible backend\n\nwithout changing domain or application code.\nTelemetry resource identity must be configured explicitly for each executable service.\nSampling must be externally configurable and must not require source-code changes.\nGraceful shutdown should attempt to flush buffered telemetry before process termination when practical.\nNo OpenTelemetry Logs SDK integration, browser instrumentation, observability vendor, or external error-reporting provider is required by the initial Orion implementation.\nRepository validation should verify observability configuration and architecture where such verification can be performed mechanically.\nOperational dashboards, alert thresholds, telemetry retention, and backend-specific infrastructure remain deployment concerns and may be documented by application-specific runbooks.\nRoutine compatible upgrades to OpenTelemetry, Pino, Fastify instrumentation, Prisma instrumentation, or OTLP exporters do not require a new ADR when the responsibilities established here remain unchanged.\nSelecting a particular observability backend for one deployment does not supersede this ADR.\nReplacing OpenTelemetry as the observability standard, replacing Pino as the logging strategy, or materially changing the responsibility boundaries defined here would require an ADR that supersedes this decision.\n"
+  },
+  {
+    "id": "repository/docs/adr/0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy",
+    "title": "ADR-0010: Establish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "References",
+    "anchor": "references",
+    "text": "References\nRelated ADR: [ADR-0003: Establish Repository Validation and Architecture Enforcement](0003-establish-repository-validation-and-architecture-enforcement.md)\nRelated ADR: [ADR-0004: Select Fastify as the Backend HTTP Framework](0004-select-fastify-as-the-backend-http-framework.md)\nRelated ADR: [ADR-0006: Select Prisma ORM for Database Access and Migrations](0006-select-prisma-orm-for-database-access-and-migrations.md)\nRelated policy: [error handling](../architecture/error-handling.md)\nRelated policy: [configuration](../architecture/configuration.md)\nRelated policy: [logging](../reliability/logging.md)\nRelated policy: [observability](../reliability/observability.md)\nRelated policy: [data classification](../security/data-classification.md)\nRelated policy: [secrets management](../security/secrets-management.md)\nExternal reference: OpenTelemetry JavaScript documentation.\nExternal reference: OpenTelemetry specification and semantic conventions.\nExternal reference: OpenTelemetry Protocol documentation.\nExternal reference: OpenTelemetry Collector documentation.\nExternal reference: `@fastify/otel` documentation.\nExternal reference: Prisma OpenTelemetry tracing documentation.\nExternal reference: OpenTelemetry Pino instrumentation documentation.\nExternal reference: Pino documentation.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "anchor": "adr-0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "text": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy\n**Status:** accepted\n**Date:** 2026-09-23\n"
+  },
+  {
     "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
     "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
     "group": "Decisions",
@@ -1285,95 +1375,5 @@
     "heading": "Negative",
     "anchor": "negative",
     "text": "Negative\nInternal deployment operators must explicitly select and protect a distinct artifact; the build cannot verify their real host's access controls.\nProducts that previously used `/docs` as end-user help must migrate those links and content.\nPublic documentation requires an approved source inventory and a product-owned publication implementation when needed.\n"
-  },
-  {
-    "id": "repository/docs/adr/0018-isolate-internal-documentation-from-product-distribution",
-    "title": "ADR-0018: Isolate Internal Documentation from Product Distribution",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Operational or Migration Impact",
-    "anchor": "operational-or-migration-impact",
-    "text": "Operational or Migration Impact\nProduction `/docs` availability intentionally changes; source, local routes, generators, SDKs, database and manifest schemas remain compatible. Rebuild and remove stale deployed assets rather than only changing links. Existing intentional internal deployments must select the protected internal build. The [migration policy](../architecture/living-documentation.md#existing-project-migration) describes adoption. No derived repository, release, remote push, provider, or deployment is changed by this implementation.\n"
-  },
-  {
-    "id": "repository/docs/adr/0018-isolate-internal-documentation-from-product-distribution",
-    "title": "ADR-0018: Isolate Internal Documentation from Product Distribution",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "References",
-    "anchor": "references",
-    "text": "References\n[Living Documentation policy](../architecture/living-documentation.md)\n[ADR-0008: web stack](0008-select-react-vite-and-tanstack-for-web-applications.md)\n[ADR-0017: clean derived baseline](0017-start-derived-projects-from-a-clean-foundation-baseline.md)\n[Project derivation](../project-derivation.md)\n[Build isolation tests](../../apps/web/scripts/documentation-build.test.mjs)\n"
-  },
-  {
-    "id": "repository/docs/adr/AGENTS",
-    "title": "ADR Instructions",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "ADR Instructions",
-    "anchor": "adr-instructions",
-    "text": "ADR Instructions\nConsult the [decision index](README.md) and [authoring policy](authoring.md) before creating or changing an ADR.\nStart new proposals with the [template](template.md) and `proposed` status. Acceptance is distinct from implementation completion.\nPreserve accepted rationale, decisions, dates, and stable identifiers. Architectural changes require a new decision and explicit supersession, not rewritten history.\nRetain meaningful alternatives, negative consequences, constraints, and evidence. Do not invent evaluations to fill the template.\nUpdate current policy and reciprocal supersession references when an accepted architectural change requires them.\n"
-  },
-  {
-    "id": "repository/docs/adr/authoring",
-    "title": "Authoring Architecture Decision Records",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Authoring Architecture Decision Records",
-    "anchor": "authoring-architecture-decision-records",
-    "text": "Authoring Architecture Decision Records\nUse the [decision index](README.md) to search existing decisions and the [template](template.md) to draft a record. ADRs preserve decision history and rationale; current policy describes current architecture. Git, migrations, changelogs, design documents, and runbooks retain their separate responsibilities.\n"
-  },
-  {
-    "id": "repository/docs/adr/authoring",
-    "title": "Authoring Architecture Decision Records",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "When a decision needs an ADR",
-    "anchor": "when-a-decision-needs-an-adr",
-    "text": "When a decision needs an ADR\nCreate an ADR for a significant choice whose rationale a future contributor cannot reliably infer from implementation. Relevant effects include system boundaries, dependency direction, ownership, runtime/deployment topology, security, persistence, public contracts, cross-cutting technology, operational behavior, and long-term maintainability.\nConsider the breadth, reversibility, long-term dependency, plausible alternatives, integrity/security implications, and risk of losing the reasoning. Ordinary local refactors, fixes, tests, small helpers, individual indexes, and routine dependency additions do not each need an ADR. Major technology choices generally do. Existing foundation policies do not each need retroactive ADRs.\nAn ADR records a sufficiently concrete architectural conclusion, not every discussion or rejected idea. It must not become a task tracker, changelog, runbook, detailed implementation design, or snapshot of volatile vendor data. A separate RFC system is not required. Bundle decisions only when their rationale and lifecycle belong together; avoid giant records deciding unrelated parts of the stack.\n"
-  },
-  {
-    "id": "repository/docs/adr/authoring",
-    "title": "Authoring Architecture Decision Records",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Lifecycle and historical integrity",
-    "anchor": "lifecycle-and-historical-integrity",
-    "text": "Lifecycle and historical integrity\nStatus\nMeaning\n`proposed`\nUnder active consideration; implementation must not assume finality unless explicitly exploratory\n`accepted`\nApproved architectural direction; implementation and current documentation should align, allowing an explicit migration period\n`rejected`\nConsidered and deliberately not adopted\n`superseded`\nPreviously accepted, then replaced by another decision; link the replacement\n`deprecated`\nHistorically relevant but no longer appropriate for new architecture; use sparingly when replacement is transitional or incomplete\nDo not add statuses without a clear need. Normal transitions are proposed to accepted/rejected and accepted to superseded/deprecated. Do not normally revert historical decisions to proposed; create a new record when reconsidering them.\nAccepted does not mean implemented or released. Track pending/partial/completed implementation through normal issues, tasks, or pull requests, not extra ADR statuses. Exploratory work and proofs of concept provide evidence but do not themselves establish acceptance. Long-lived production implementation should generally not rely on an unresolved major proposal.\nAccepted substantive history should remain immutable. Non-semantic spelling, formatting, broken-link, and obvious-typo corrections may be acceptable, but must not change historical meaning. When architecture changes, create a new ADR. Retain the old record, mark it superseded, and add reciprocal `Supersedes` / `Superseded by` references. Keep the original date. For partial supersession, identify precisely what remains valid, what changed, and which decision replaces it.\nRejected records can preserve useful evaluation and constraints; a changed context can justify reconsideration in a new ADR. Do not treat rejection as a permanent prohibition. Purely local abandoned proposals may be removed before meaningful shared history; preserve broadly reviewed or referenced proposals as rejected where useful. Do not record every immediately dismissed idea.\n"
-  },
-  {
-    "id": "repository/docs/adr/authoring",
-    "title": "Authoring Architecture Decision Records",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Identity and metadata",
-    "anchor": "identity-and-metadata",
-    "text": "Identity and metadata\nUse monotonic numeric identifiers and descriptive English filenames of the form `NNNN-short-decision-title.md`. Numbers identify records, not importance, domain, priority, or version. Gaps are acceptable. Never reuse or renumber identifiers already in shared history. Resolve parallel numbering conflicts before merge; an unshared identifier may be changed.\nRecord title, status, date, context, decision, and consequences. For accepted records, the date should generally be the acceptance date. Titles should describe the decision rather than merely name a topic. Preserve identifiers once merged and referenced.\nSimple Markdown metadata is the current format. `pnpm docs:check` validates filenames, matching titles/IDs, status, ISO dates, required sections, and index membership. Preserve these field names as tooling contracts. Supersession semantics still require review; no automatic numbering or supersession checker is implemented. ADR files remain canonical; avoid duplicate status stores or custom ADR software without a concrete need.\n"
-  },
-  {
-    "id": "repository/docs/adr/authoring",
-    "title": "Authoring Architecture Decision Records",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Content and evidence",
-    "anchor": "content-and-evidence",
-    "text": "Content and evidence\n**Context:** explain the actual problem, relevant constraints, scope, timing, and assumptions. Avoid unnecessary implementation detail.\n**Decision:** state the chosen direction clearly enough to understand independently of the alternatives.\n**Rationale:** explain the material tradeoffs, evidence, and constraints. Distinguish confirmed evidence, reasoned tradeoffs, and assumptions.\n**Alternatives:** describe serious alternatives considered; do not fabricate alternatives or evaluation evidence to fill a template.\n**Consequences:** include benefits, costs, limitations, new responsibilities, security/operational effects, and reversibility or migration costs where relevant. Formal scoring is not required.\n**References:** link relevant repository policy, earlier decisions, designs, benchmarks, proofs of concept, and durable evidence. Avoid unnecessary dependency graphs and large volatile datasets. Preserve enough explanation that disappearing external links do not destroy the rationale.\nUse current evidence at decision time when product capability, support lifecycle, pricing, security status, or provider limits matter. Vendor documentation can support constraints but must not be the sole location of the explanation. Detailed implementation and operational migration steps normally belong outside the ADR.\n"
-  },
-  {
-    "id": "repository/docs/adr/authoring",
-    "title": "Authoring Architecture Decision Records",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Creation, review, and acceptance",
-    "anchor": "creation-review-and-acceptance",
-    "text": "Creation, review, and acceptance\nSearch the index and related policies for the same question, accepted direction, superseded decision, or rejected alternative. Determine whether this is an architectural decision rather than an implementation detail.\nAllocate the next available identifier, copy the template, and use `proposed` status.\nDocument context, explicit direction, meaningful alternatives, rationale, constraints, and positive and negative consequences while the context is still known.\nReview in proportion to impact: is the problem real, the complexity justified, and the choice consistent with existing architecture? Identify conflicts and intentional deviations explicitly.\nAccept or reject through repository review. For a small team, review, merge, and accepted status are sufficient; do not add governance ceremony without a concrete need.\nOn acceptance, update affected current documentation and implement the selected direction with relevant verification. Do not retain rejected experimental paths unnecessarily.\nFor supersession, additionally identify changed constraints, reciprocal references, affected current policy, and compatibility/migration work. For rejection, record decisive reasons, preferred alternatives where applicable, and conditions that could justify reconsideration.\nRetrospective ADRs should say the decision was already in effect. Record only known reasoning and state uncertainty rather than inventing a historical evaluation. Significant principle deviations belong in the decision and corresponding current-policy update. When later accepted decisions supersede older records, follow the replacement and current policy rather than treating the superseded record as current architecture.\n"
-  },
-  {
-    "id": "repository/docs/adr/authoring",
-    "title": "Authoring Architecture Decision Records",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Maintenance and deferred mechanisms",
-    "anchor": "maintenance-and-deferred-mechanisms",
-    "text": "Maintenance and deferred mechanisms\nRoutine maintenance should be limited to permitted corrections and supersession metadata. Current architecture must remain discoverable without reading the entire chronological ADR history. Keep descriptive titles, explicit technologies/concepts, and useful related references.\nFrontmatter, automatic numbering, generated indexing, status/supersession validation, approval workflows, and required reviewers remain tooling or organizational decisions. Introduce them only when justified. ADRs should preserve meaningful reasoning without becoming bureaucratic records for every change.\n"
   }
 ]

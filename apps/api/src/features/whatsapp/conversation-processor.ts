@@ -24,12 +24,13 @@ type Transaction = Pick<
   | "whatsAppInboundMessage"
   | "whatsAppOutboundMessage"
   | "whatsAppTroubleshootingFeedback"
+  | "whatsAppTicketSubmission"
 >;
 type Identity = Pick<
   ReturnType<typeof createIdentityVerification>,
   "requestVerification" | "confirmVerification"
 >;
-type ReplyAddress = {
+export type ReplyAddress = {
   scopeKey: string;
   recipient: OutboundPayload["recipient"];
   expiresAt: Date;
@@ -69,7 +70,7 @@ function resolveAddress(
   return expiresAt > now ? { scopeKey, recipient, expiresAt } : undefined;
 }
 
-async function verifiedUser(
+export async function verifiedUser(
   tx: Transaction,
   scopeKey: string,
   now: Date,
@@ -81,7 +82,7 @@ async function verifiedUser(
   return link ? Number(link.glpiUserId) : undefined;
 }
 
-async function stateFor(
+export async function stateFor(
   tx: Transaction,
   scopeKey: string,
 ): Promise<Conversation> {
@@ -92,7 +93,7 @@ async function stateFor(
   return readConversationState(row?.state);
 }
 
-async function applyMove(
+export async function applyMove(
   tx: Transaction,
   address: ReplyAddress,
   businessPhoneId: string,
@@ -105,6 +106,41 @@ async function applyMove(
     create: { scopeKey: address.scopeKey, ...next },
     update: next,
   });
+  if (move.submission) {
+    const { draftId, requesterId, title, description, mediaIds } =
+      move.submission;
+    const payload = {
+      recipient: address.recipient,
+      replyExpiresAt: address.expiresAt,
+      title,
+      description,
+      mediaIds,
+      attachmentCount: mediaIds.length,
+      availableAt: now,
+      updatedAt: now,
+    };
+    const inserted = await tx.whatsAppTicketSubmission.createMany({
+      data: {
+        draftId,
+        businessPhoneId,
+        scopeKey: address.scopeKey,
+        requesterId,
+        ...payload,
+      },
+      skipDuplicates: true,
+    });
+    if (inserted.count === 0)
+      await tx.whatsAppTicketSubmission.updateMany({
+        where: {
+          draftId,
+          businessPhoneId,
+          scopeKey: address.scopeKey,
+          requesterId,
+          state: "FAILED",
+        },
+        data: { ...payload, state: "PENDING", attempts: 0 },
+      });
+  }
   if (move.feedback)
     await tx.whatsAppTroubleshootingFeedback.createMany({
       data: { ...move.feedback, recordedAt: now },
