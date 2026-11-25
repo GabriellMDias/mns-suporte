@@ -101,6 +101,16 @@
       "file": "pages/api/verifyWhatsAppWebhook.json"
     },
     {
+      "id": "database/whatsapp_conversations",
+      "kind": "database",
+      "title": "whatsapp_conversations",
+      "group": "WhatsApp guided conversations",
+      "source": "docs/generated/database/schema.md",
+      "summary": "Latest guided intake state and a resumable or confirmed draft for an authenticated WhatsApp sender scope.",
+      "headings": [],
+      "file": "pages/database/whatsapp_conversations.json"
+    },
+    {
       "id": "database/whatsapp_identity_events",
       "kind": "database",
       "title": "whatsapp_identity_events",
@@ -738,7 +748,7 @@
       "title": "Database Reference",
       "group": "Generated references",
       "source": "docs/generated/database/schema.md",
-      "summary": "Durable inbound identity receipts and short-lived challenge reservations scoped to a WhatsApp sender.",
+      "summary": "Latest guided intake state and a resumable or confirmed draft for an authenticated WhatsApp sender scope.",
       "headings": [],
       "file": "pages/repository/docs/generated/database/schema.json"
     },
@@ -1047,19 +1057,19 @@
     "shards": [
       {
         "file": "search/0000.json",
-        "count": 71,
+        "count": 68,
         "kinds": ["api", "component", "database", "repository"]
       },
-      { "file": "search/0001.json", "count": 109, "kinds": ["repository"] },
-      { "file": "search/0002.json", "count": 122, "kinds": ["repository"] },
-      { "file": "search/0003.json", "count": 159, "kinds": ["repository"] },
-      { "file": "search/0004.json", "count": 103, "kinds": ["repository"] },
-      { "file": "search/0005.json", "count": 117, "kinds": ["repository"] },
-      { "file": "search/0006.json", "count": 97, "kinds": ["repository"] },
-      { "file": "search/0007.json", "count": 103, "kinds": ["repository"] },
-      { "file": "search/0008.json", "count": 91, "kinds": ["repository"] },
-      { "file": "search/0009.json", "count": 3, "kinds": ["repository"] }
+      { "file": "search/0001.json", "count": 111, "kinds": ["repository"] },
+      { "file": "search/0002.json", "count": 118, "kinds": ["repository"] },
+      { "file": "search/0003.json", "count": 152, "kinds": ["repository"] },
+      { "file": "search/0004.json", "count": 113, "kinds": ["repository"] },
+      { "file": "search/0005.json", "count": 114, "kinds": ["repository"] },
+      { "file": "search/0006.json", "count": 96, "kinds": ["repository"] },
+      { "file": "search/0007.json", "count": 101, "kinds": ["repository"] },
+      { "file": "search/0008.json", "count": 94, "kinds": ["repository"] },
+      { "file": "search/0009.json", "count": 12, "kinds": ["repository"] }
     ],
-    "count": 975
+    "count": 979
   }
 }

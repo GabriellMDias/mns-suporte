@@ -37,11 +37,33 @@
         "content": {
           "description": "Normalized text, action identifier, media reference or protected verification-code digest consumed by the conversation flow.",
           "classification": "RESTRICTED"
+        },
+        "conversation_processed_at": {
+          "description": "Time the guided worker completed processing this input and committed its effects.",
+          "classification": "INTERNAL",
+          "nullMeaning": "The guided worker has not completed this message."
+        },
+        "conversation_action": {
+          "description": "Durable identity operation owned by this inbound event.",
+          "classification": "INTERNAL",
+          "nullMeaning": "There is no outstanding identity operation for the conversation."
+        },
+        "conversation_claim_id": {
+          "description": "Unique fence for the worker currently allowed to finalize the identity operation.",
+          "classification": "INTERNAL",
+          "nullMeaning": "The event has no identity work claim."
+        },
+        "conversation_claim_until": {
+          "description": "Time after which another conversation worker may reclaim an unfinished identity operation.",
+          "classification": "INTERNAL",
+          "nullMeaning": "The event has no active identity work claim."
         }
       },
       "objects": {
         "whatsapp_inbound_messages_pkey": "Keeps one accepted event per Meta message ID across retries and concurrent delivery.",
-        "whatsapp_inbound_messages_sender_required": "Requires at least one sender identifier so a message can be associated with a conversation."
+        "whatsapp_inbound_messages_sender_required": "Requires at least one sender identifier so a message can be associated with a conversation.",
+        "whatsapp_inbound_messages_conversation_claim": "Requires a complete claim only on an outstanding identity operation and keeps completed events unlocked.",
+        "whatsapp_inbound_messages_conversation_idx": "Supports finding the earliest unprocessed message for one business number."
       }
     },
     "whatsapp_outbound_messages": {

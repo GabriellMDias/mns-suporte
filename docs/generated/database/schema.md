@@ -4,6 +4,26 @@
 
 [Schema documentation policy](../../database/schema-documentation.md) · [Database principles](../../database/principles.md)
 
+## whatsapp_conversations
+
+Latest guided intake state and a resumable or confirmed draft for an authenticated WhatsApp sender scope.
+
+Owner: WhatsApp guided conversations. Classification: RESTRICTED.
+
+Lifecycle: Created on first actionable inbound message and updated as the conversation advances. An unconfirmed draft can be cancelled. Drafts are disclosed only to the currently verified GLPI owner. Retention is release-plan work.
+
+| Column | PostgreSQL type | Nullable | Default | Classification | Meaning | Null meaning | Unit |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `scope_key` | `text` | no | — | RESTRICTED | Stable hash of the business phone ID and preferred sender identity. | — | — |
+| `state` | `jsonb` | no | — | RESTRICTED | Current stage, owning GLPI user, intake fields, attachment references and confirmation state where present. | — | — |
+| `updated_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Clock instant of the last applied conversation move. | — | — |
+
+### Constraints and indexes
+
+| Object | Physical definition | Purpose |
+| --- | --- | --- |
+| `whatsapp_conversations_pkey` | `PRIMARY KEY (scope_key)` | Keeps one current conversation and draft per WhatsApp sender scope. |
+
 ## whatsapp_identity_events
 
 Durable inbound identity receipts and short-lived challenge reservations scoped to a WhatsApp sender.
@@ -75,13 +95,19 @@ Lifecycle: Created before acknowledging the webhook. Redelivery preserves the or
 | `occurred_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Timestamp reported by Meta as the message time. | — | UTC instant |
 | `received_at` | `timestamp(3) with time zone` | no | `CURRENT_TIMESTAMP` | INTERNAL | Database timestamp of the first accepted delivery. | — | UTC instant |
 | `content` | `jsonb` | no | — | RESTRICTED | Normalized text, action identifier, media reference or protected verification-code digest consumed by the conversation flow. | — | — |
+| `conversation_processed_at` | `timestamp(3) with time zone` | yes | — | INTERNAL | Time the guided worker completed processing this input and committed its effects. | The guided worker has not completed this message. | — |
+| `conversation_action` | `"WhatsAppConversationAction"` | yes | — | INTERNAL | Durable identity operation owned by this inbound event. | There is no outstanding identity operation for the conversation. | — |
+| `conversation_claim_id` | `uuid` | yes | — | INTERNAL | Unique fence for the worker currently allowed to finalize the identity operation. | The event has no identity work claim. | — |
+| `conversation_claim_until` | `timestamp(3) with time zone` | yes | — | INTERNAL | Time after which another conversation worker may reclaim an unfinished identity operation. | The event has no active identity work claim. | — |
 
 ### Constraints and indexes
 
 | Object | Physical definition | Purpose |
 | --- | --- | --- |
+| `whatsapp_inbound_messages_conversation_claim` | `CHECK ((((conversation_claim_id IS NULL) AND (conversation_claim_until IS NULL)) OR ((conversation_claim_id IS NOT NULL) AND (conversation_claim_until IS NOT NULL) AND (conversation_action IS NOT NULL) AND (conversation_processed_at IS NULL))))` | Requires a complete claim only on an outstanding identity operation and keeps completed events unlocked. |
 | `whatsapp_inbound_messages_pkey` | `PRIMARY KEY (message_id)` | Keeps one accepted event per Meta message ID across retries and concurrent delivery. |
 | `whatsapp_inbound_messages_sender_required` | `CHECK (((sender_business_id IS NOT NULL) OR (sender_phone IS NOT NULL)))` | Requires at least one sender identifier so a message can be associated with a conversation. |
+| `whatsapp_inbound_messages_conversation_idx` | `CREATE INDEX whatsapp_inbound_messages_conversation_idx ON public.whatsapp_inbound_messages USING btree (business_phone_id, conversation_processed_at, received_at, occurred_at, message_id)` | Supports finding the earliest unprocessed message for one business number. |
 
 ## whatsapp_outbound_messages
 
@@ -119,4 +145,5 @@ Lifecycle: Enqueued before dispatch. Retried only after an explicit provider thr
 
 | Enum | Values | Meaning |
 | --- | --- | --- |
+| `WhatsAppConversationAction` | REQUEST_CODE, CONFIRM_CODE | Identity operation to request or confirm an employee email code after committing the preceding conversation move. |
 | `WhatsAppOutboundState` | PENDING, SENDING, ACCEPTED, SENT, DELIVERED, READ, FAILED, UNCERTAIN, EXPIRED | Tracks work from pending and claimed through acceptance, delivery, read, known failure, uncertainty, or service-window expiry. |

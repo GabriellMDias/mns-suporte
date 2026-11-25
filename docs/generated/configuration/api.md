@@ -35,3 +35,4 @@ No values are eligible for client exposure. `ORION_ENV` is always required. The 
 | `IDENTITY_SMTP_USER` | nonempty string | no | — | server | RESTRICTED | yes | SMTP service credential username for employee verification mail. |
 | `IDENTITY_SMTP_PASSWORD` | secret string | no | — | server | RESTRICTED | yes | SMTP service credential password for employee verification mail. |
 | `IDENTITY_SMTP_FROM` | email address | no | — | server | INTERNAL | no | Authorized From mailbox for employee verification email. |
+| `WHATSAPP_SUPPORT_CONTACT` | email address or HTTPS URL | no | — | server | INTERNAL | no | IT contact shown by the WhatsApp menu. Enables guided conversations with configured integrations. |

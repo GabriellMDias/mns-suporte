@@ -4,6 +4,69 @@
     "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
     "group": "Decisions",
     "kind": "repository",
+    "heading": "Canonical validation contract",
+    "anchor": "canonical-validation-contract",
+    "text": "Canonical validation contract\n`pnpm validate` remains the canonical repository validation contract.\nCI may decompose validation capabilities into separate jobs for:\nparallel execution;\nclearer failure reporting;\nresource isolation;\nbrowser requirements;\ncontainer requirements;\nfuture sharding.\nFor example, CI may conceptually execute:\nformat / lint / architecture\ntypecheck\nunit tests\nintegration tests\nbrowser tests\nE2E tests\ngenerated-artifact validation\nbuild validation\n\nas independent jobs.\nThose jobs must invoke repository scripts implementing the same capabilities available locally.\nWorkflow YAML must not contain an independent implementation of validation logic.\nFor example, this is preferred:\nGitHub Actions\n    ↓\npnpm test:integration\n\nrather than embedding database setup, test discovery, test filters, and project-specific test semantics exclusively inside the workflow.\nThe stable interface is the repository command.\nThe CI workflow is an orchestrator.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Incremental validation capabilities",
+    "anchor": "incremental-validation-capabilities",
+    "text": "Incremental validation capabilities\nNot every validation category must exist before the repository contains the corresponding capability.\nThe validation system will grow with the repository.\nFor example:\ninitial foundation\n├── format:check\n├── lint\n├── typecheck\n└── architecture\n\nafter application code exists\n├── unit tests\n├── integration tests\n├── generated artifacts\n├── web build\n├── browser tests\n└── E2E tests\n\nA capability should enter required CI validation when the repository contains meaningful content that the capability protects.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Pull-request validation",
+    "anchor": "pull-request-validation",
+    "text": "Pull-request validation\nRequired CI validation will run for pull requests targeting the primary protected branch.\nPull requests must pass the required validation gate before normal merge.\nThe primary branch should be protected so that repository correctness does not depend on contributors remembering to execute checks manually.\nDirect pushes or administrative bypass mechanisms, when permitted by repository governance, must remain exceptional rather than the ordinary delivery workflow.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Primary-branch validation",
+    "anchor": "primary-branch-validation",
+    "text": "Primary-branch validation\nCI will also run after changes reach the primary branch.\nPull-request validation reduces risk but does not make primary-branch validation redundant.\nPrimary-branch execution verifies the exact merged commit and provides a stable post-merge signal for future release, deployment, packaging, or downstream automation.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Manual execution",
+    "anchor": "manual-execution",
+    "text": "Manual execution\nImportant CI workflows should support manual execution where GitHub Actions provides an appropriate mechanism.\nThis supports:\ndiagnostics;\ninfrastructure investigation;\nvalidation after configuration changes;\ncontrolled reruns;\nfuture release workflows.\nManual execution must not require a separate validation implementation.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "Required CI gate",
+    "anchor": "required-ci-gate",
+    "text": "Required CI gate\nOrion will expose a **stable aggregate required CI gate** for branch protection.\nConceptually:\nstatic validation ──────┐\ntype checking ──────────┤\nunit tests ─────────────┤\nintegration tests ──────┤\nbrowser tests ──────────┤\nE2E tests ──────────────┤\nbuild validation ───────┤\n                        ↓\n                 required CI gate\n\nThe specific internal jobs may evolve without requiring branch-protection configuration to track every implementation change.\nThe aggregate gate succeeds only when all required jobs for that repository state succeed.\nThis creates a stable external contract between CI implementation and repository governance.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
+    "heading": "CI execution environment",
+    "anchor": "ci-execution-environment",
+    "text": "CI execution environment\nGitHub-hosted Linux runners will be Orion's default CI execution environment initially.\nThe foundation will not run a Windows/macOS operating-system matrix by default.\nAdditional operating systems should be introduced only when a product or supported runtime genuinely depends on cross-platform behavior.\nThe CI operating system does not imply that every Orion application must deploy on the same operating system.\n"
+  },
+  {
+    "id": "repository/docs/adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy",
+    "title": "ADR-0011: Establish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy",
+    "group": "Decisions",
+    "kind": "repository",
     "heading": "Runtime versions",
     "anchor": "runtime-versions",
     "text": "Runtime versions\nCI must use repository-pinned runtime and package-manager versions.\nThe CI workflow must not independently choose a different Node.js or pnpm release from the versions established by repository configuration.\nConceptually:\nrepository\n├── Node version policy / pin\n└── packageManager → pnpm version\n        ↓\nCI consumes those versions\n\nThis avoids situations where:\nlocal development\n→ Node A / pnpm A\n\nCI\n→ Node B / pnpm B\n\nsilently creates environment-dependent behavior.\n"
@@ -1303,131 +1366,5 @@
     "heading": "Architecture Decision Records",
     "anchor": "architecture-decision-records",
     "text": "Architecture Decision Records\nUse this index to locate governing decisions without reading the full history. Each linked record owns its status, decision, rationale, and consequences. Acceptance does not imply implementation; see [validation availability](../validation.md) and the [technology map](../architecture/technology-decisions.md).\nFor a new decision, read [authoring policy](authoring.md), inspect related records, and use the [proposed template](template.md). Current behavior belongs in the [policy index](../README.md), not in rewritten historical ADRs.\n"
-  },
-  {
-    "id": "repository/docs/adr/README",
-    "title": "Architecture Decision Records",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Decision index",
-    "anchor": "decision-index",
-    "text": "Decision index\nRecord\nDecision\n[ADR-0001](0001-select-typescript-and-nodejs-as-primary-language-and-runtime.md)\nSelect TypeScript and Node.js as the Primary Language and Runtime\n[ADR-0002](0002-select-pnpm-for-package-and-workspace-management.md)\nSelect pnpm for Package and Workspace Management\n[ADR-0003](0003-establish-repository-validation-and-architecture-enforcement.md)\nEstablish Repository Validation and Architecture Enforcement\n[ADR-0004](0004-select-fastify-as-the-backend-http-framework.md)\nSelect Fastify as the Backend HTTP Framework\n[ADR-0005](0005-select-postgresql-as-the-primary-database.md)\nSelect PostgreSQL as the Primary Database\n[ADR-0006](0006-select-prisma-orm-for-database-access-and-migrations.md)\nSelect Prisma ORM for Database Access and Migrations\n[ADR-0007](0007-establish-api-contract-openapi-sdk-and-configuration-schema-strategy.md)\nEstablish API Contract, OpenAPI, SDK, and Configuration Schema Strategy\n[ADR-0008](0008-select-react-vite-and-tanstack-for-web-applications.md)\nSelect React, Vite, and TanStack for Web Applications\n[ADR-0009](0009-establish-testing-strategy-and-tooling.md)\nEstablish Testing Strategy and Tooling\n[ADR-0010](0010-establish-observability-logging-tracing-metrics-and-error-reporting-strategy.md)\nEstablish Observability, Logging, Tracing, Metrics, and Error Reporting Strategy\n[ADR-0011](0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy.md)\nEstablish Continuous Integration, Dependency Automation, and Supply Chain Security Strategy\n[ADR-0012](0012-verify-jwt-access-tokens-at-the-first-api-boundary.md)\nVerify JWT Access Tokens at the First API Boundary\n[ADR-0013](0013-keep-agents-md-as-the-agent-neutral-instruction-source.md)\nKeep AGENTS.md as the Agent-Neutral Instruction Source\n[ADR-0014](0014-derive-projects-from-orion-through-git-ancestry-with-recorded-provenance.md)\nDerive Projects from Orion through Git Ancestry with Recorded Provenance\n[ADR-0015](0015-name-stable-orion-foundation-revisions-with-semantic-tags.md)\nName Stable Orion Foundation Revisions with Semantic Tags\n[ADR-0016](0016-license-the-orion-foundation-under-apache-2-0.md)\nLicense the Orion Foundation under Apache-2.0\n[ADR-0017](0017-start-derived-projects-from-a-clean-foundation-baseline.md)\nStart Derived Projects from a Clean Foundation Baseline\n[ADR-0018](0018-isolate-internal-documentation-from-product-distribution.md)\nIsolate Internal Documentation from Product Distribution\n"
-  },
-  {
-    "id": "repository/docs/adr/template",
-    "title": "ADR-NNNN: Decision Title",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "ADR-NNNN: Decision Title",
-    "anchor": "adr-nnnn-decision-title",
-    "text": "ADR-NNNN: Decision Title\n**Status:** proposed\n**Date:** YYYY-MM-DD\n"
-  },
-  {
-    "id": "repository/docs/adr/template",
-    "title": "ADR-NNNN: Decision Title",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Context",
-    "anchor": "context",
-    "text": "Context\nDescribe the architectural problem or constraint that requires a decision.\nInclude only the context necessary to understand:\nwhy a decision is needed;\nwhich systems or boundaries are affected;\nwhich constraints materially influence the choice;\nwhich assumptions matter.\nAvoid turning this section into a complete implementation design.\n"
-  },
-  {
-    "id": "repository/docs/adr/template",
-    "title": "ADR-NNNN: Decision Title",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Decision",
-    "anchor": "decision",
-    "text": "Decision\nState the architectural decision clearly.\nThis section should make it possible to understand the chosen direction without inferring it from the alternatives or rationale.\nExample form:\nThis repository will ...\n\n"
-  },
-  {
-    "id": "repository/docs/adr/template",
-    "title": "ADR-NNNN: Decision Title",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Rationale",
-    "anchor": "rationale",
-    "text": "Rationale\nExplain why this option was selected.\nFocus on the tradeoffs, constraints, and evidence that materially influenced the decision.\nDo not list only advantages.\n"
-  },
-  {
-    "id": "repository/docs/adr/template",
-    "title": "ADR-NNNN: Decision Title",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Alternatives Considered",
-    "anchor": "alternatives-considered",
-    "text": "Alternatives Considered\n"
-  },
-  {
-    "id": "repository/docs/adr/template",
-    "title": "ADR-NNNN: Decision Title",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Alternative A",
-    "anchor": "alternative-a",
-    "text": "Alternative A\nBriefly describe the alternative and why it was not selected.\n"
-  },
-  {
-    "id": "repository/docs/adr/template",
-    "title": "ADR-NNNN: Decision Title",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Alternative B",
-    "anchor": "alternative-b",
-    "text": "Alternative B\nBriefly describe the alternative and why it was not selected.\nRemove unused alternative sections rather than inventing alternatives.\n"
-  },
-  {
-    "id": "repository/docs/adr/template",
-    "title": "ADR-NNNN: Decision Title",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Consequences",
-    "anchor": "consequences",
-    "text": "Consequences\n"
-  },
-  {
-    "id": "repository/docs/adr/template",
-    "title": "ADR-NNNN: Decision Title",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Positive",
-    "anchor": "positive",
-    "text": "Positive\nDescribe meaningful benefits.\n"
-  },
-  {
-    "id": "repository/docs/adr/template",
-    "title": "ADR-NNNN: Decision Title",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Negative",
-    "anchor": "negative",
-    "text": "Negative\nDescribe accepted costs, limitations, or additional responsibilities.\n"
-  },
-  {
-    "id": "repository/docs/adr/template",
-    "title": "ADR-NNNN: Decision Title",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "Operational or Migration Impact",
-    "anchor": "operational-or-migration-impact",
-    "text": "Operational or Migration Impact\nDescribe important deployment, compatibility, data, security, or migration consequences when applicable.\nRemove this subsection when there is no meaningful operational or migration impact.\n"
-  },
-  {
-    "id": "repository/docs/adr/template",
-    "title": "ADR-NNNN: Decision Title",
-    "group": "Decisions",
-    "kind": "repository",
-    "heading": "References",
-    "anchor": "references",
-    "text": "References\nInclude only useful references.\nLink relevant [current policies](../README.md), [related ADRs](README.md), design documents, and evidence. Use actual relative Markdown links to existing records; remove unused references.\nIf this ADR supersedes another accepted ADR, update that ADR to reference this one as its replacement.\n"
-  },
-  {
-    "id": "repository/docs/AGENTS",
-    "title": "Documentation Instructions",
-    "group": "Agent instructions",
-    "kind": "repository",
-    "heading": "Documentation Instructions",
-    "anchor": "documentation-instructions",
-    "text": "Documentation Instructions\nUse [the task index](README.md) to locate the owner of the information being changed. Read [contributing guidance](contributing.md) when creating, moving, or maintaining documentation.\nPreserve normative meaning, exceptions, and the distinction between requirements, examples, accepted decisions, and implementation availability. Check governing ADRs before treating a choice as unresolved.\nKeep one authoritative policy for each concern. Use links and scoped reading routes rather than copying policy into indexes or agent instructions.\nWhen moving content, retain every unique requirement at an explicit destination and update references. Check local links and section anchors after restructuring.\nKeep numbered accepted ADRs substantively intact. Follow the additional instructions in `adr/AGENTS.md` for ADR work and `runbooks/AGENTS.md` for runbook work.\nUse only available [validation](validation.md); do not describe planned generators, commands, applications, or procedures as implemented.\nClassify documentation by [audience and publication](architecture/living-documentation.md#documentation-audiences-and-publication). Inclusion in the internal catalog never approves public distribution; preserve canonical engineering sources when changing build exposure.\n"
   }
 ]

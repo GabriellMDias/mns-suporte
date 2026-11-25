@@ -1,0 +1,47 @@
+{
+  "kind": "database",
+  "name": "whatsapp_conversations",
+  "description": "Latest guided intake state and a resumable or confirmed draft for an authenticated WhatsApp sender scope.",
+  "owner": "WhatsApp guided conversations",
+  "classification": "RESTRICTED",
+  "lifecycle": "Created on first actionable inbound message and updated as the conversation advances. An unconfirmed draft can be cancelled. Drafts are disclosed only to the currently verified GLPI owner. Retention is release-plan work.",
+  "columns": [
+    {
+      "Column": "scope_key",
+      "PostgreSQL type": "text",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Stable hash of the business phone ID and preferred sender identity.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "state",
+      "PostgreSQL type": "jsonb",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "RESTRICTED",
+      "Meaning": "Current stage, owning GLPI user, intake fields, attachment references and confirmation state where present.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "updated_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "no",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Clock instant of the last applied conversation move.",
+      "Null meaning": "—",
+      "Unit": "—"
+    }
+  ],
+  "constraints": [
+    {
+      "Object": "whatsapp_conversations_pkey",
+      "Physical definition": "PRIMARY KEY (scope_key)",
+      "Purpose": "Keeps one current conversation and draft per WhatsApp sender scope."
+    }
+  ]
+}

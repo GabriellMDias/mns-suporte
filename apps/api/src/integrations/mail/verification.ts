@@ -1,6 +1,12 @@
 import { createTransport } from "nodemailer";
 import type { VerificationSmtpConfig } from "../../config.js";
 
+export class VerificationMailUnconfirmedError extends Error {
+  constructor() {
+    super("Verification email delivery could not be confirmed");
+  }
+}
+
 export function createVerificationMailer(config: VerificationSmtpConfig) {
   const transport = createTransport({
     host: config.host,
@@ -31,7 +37,7 @@ export function createVerificationMailer(config: VerificationSmtpConfig) {
         throw new Error("SMTP recipient was not accepted");
     } catch {
       // Nodemailer diagnostics can contain credentials, addresses and server text.
-      throw new Error("Verification email delivery could not be confirmed");
+      throw new VerificationMailUnconfirmedError();
     }
   };
 }

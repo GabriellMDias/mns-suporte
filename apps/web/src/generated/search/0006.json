@@ -1,5 +1,68 @@
 [
   {
+    "id": "repository/docs/database/migrations",
+    "title": "Database Migrations",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Destructive Changes",
+    "anchor": "destructive-changes",
+    "text": "Destructive Changes\nDropping/truncating structures, deleting durable data, narrowing values, or irreversible transformation requires explicit review of owner intent, retention/audit/reporting needs, every consumer, data loss, supported rollback, and recovery. Lack of code references is insufficient evidence that data is disposable. Record irreversibility rather than providing a misleading automatic reverse operation.\nApplication rollback, schema rollback, data restoration, and a corrective forward migration are different actions. Older application code can run only if compatible with the current schema. Recreating an empty dropped column does not recover its data; new writes may make backward migration unsafe. Prefer a reviewed forward correction for released history, and use an actual environment's backup/restore or repair procedure when required. No universal safe `down` migration is assumed.\n"
+  },
+  {
+    "id": "repository/docs/database/migrations",
+    "title": "Database Migrations",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Backfills",
+    "anchor": "backfills",
+    "text": "Backfills\nA backfill is a data migration. Assess row count, runtime, locks, transaction size, retry behavior, progress, and failure recovery. Small bounded transformations may share a migration; large work may need a dedicated batched, resumable, preferably idempotent process instead of one long transaction. Repeating a batch must not corrupt data.\nDeploy compatible schema, run the backfill, observe progress, verify completeness/semantics, then enforce stricter constraints. Track safe progress such as processed/remaining counts, checkpoints, batch duration, and failures. Choose batch sizes and stop conditions from evidence. A transformation needed by every upgraded database belongs in the supported release path; a one-off environment repair may belong in a controlled audited script/runbook instead.\n"
+  },
+  {
+    "id": "repository/docs/database/migrations",
+    "title": "Database Migrations",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Execution, failure, and drift",
+    "anchor": "execution-failure-and-drift",
+    "text": "Execution, failure, and drift\nTransaction behavior depends on PostgreSQL, the specific DDL, and Prisma execution; do not assume every migration is automatically transactional or safely retryable. Make non-transactional operations and partial-failure recovery explicit. Large transactions can hold locks, exhaust resources, and increase replication lag. Prevent incompatible concurrent migration runners using appropriate tool/platform coordination.\nA failure must expose the migration, stage, rollback/partial-application state, and recovery path safely. Do not blindly rerun partially applied SQL or manually mark a failed migration successful merely to continue. Required migration failure must stop dependent rollout. Tool metadata is evidence of execution, not a substitute for understanding the physical schema.\nSchema drift is a defect. Do not routinely type ad hoc production DDL, automatically overwrite unexplained drift, or leave emergency changes outside repository history. Investigate intent and data dependence, record exact intervention, reconcile migrations, and verify future paths. [Production access](../security/production-access.md) and [incident response](../security/incident-response.md) govern authority; this policy grants none.\nFor high-risk changes, use a concrete runbook with preconditions, execution, monitoring, abort thresholds, verification, and recovery. Observe locks, application error/latency, replication lag, and progress as relevant. If future topology includes multiple databases, tenants, shards, or customer installations, define per-instance state, rollout ordering, partial failure, and version skew; do not assume atomic fleet migration.\nMigration credentials must remain separate from ordinary runtime code and limited to required privileges. Execution should be attributable to release, migration, environment, identity, time, duration, and result where available. Never embed real sensitive rows, credentials, or connection strings in SQL, examples, registry entries, or logs. Follow [redaction](../security/telemetry-redaction.md).\n"
+  },
+  {
+    "id": "repository/docs/database/migrations",
+    "title": "Database Migrations",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Validation and release history",
+    "anchor": "validation-and-release-history",
+    "text": "Validation and release history\nThe current [release workflow](release-evolution.md) owns commands and evidence. `pnpm release:check` protects recorded durable commits, complete migration sets/checksums, and append-only registry history. Fresh Testcontainers PostgreSQL checks replay committed migrations and generate physical references; root `pnpm validate` includes real database tests. These do not prove an upgrade from a released database or inspect an actual deployment.\nWhen supported released baselines exist, add upgrade tests from those real states, with permitted representative data. Verify data meaning, constraints, schema outcome, and supported application/schema combinations; do not merely assert successful SQL execution. Historical fixtures must not be changed just to pass tests. Establish the supported upgrade window with actual deployment/support requirements rather than inventing one now.\nStatic checks can flag risky DDL, but cannot prove lock cost, retention safety, or semantic correctness. Review schema, migration, metadata, and generated reference diffs together. Major boundary changes may need an ADR; ordinary schema evolution does not. Keep temporary transition rationale in migration comments/runbooks and current meaning in schema metadata.\n"
+  },
+  {
+    "id": "repository/docs/database/migrations",
+    "title": "Database Migrations",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Migration review checklist",
+    "anchor": "migration-review-checklist",
+    "text": "Migration review checklist\nVerify ownership, actual release status, source/target state, and whether to refine verified unreleased work or append a new stage.\nReview generated/custom SQL, existing data, irreversible effects, retention, constraints/indexes, lock/rewrite cost, and transaction/partial-failure behavior.\nIdentify supported old/new application combinations, rollout order, backfill strategy, temporary compatibility, recovery, and removal conditions.\nUpdate schema semantics and [generated references](schema-documentation.md); test fresh creation, relevant real release upgrades, data outcomes, and critical constraints/concurrency.\nReview risk-proportionate monitoring, abort and verification evidence, credential separation, and required human/environment decisions. Report unavailable checks explicitly.\n"
+  },
+  {
+    "id": "repository/docs/database/principles",
+    "title": "Database Principles",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Database Principles",
+    "anchor": "database-principles",
+    "text": "Database Principles\n[Task index](../README.md) · [Migrations](migrations.md) · [Schema documentation](schema-documentation.md) · [Transactions](transactions-and-concurrency.md)\nThis policy owns durable data design and persistence boundaries. [ADR-0005](../adr/0005-select-postgresql-as-the-primary-database.md) selects PostgreSQL and [ADR-0006](../adr/0006-select-prisma-orm-for-database-access-and-migrations.md) selects Prisma ORM/Migrate. Both are implemented as shared API infrastructure that modules use for their own tables; hosting, production topology, and backup procedures depend on actual deployment requirements.\n"
+  },
+  {
+    "id": "repository/docs/database/principles",
+    "title": "Database Principles",
+    "group": "Database guides",
+    "kind": "repository",
+    "heading": "Sources and implementation boundary",
+    "anchor": "sources-and-implementation-boundary",
+    "text": "Sources and implementation boundary\nConcern\nAuthority\nStructures Prisma can express\n[Authored Prisma schema folder](../../apps/api/prisma/schema/schema.prisma): shared configuration plus one model file per module\nReviewed database evolution\nCommitted SQL migrations in `apps/api/prisma/migrations/` under [migration policy](migrations.md)\nComplete physical schema, including custom SQL\nPostgreSQL after applying the committed migrations\nObject meaning, owner, classification, lifecycle\nSchema-adjacent metadata in `apps/api/prisma/metadata/`, one file per module, under [schema documentation](schema-documentation.md)\nLeast-privilege runtime access\nModule grants in `apps/api/prisma/runtime-grants/`, applied to the restricted runtime role in disposable databases\nNavigable current reference\n[Generated database reference](../generated/database/schema.md), derived from migrated PostgreSQL plus metadata\nFeature writes and queries\nA module's Prisma adapter behind its own persistence capabilities, using the shared [database client](../../apps/api/src/database.ts)\nPrisma is infrastructure. Its generated records are not automatically domain entities, public contracts, UI models, or events. Use Prisma Client where clear and efficient, and TypedSQL or explicit parameterized SQL for operations better expressed that way. Do not discard valuable PostgreSQL-native constraints, indexes, views, extensions, or types merely for ORM purity or hypothetical portability. Keep specialized access inside persistence adapters and document custom behavior.\n"
+  },
+  {
     "id": "repository/docs/database/principles",
     "title": "Database Principles",
     "group": "Database guides",
@@ -456,7 +519,7 @@
     "kind": "repository",
     "heading": "API Configuration Reference",
     "anchor": "api-configuration-reference",
-    "text": "API Configuration Reference\n[Configuration policy](../../architecture/configuration.md) · [API runtime](../../../apps/api/README.md)\nNo values are eligible for client exposure. `ORION_ENV` is always required. The three token settings are configured together. API modules that require the database or bearer authentication stay unmounted until those settings exist, and production startup fails instead.\nEnvironment variable\nType\nRequired\nDefault\nVisibility\nClassification\nSecret\nPurpose\n`ORION_ENV`\ndevelopment | test | production\nyes\n—\nserver\nINTERNAL\nno\nRuntime environment.\n`ORION_RELEASE_ID`\nartifact identifier, 1..128 ASCII letters/digits/._-\nno\n`local`\nserver\nINTERNAL\nno\nActual artifact revision for correlated logs and traces; local for unversioned development.\n`ORION_API_HOST`\nnonempty string\nno\n`127.0.0.1`\nserver\nINTERNAL\nno\nListen address; loopback by default.\n`ORION_API_PORT`\ninteger 0..65535\nno\n`3000`\nserver\nINTERNAL\nno\nListen port; zero selects an ephemeral port.\n`ORION_LOG_LEVEL`\nPino level\nno\n`info`\nserver\nINTERNAL\nno\nStructured log threshold.\n`ORION_SHUTDOWN_TIMEOUT_MS`\ninteger 100..30000\nno\n`5000`\nserver\nINTERNAL\nno\nTotal graceful shutdown deadline.\n`ORION_OTLP_ENDPOINT`\nhttp(s) URL\nno\n—\nserver\nINTERNAL\nno\nOptional OTLP HTTP collector base URL.\n`ORION_TRACE_SAMPLE_RATIO`\nnumber 0..1\nno\n`1`\nserver\nINTERNAL\nno\nTrace sampling probability.\n`ORION_DATABASE_URL`\nPostgreSQL URL\nno\n—\nserver\nRESTRICTED\nyes\nRuntime PostgreSQL credential; enables the database for modules that require it and adds it to readiness.\n`ORION_TOKEN_ISSUER`\nissuer URL\nno\n—\nserver\nINTERNAL\nno\nExpected access-token issuer; configure with audience and JWKS URL to enable bearer authentication.\n`ORION_TOKEN_AUDIENCE`\nnonempty string\nno\n—\nserver\nINTERNAL\nno\nExpected API access-token audience.\n`ORION_TOKEN_JWKS_URL`\nhttp(s) URL\nno\n—\nserver\nINTERNAL\nno\nTrusted issuer public-key endpoint.\n`WHATSAPP_APP_SECRET`\nsecret string\nno\n—\nserver\nRESTRICTED\nyes\nMeta app secret used to verify incoming webhook signatures.\n`WHATSAPP_WEBHOOK_VERIFY_TOKEN`\nsecret string\nno\n—\nserver\nRESTRICTED\nyes\nApplication-generated secret used to verify the Meta callback.\n`WHATSAPP_PHONE_NUMBER_ID`\nMeta asset identifier\nno\n—\nserver\nINTERNAL\nno\nMeta business phone number ID accepted by the webhook.\n`WHATSAPP_ACCESS_TOKEN`\nsecret string\nno\n—\nserver\nRESTRICTED\nyes\nMeta system user token that enables WhatsApp outbound dispatch.\n`WHATSAPP_GRAPH_API_VERSION`\nGraph API version\nno\n`v27.0`\nserver\nINTERNAL\nno\nGraph API version used by WhatsApp outbound dispatch.\n`GLPI_API_URL`\nHTTPS URL\nno\n—\nserver\nINTERNAL\nno\nBase URL of the GLPI REST v1 API, including its API path.\n`GLPI_APP_TOKEN`\nsecret string\nno\n—\nserver\nRESTRICTED\nyes\nApplication token for the configured GLPI API client.\n`GLPI_USER_TOKEN`\nsecret string\nno\n—\nserver\nRESTRICTED\nyes\nUser token for the scoped GLPI service account.\n`IDENTITY_CODE_SECRET`\nsecret string\nno\n—\nserver\nRESTRICTED\nyes\n32-byte hex key for verification code and mailbox digests.\n`IDENTITY_ALLOWED_EMAIL_DOMAINS`\ncomma-separated domain names\nno\n—\nserver\nINTERNAL\nno\nExact corporate email domains eligible for employee verification.\n`IDENTITY_SMTP_HOST`\nSMTP hostname\nno\n—\nserver\nINTERNAL\nno\nSMTP submission server used for employee verification email.\n`IDENTITY_SMTP_PORT`\ninteger 1..65535\nno\n`587`\nserver\nINTERNAL\nno\nSMTP submission port. Port 465 uses implicit TLS. Other ports require STARTTLS.\n`IDENTITY_SMTP_USER`\nnonempty string\nno\n—\nserver\nRESTRICTED\nyes\nSMTP service credential username for employee verification mail.\n`IDENTITY_SMTP_PASSWORD`\nsecret string\nno\n—\nserver\nRESTRICTED\nyes\nSMTP service credential password for employee verification mail.\n`IDENTITY_SMTP_FROM`\nemail address\nno\n—\nserver\nINTERNAL\nno\nAuthorized From mailbox for employee verification email.\n"
+    "text": "API Configuration Reference\n[Configuration policy](../../architecture/configuration.md) · [API runtime](../../../apps/api/README.md)\nNo values are eligible for client exposure. `ORION_ENV` is always required. The three token settings are configured together. API modules that require the database or bearer authentication stay unmounted until those settings exist, and production startup fails instead.\nEnvironment variable\nType\nRequired\nDefault\nVisibility\nClassification\nSecret\nPurpose\n`ORION_ENV`\ndevelopment | test | production\nyes\n—\nserver\nINTERNAL\nno\nRuntime environment.\n`ORION_RELEASE_ID`\nartifact identifier, 1..128 ASCII letters/digits/._-\nno\n`local`\nserver\nINTERNAL\nno\nActual artifact revision for correlated logs and traces; local for unversioned development.\n`ORION_API_HOST`\nnonempty string\nno\n`127.0.0.1`\nserver\nINTERNAL\nno\nListen address; loopback by default.\n`ORION_API_PORT`\ninteger 0..65535\nno\n`3000`\nserver\nINTERNAL\nno\nListen port; zero selects an ephemeral port.\n`ORION_LOG_LEVEL`\nPino level\nno\n`info`\nserver\nINTERNAL\nno\nStructured log threshold.\n`ORION_SHUTDOWN_TIMEOUT_MS`\ninteger 100..30000\nno\n`5000`\nserver\nINTERNAL\nno\nTotal graceful shutdown deadline.\n`ORION_OTLP_ENDPOINT`\nhttp(s) URL\nno\n—\nserver\nINTERNAL\nno\nOptional OTLP HTTP collector base URL.\n`ORION_TRACE_SAMPLE_RATIO`\nnumber 0..1\nno\n`1`\nserver\nINTERNAL\nno\nTrace sampling probability.\n`ORION_DATABASE_URL`\nPostgreSQL URL\nno\n—\nserver\nRESTRICTED\nyes\nRuntime PostgreSQL credential; enables the database for modules that require it and adds it to readiness.\n`ORION_TOKEN_ISSUER`\nissuer URL\nno\n—\nserver\nINTERNAL\nno\nExpected access-token issuer; configure with audience and JWKS URL to enable bearer authentication.\n`ORION_TOKEN_AUDIENCE`\nnonempty string\nno\n—\nserver\nINTERNAL\nno\nExpected API access-token audience.\n`ORION_TOKEN_JWKS_URL`\nhttp(s) URL\nno\n—\nserver\nINTERNAL\nno\nTrusted issuer public-key endpoint.\n`WHATSAPP_APP_SECRET`\nsecret string\nno\n—\nserver\nRESTRICTED\nyes\nMeta app secret used to verify incoming webhook signatures.\n`WHATSAPP_WEBHOOK_VERIFY_TOKEN`\nsecret string\nno\n—\nserver\nRESTRICTED\nyes\nApplication-generated secret used to verify the Meta callback.\n`WHATSAPP_PHONE_NUMBER_ID`\nMeta asset identifier\nno\n—\nserver\nINTERNAL\nno\nMeta business phone number ID accepted by the webhook.\n`WHATSAPP_ACCESS_TOKEN`\nsecret string\nno\n—\nserver\nRESTRICTED\nyes\nMeta system user token that enables WhatsApp outbound dispatch.\n`WHATSAPP_GRAPH_API_VERSION`\nGraph API version\nno\n`v27.0`\nserver\nINTERNAL\nno\nGraph API version used by WhatsApp outbound dispatch.\n`GLPI_API_URL`\nHTTPS URL\nno\n—\nserver\nINTERNAL\nno\nBase URL of the GLPI REST v1 API, including its API path.\n`GLPI_APP_TOKEN`\nsecret string\nno\n—\nserver\nRESTRICTED\nyes\nApplication token for the configured GLPI API client.\n`GLPI_USER_TOKEN`\nsecret string\nno\n—\nserver\nRESTRICTED\nyes\nUser token for the scoped GLPI service account.\n`IDENTITY_CODE_SECRET`\nsecret string\nno\n—\nserver\nRESTRICTED\nyes\n32-byte hex key for verification code and mailbox digests.\n`IDENTITY_ALLOWED_EMAIL_DOMAINS`\ncomma-separated domain names\nno\n—\nserver\nINTERNAL\nno\nExact corporate email domains eligible for employee verification.\n`IDENTITY_SMTP_HOST`\nSMTP hostname\nno\n—\nserver\nINTERNAL\nno\nSMTP submission server used for employee verification email.\n`IDENTITY_SMTP_PORT`\ninteger 1..65535\nno\n`587`\nserver\nINTERNAL\nno\nSMTP submission port. Port 465 uses implicit TLS. Other ports require STARTTLS.\n`IDENTITY_SMTP_USER`\nnonempty string\nno\n—\nserver\nRESTRICTED\nyes\nSMTP service credential username for employee verification mail.\n`IDENTITY_SMTP_PASSWORD`\nsecret string\nno\n—\nserver\nRESTRICTED\nyes\nSMTP service credential password for employee verification mail.\n`IDENTITY_SMTP_FROM`\nemail address\nno\n—\nserver\nINTERNAL\nno\nAuthorized From mailbox for employee verification email.\n`WHATSAPP_SUPPORT_CONTACT`\nemail address or HTTPS URL\nno\n—\nserver\nINTERNAL\nno\nIT contact shown by the WhatsApp menu. Enables guided conversations with configured integrations.\n"
   },
   {
     "id": "repository/docs/generated/database/schema",
@@ -466,6 +529,24 @@
     "heading": "Database Reference",
     "anchor": "database-reference",
     "text": "Database Reference\n[Schema documentation policy](../../database/schema-documentation.md) · [Database principles](../../database/principles.md)\n"
+  },
+  {
+    "id": "repository/docs/generated/database/schema",
+    "title": "Database Reference",
+    "group": "Generated references",
+    "kind": "repository",
+    "heading": "whatsapp_conversations",
+    "anchor": "whatsapp_conversations",
+    "text": "whatsapp_conversations\nLatest guided intake state and a resumable or confirmed draft for an authenticated WhatsApp sender scope.\nOwner: WhatsApp guided conversations. Classification: RESTRICTED.\nLifecycle: Created on first actionable inbound message and updated as the conversation advances. An unconfirmed draft can be cancelled. Drafts are disclosed only to the currently verified GLPI owner. Retention is release-plan work.\nColumn\nPostgreSQL type\nNullable\nDefault\nClassification\nMeaning\nNull meaning\nUnit\n`scope_key`\n`text`\nno\n—\nRESTRICTED\nStable hash of the business phone ID and preferred sender identity.\n—\n—\n`state`\n`jsonb`\nno\n—\nRESTRICTED\nCurrent stage, owning GLPI user, intake fields, attachment references and confirmation state where present.\n—\n—\n`updated_at`\n`timestamp(3) with time zone`\nno\n—\nINTERNAL\nClock instant of the last applied conversation move.\n—\n—\n"
+  },
+  {
+    "id": "repository/docs/generated/database/schema",
+    "title": "Database Reference",
+    "group": "Generated references",
+    "kind": "repository",
+    "heading": "Constraints and indexes",
+    "anchor": "constraints-and-indexes",
+    "text": "Constraints and indexes\nObject\nPhysical definition\nPurpose\n`whatsapp_conversations_pkey`\n`PRIMARY KEY (scope_key)`\nKeeps one current conversation and draft per WhatsApp sender scope.\n"
   },
   {
     "id": "repository/docs/generated/database/schema",
@@ -482,7 +563,7 @@
     "group": "Generated references",
     "kind": "repository",
     "heading": "Constraints and indexes",
-    "anchor": "constraints-and-indexes",
+    "anchor": "constraints-and-indexes-1",
     "text": "Constraints and indexes\nObject\nPhysical definition\nPurpose\n`whatsapp_identity_events_active`\n`CHECK (((NOT active) OR ((expires_at IS NOT NULL) AND (attempts_left > 0))))`\nRequires an expiration and an available attempt for an active challenge.\n`whatsapp_identity_events_attempts`\n`CHECK (((attempts_left >= 0) AND (attempts_left <= 5)))`\nBounds challenge comparisons to the configured maximum of five.\n`whatsapp_identity_events_code`\n`CHECK (((code_digest IS NULL) OR (active AND (glpi_user_id IS NOT NULL) AND (glpi_user_id > 0) AND (code_digest ~ '^[a-f0-9]{64}$'::text))))`\nRequires a canonical digest and a valid directory candidate for a prepared active challenge.\n`whatsapp_identity_events_pkey`\n`PRIMARY KEY (event_key)`\nPrevents one signed inbound message from starting or confirming verification twice for a sender.\n`whatsapp_identity_events_mailbox_idx`\n`CREATE INDEX whatsapp_identity_events_mailbox_idx ON public.whatsapp_identity_events USING btree (mailbox_key, created_at)`\nSupports the rolling hourly quota shared by all senders targeting a mailbox.\n`whatsapp_identity_events_scope_idx`\n`CREATE INDEX whatsapp_identity_events_scope_idx ON public.whatsapp_identity_events USING btree (scope_key, created_at)`\nSupports sender-scoped quotas and challenge selection.\n"
   },
   {
@@ -500,7 +581,7 @@
     "group": "Generated references",
     "kind": "repository",
     "heading": "Constraints and indexes",
-    "anchor": "constraints-and-indexes-1",
+    "anchor": "constraints-and-indexes-2",
     "text": "Constraints and indexes\nObject\nPhysical definition\nPurpose\n`whatsapp_verified_identities_expiration`\n`CHECK ((expires_at > verified_at))`\nRequires verification to precede expiration.\n`whatsapp_verified_identities_pkey`\n`PRIMARY KEY (scope_key)`\nMaintains one current verified GLPI identity for a WhatsApp sender scope.\n`whatsapp_verified_identities_user`\n`CHECK ((glpi_user_id > 0))`\nRequires a positive GLPI directory identity.\n"
   },
   {
@@ -510,7 +591,7 @@
     "kind": "repository",
     "heading": "whatsapp_inbound_messages",
     "anchor": "whatsapp_inbound_messages",
-    "text": "whatsapp_inbound_messages\nDurable intake of supported and authenticated Meta messages for the configured business number.\nOwner: WhatsApp webhook. Classification: RESTRICTED.\nLifecycle: Created before acknowledging the webhook. Redelivery preserves the original row. Processing and retention are release-plan work.\nColumn\nPostgreSQL type\nNullable\nDefault\nClassification\nMeaning\nNull meaning\nUnit\n`message_id`\n`text`\nno\n—\nRESTRICTED\nOpaque Meta message identifier used to deduplicate redelivery.\n—\n—\n`business_phone_id`\n`text`\nno\n—\nINTERNAL\nMeta asset identifier of the business number that received the event.\n—\n—\n`sender_business_id`\n`text`\nyes\n—\nRESTRICTED\nMeta sender identifier scoped to the business portfolio.\nMeta supplied only the sender phone number.\n—\n`sender_phone`\n`text`\nyes\n—\nRESTRICTED\nSender number supplied by Meta to support directory linking and routing.\nMeta supplied a business-scoped sender identifier without a phone number.\n—\n`occurred_at`\n`timestamp(3) with time zone`\nno\n—\nINTERNAL\nTimestamp reported by Meta as the message time.\n—\nUTC instant\n`received_at`\n`timestamp(3) with time zone`\nno\n`CURRENT_TIMESTAMP`\nINTERNAL\nDatabase timestamp of the first accepted delivery.\n—\nUTC instant\n`content`\n`jsonb`\nno\n—\nRESTRICTED\nNormalized text, action identifier, media reference or protected verification-code digest consumed by the conversation flow.\n—\n—\n"
+    "text": "whatsapp_inbound_messages\nDurable intake of supported and authenticated Meta messages for the configured business number.\nOwner: WhatsApp webhook. Classification: RESTRICTED.\nLifecycle: Created before acknowledging the webhook. Redelivery preserves the original row. Processing and retention are release-plan work.\nColumn\nPostgreSQL type\nNullable\nDefault\nClassification\nMeaning\nNull meaning\nUnit\n`message_id`\n`text`\nno\n—\nRESTRICTED\nOpaque Meta message identifier used to deduplicate redelivery.\n—\n—\n`business_phone_id`\n`text`\nno\n—\nINTERNAL\nMeta asset identifier of the business number that received the event.\n—\n—\n`sender_business_id`\n`text`\nyes\n—\nRESTRICTED\nMeta sender identifier scoped to the business portfolio.\nMeta supplied only the sender phone number.\n—\n`sender_phone`\n`text`\nyes\n—\nRESTRICTED\nSender number supplied by Meta to support directory linking and routing.\nMeta supplied a business-scoped sender identifier without a phone number.\n—\n`occurred_at`\n`timestamp(3) with time zone`\nno\n—\nINTERNAL\nTimestamp reported by Meta as the message time.\n—\nUTC instant\n`received_at`\n`timestamp(3) with time zone`\nno\n`CURRENT_TIMESTAMP`\nINTERNAL\nDatabase timestamp of the first accepted delivery.\n—\nUTC instant\n`content`\n`jsonb`\nno\n—\nRESTRICTED\nNormalized text, action identifier, media reference or protected verification-code digest consumed by the conversation flow.\n—\n—\n`conversation_processed_at`\n`timestamp(3) with time zone`\nyes\n—\nINTERNAL\nTime the guided worker completed processing this input and committed its effects.\nThe guided worker has not completed this message.\n—\n`conversation_action`\n`\"WhatsAppConversationAction\"`\nyes\n—\nINTERNAL\nDurable identity operation owned by this inbound event.\nThere is no outstanding identity operation for the conversation.\n—\n`conversation_claim_id`\n`uuid`\nyes\n—\nINTERNAL\nUnique fence for the worker currently allowed to finalize the identity operation.\nThe event has no identity work claim.\n—\n`conversation_claim_until`\n`timestamp(3) with time zone`\nyes\n—\nINTERNAL\nTime after which another conversation worker may reclaim an unfinished identity operation.\nThe event has no active identity work claim.\n—\n"
   },
   {
     "id": "repository/docs/generated/database/schema",
@@ -518,8 +599,8 @@
     "group": "Generated references",
     "kind": "repository",
     "heading": "Constraints and indexes",
-    "anchor": "constraints-and-indexes-2",
-    "text": "Constraints and indexes\nObject\nPhysical definition\nPurpose\n`whatsapp_inbound_messages_pkey`\n`PRIMARY KEY (message_id)`\nKeeps one accepted event per Meta message ID across retries and concurrent delivery.\n`whatsapp_inbound_messages_sender_required`\n`CHECK (((sender_business_id IS NOT NULL) OR (sender_phone IS NOT NULL)))`\nRequires at least one sender identifier so a message can be associated with a conversation.\n"
+    "anchor": "constraints-and-indexes-3",
+    "text": "Constraints and indexes\nObject\nPhysical definition\nPurpose\n`whatsapp_inbound_messages_conversation_claim`\n`CHECK ((((conversation_claim_id IS NULL) AND (conversation_claim_until IS NULL)) OR ((conversation_claim_id IS NOT NULL) AND (conversation_claim_until IS NOT NULL) AND (conversation_action IS NOT NULL) AND (conversation_processed_at IS NULL))))`\nRequires a complete claim only on an outstanding identity operation and keeps completed events unlocked.\n`whatsapp_inbound_messages_pkey`\n`PRIMARY KEY (message_id)`\nKeeps one accepted event per Meta message ID across retries and concurrent delivery.\n`whatsapp_inbound_messages_sender_required`\n`CHECK (((sender_business_id IS NOT NULL) OR (sender_phone IS NOT NULL)))`\nRequires at least one sender identifier so a message can be associated with a conversation.\n`whatsapp_inbound_messages_conversation_idx`\n`CREATE INDEX whatsapp_inbound_messages_conversation_idx ON public.whatsapp_inbound_messages USING btree (business_phone_id, conversation_processed_at, received_at, occurred_at, message_id)`\nSupports finding the earliest unprocessed message for one business number.\n"
   },
   {
     "id": "repository/docs/generated/database/schema",
@@ -536,7 +617,7 @@
     "group": "Generated references",
     "kind": "repository",
     "heading": "Constraints and indexes",
-    "anchor": "constraints-and-indexes-3",
+    "anchor": "constraints-and-indexes-4",
     "text": "Constraints and indexes\nObject\nPhysical definition\nPurpose\n`whatsapp_outbound_messages_attempts_nonnegative`\n`CHECK ((attempts >= 0))`\nRejects invalid negative dispatch attempt counts.\n`whatsapp_outbound_messages_pkey`\n`PRIMARY KEY (id)`\nPrevents another reply intent with the same durable identifier.\n`whatsapp_outbound_messages_dispatch_idx`\n`CREATE INDEX whatsapp_outbound_messages_dispatch_idx ON public.whatsapp_outbound_messages USING btree (business_phone_id, state, available_at)`\nSupports finding due messages for a configured sender and tracking current states.\n`whatsapp_outbound_messages_provider_key`\n`CREATE UNIQUE INDEX whatsapp_outbound_messages_provider_key ON public.whatsapp_outbound_messages USING btree (business_phone_id, provider_message_id)`\nCorrelates delivery by provider message ID within one business phone number and prevents conflicting associations.\n"
   },
   {
@@ -546,7 +627,7 @@
     "kind": "repository",
     "heading": "Database enums",
     "anchor": "database-enums",
-    "text": "Database enums\nEnum\nValues\nMeaning\n`WhatsAppOutboundState`\nPENDING, SENDING, ACCEPTED, SENT, DELIVERED, READ, FAILED, UNCERTAIN, EXPIRED\nTracks work from pending and claimed through acceptance, delivery, read, known failure, uncertainty, or service-window expiry.\n"
+    "text": "Database enums\nEnum\nValues\nMeaning\n`WhatsAppConversationAction`\nREQUEST_CODE, CONFIRM_CODE\nIdentity operation to request or confirm an employee email code after committing the preceding conversation move.\n`WhatsAppOutboundState`\nPENDING, SENDING, ACCEPTED, SENT, DELIVERED, READ, FAILED, UNCERTAIN, EXPIRED\nTracks work from pending and claimed through acceptance, delivery, read, known failure, uncertainty, or service-window expiry.\n"
   },
   {
     "id": "repository/docs/project-derivation",
@@ -781,95 +862,5 @@
     "heading": "Tracking",
     "anchor": "tracking",
     "text": "Tracking\nThe V1 denominator is the number of rows in [V1 work](#v1-work). Count a row as complete only after its acceptance criteria pass with recorded evidence. Report completed, in-progress, pending, and blocked counts on each handoff. Project decisions stay in the product scope or relevant ADR. Access that requires a human stays in the [human-action checklist](human-actions.md). Preserve task IDs and record scope changes here.\n"
-  },
-  {
-    "id": "repository/docs/project/implementation-plan",
-    "title": "MNS Suporte Implementation Plan",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "V1 work",
-    "anchor": "v1-work",
-    "text": "V1 work\nTask\nDeliverable and acceptance\nStatus\nEvidence or dependency\nPJ-01\nEstablish a private GitHub repository. Verify the initial default branch, security settings and enforced CI gate.\nblocked\nPrivate repository and vulnerability alerts verified. [Initial CI passed](https://github.com/GabriellMDias/mns-suporte/actions/runs/45622724328). Required branch protection depends on [PH-11](human-actions.md#ph-11).\nPJ-02\nRecord actors, scope, data ownership, first-release acceptance and the future AI boundary.\ncompleted\n[Approved scope and acceptance](product-scope.md).\nPJ-06\nImplement Meta callback verification and signed webhook ingestion. Verify the challenge, exact-byte HMAC, incoming identity fields and recipient scope with synthetic requests.\ncompleted\n[Webhook tests](../../apps/api/test/whatsapp/webhook.test.ts) passed. The [API guide](../../apps/api/README.md#whatsapp-webhook) documents configuration.\nPJ-07\nPersist incoming messages before acknowledgement and deduplicate replays, including concurrent delivery, using the restricted database role.\ncompleted\n[Webhook integration tests](../../apps/api/test/whatsapp/webhook.test.ts) verified concurrent replays, PostgreSQL grants and failure acknowledgement.\nPJ-08\nImplement the Meta outbound adapter and durable sends. Test text and interactive replies, safe retries and delivery status handling.\ncompleted\n[Adapter](../../apps/api/test/whatsapp/graph-client.test.ts), [outbox and delivery](../../apps/api/test/whatsapp/outbox.test.ts), and [worker lifecycle](../../apps/api/test/whatsapp/dispatch-worker.test.ts) verified with a synthetic Meta transport and migrated PostgreSQL. Live pilot remains under PJ-17.\nPJ-09\nImplement the GLPI adapter and exact directory lookup. Test scoped credentials, timeouts, session renewal and explicit outcomes for mutations.\ncompleted\n[Seven contract and transport tests](../../apps/api/test/glpi/client.test.ts) passed. Company GLPI testing remains under [PH-08](human-actions.md#ph-08) and PJ-17.\nPJ-10\nVerify and persist employee identity with short-lived, rate-limited email challenges. Test invalid, replayed and expired codes, and access isolation between employees.\ncompleted\n[Identity integration](../../apps/api/test/whatsapp/identity.test.ts) and [SMTP TLS checks](../../apps/api/test/whatsapp/verification-mail.test.ts) passed. The menu consumes these operations in PJ-11. The live relay remains under [PH-09](human-actions.md#ph-09) and PJ-17.\nPJ-11\nImplement the menu, guided intake, resumable drafts, confirmation, editing, cancel and the direct path to IT. Test ordinary navigation and restart recovery.\npending\nDepends on PJ-07, PJ-08 and PJ-10.\nPJ-12\nProvide approved static troubleshooting with a direct path to open a ticket. Record whether it helped.\npending\nDepends on PJ-11.\nPJ-13\nCreate GLPI tickets with attachments and confirmed summaries. Test duplicates, ambiguous creation outcomes and recoverable attachment failures.\npending\nDepends on PJ-09 and PJ-11.\nPJ-14\nList the employee's open GLPI tickets and show authorized ticket details. Test ownership before disclosure and preserve existing ticket access through verified identity.\npending\nDepends on PJ-09 and PJ-10.\nPJ-15\nNotify on closure, capture permission to receive updates and use the approved utility template when required. Verify retries and delivery tracking.\npending\nDepends on PJ-08, PJ-13 and PJ-14. Live template under [PH-07](human-actions.md#ph-07).\nPJ-16\nPackage and document operation with a container, production configuration, restricted database access, retention, backup and restore, sanitized diagnostics, alerts and recovery procedures. Verify local deployment and rollback rehearsal.\npending\nStarts after stable local flows. Company ingress and deployment access under [PH-10](human-actions.md#ph-10).\nPJ-19\nTriage GitHub dependency alerts and upgrade affected dependencies or document verified non-applicability. Revalidate the lockfile and runtime boundaries before the pilot.\npending\nGitHub reported eight alerts on the inherited baseline on 2026-11-25, four high and four moderate. [Dependabot alerts](https://github.com/GabriellMDias/mns-suporte/security/dependabot).\nPJ-17\nRun the release acceptance suite against disposable infrastructure, then run a pilot with the test Meta number, company test GLPI and mail relay. Verify real end-to-end delivery and failure recovery.\npending\nDepends on PJ-08 through PJ-16, PJ-19 and external test access.\nPJ-18\nReconcile active legacy notifications and onboard verified employees. Deploy, verify smoke checks and supervise the switch to the corporate support number.\npending\nDepends on PJ-17. Production access and the support number under [PH-07](human-actions.md#ph-07), [PH-08](human-actions.md#ph-08) and [PH-10](human-actions.md#ph-10).\n"
-  },
-  {
-    "id": "repository/docs/project/implementation-plan",
-    "title": "MNS Suporte Implementation Plan",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "Plan changes and later work",
-    "anchor": "plan-changes-and-later-work",
-    "text": "Plan changes and later work\nPJ-03 was the generic first module. PJ-06 through PJ-15 replace it with independently verifiable product capabilities.\nPJ-04 remains outside V1. The web shell already provides the local documentation portal and is available for a future operator interface.\nPJ-05 is split across PJ-10 and PJ-16. Corporate email verification is the V1 identity mechanism, with deployment work verified independently.\nPost-V1 candidates include supplementing tickets over WhatsApp, known incident notices, an editorial knowledge base, and optional AI guidance and summarization. The [AI extension boundary](product-scope.md#ai-extension) governs that work. These items are outside the V1 progress denominator.\n"
-  },
-  {
-    "id": "repository/docs/project/product-scope",
-    "title": "MNS Suporte Product Scope",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "MNS Suporte Product Scope",
-    "anchor": "mns-suporte-product-scope",
-    "text": "MNS Suporte Product Scope\n[Implementation plan](implementation-plan.md) · [Project README](../../README.md)\nMNS Suporte is an internal IT support channel for MNS employees. Employees use WhatsApp to open and consult GLPI tickets or find the IT contact. The IT team receives and resolves the tickets in GLPI. The V1 menu and employee-facing prompts use Brazilian Portuguese.\n"
-  },
-  {
-    "id": "repository/docs/project/product-scope",
-    "title": "MNS Suporte Product Scope",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "V1 workflow",
-    "anchor": "v1-workflow",
-    "text": "V1 workflow\nVerify the employee with a short-lived code delivered to their corporate mailbox after an exact, unique lookup in the corporate directory exposed by GLPI. Bind the verified GLPI identity to the WhatsApp account. Limit challenges and attempts, and use neutral replies during lookup.\nOffer to open a ticket, list the employee's open tickets, or direct them to IT. The human contact is an explicit menu option and remains available during intake.\nCollect category, unit or department, description, impact, and optional photos, audio or documents. Keep a resumable draft. Offer a relevant static instruction when one exists. The employee can mark it helpful, request more support, or skip to ticket creation.\nPresent a draft summary for review. On confirmation, create the ticket and attach media in GLPI. Confirm creation only after obtaining the GLPI ticket ID. Surface attachment failures independently from ticket creation.\nCheck ownership in GLPI before displaying ticket details. Record permission for outbound updates, check for closure and send a notification. Use the approved Meta utility template outside the customer service window.\nEmail password reset was retired from the product scope. The verification code proves access to the mailbox for onboarding.\n"
-  },
-  {
-    "id": "repository/docs/project/product-scope",
-    "title": "MNS Suporte Product Scope",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "Delivery and data boundaries",
-    "anchor": "delivery-and-data-boundaries",
-    "text": "Delivery and data boundaries\nMeta Cloud API carries conversations. Use a TLS webhook, verify its requests, scope incoming events to the configured business number, and persist supported inbound messages before acknowledging them. Use the business-scoped sender identifier when available and retain a supplied phone number only where needed for identity continuity and routing.\nGLPI remains authoritative for employee directory records, ticket ownership, tickets, attachments and ticket status. Its service account receives scoped permissions.\nPostgreSQL owns verified links, in-progress conversations, integration delivery state and job deduplication. Treat identifiers, user-provided support content and attachments as restricted. Exclude them from routine logs, keep media references only while needed for delivery to GLPI, and establish automated retention before real traffic.\nRecord ambiguous provider outcomes for reconciliation. A missing response after ticket submission may hide a successful creation. Replays or restarts must preserve the original intent and must not create a second ticket.\nExisting GLPI tickets remain in GLPI. Reverify legacy identity links. Reconcile pending legacy notifications with the live GLPI status and the employee's verified identity before sending from the new service.\n"
-  },
-  {
-    "id": "repository/docs/project/product-scope",
-    "title": "MNS Suporte Product Scope",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "AI extension",
-    "anchor": "ai-extension",
-    "text": "AI extension\nThe conversation service owns its state and the complete guided flow. An optional assistant may return candidate field values, approved knowledge article references and a draft summary. Application rules validate those outputs and require employee review before ticket creation. On timeout, unavailability or lack of relevant guidance, continue from the saved step with the guided prompts. Limit context to approved content and the minimum necessary support data. Treat user messages and retrieved articles as untrusted input. AI receives no write capability in GLPI.\n"
-  },
-  {
-    "id": "repository/docs/project/product-scope",
-    "title": "MNS Suporte Product Scope",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "Release acceptance",
-    "anchor": "release-acceptance",
-    "text": "Release acceptance\nAn employee can verify ownership of their corporate mailbox, resume a draft after restart, open a ticket with an attachment, consult their own tickets and receive a closure notice in the test environment.\nDirect access to IT and every core flow work with the guided messages alone.\nReplayed or concurrent inbound deliveries do not duplicate tickets. A GLPI outage preserves the draft and permits safe recovery.\nAnother employee cannot view ticket details or trigger actions with a stale or unverified messenger identity.\nRelease evidence includes local validation, a pilot on real service boundaries, backup and restore checks, and a supervised cutover rehearsal.\n"
-  },
-  {
-    "id": "repository/docs/README",
-    "title": "Documentation Task Index",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "Documentation Task Index",
-    "anchor": "documentation-task-index",
-    "text": "Documentation Task Index\nChoose the route relevant to the change, then use the policy's headings and source links for focused reading. Related policies apply when the change crosses their boundaries. The repository has an API runtime with composable modules and PostgreSQL support, a generated SDK, and a web application shell with this portal; the README's [Current state](../README.md#current-state) says which modules this repository composes. [Selected technologies](architecture/technology-decisions.md) are not proof of [implemented commands](validation.md).\n"
-  },
-  {
-    "id": "repository/docs/README",
-    "title": "Documentation Task Index",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "Find the smallest useful context",
-    "anchor": "find-the-smallest-useful-context",
-    "text": "Find the smallest useful context\nRead the root and applicable nested `AGENTS.md`, then select the task route below. Read related policies only when the change crosses their boundaries.\nFollow the owner to its canonical source and relevant tests. For a complete implemented example, see [Orion's reference implementation](project-derivation.md#orions-reference-implementation). For commands, use [setup](setup.md) and [validation](validation.md).\nConsult the [technology map](architecture/technology-decisions.md) and governing ADR for an architectural choice or rationale. Accepted ADRs preserve decision-time context; their future-tense examples are not current command inventories.\nIf implementation and policy disagree, record the discrepancy and resolve it within the task's scope. Do not infer that a requirement is implemented or weaken it to match a gap.\n[Contributing](contributing.md#documentation-ownership) owns documentation responsibilities. The implementation plan owns execution status and the human-action checklist owns actual owner/access prerequisites; the README's [Current state](../README.md#current-state) links this repository's copies. Neither activates conditional deployment work.\n"
-  },
-  {
-    "id": "repository/docs/README",
-    "title": "Documentation Task Index",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "Architecture and implementation",
-    "anchor": "architecture-and-implementation",
-    "text": "Architecture and implementation\nTask\nAuthoritative policy\nExecute or track implementation work\nThe implementation plan linked from the README's [Current state](../README.md#current-state)\nStart a new project from Orion, check its provenance, or upgrade its Orion baseline\n[Start and upgrade a project from Orion](project-derivation.md)\nName a stable Orion foundation release or assess derived-project compatibility\n[Foundation versioning](versioning.md)\nChange agent instruction files or tool compatibility adapters\n[Agent instructions](architecture/agent-instructions.md)\nReproduce development setup, local execution, and the validation gate\n[Development setup](setup.md)\nRun the living API/data/component portal and understand its architecture\n[Portal setup](setup.md#living-documentation-portal), [living documentation](architecture/living-documentation.md)\nResolve owner decisions, external access, or other human prerequisites\nThe human-action checklist linked from the README's [Current state](../README.md#current-state)\nAdd an API module or web workflow\n[API runtime](../apps/api/README.md#modules), [web workflow](../apps/web/README.md#modules)\nStudy a complete implemented example across database, API, SDK, and UI\n[Orion's reference implementation](project-derivation.md#orions-reference-implementation)\nEvaluate architectural tradeoffs or exceptions\n[Principles](architecture/principles.md)\nFind selected technology decisions\n[Technology decisions](architecture/technology-decisions.md)\nPlace code or create an application/package\n[Repository structure](architecture/repository-structure.md), [application boundaries](architecture/application-boundaries.md)\nAdd imports or shared dependencies\n[Dependency rules](architecture/dependency-rules.md)\nReuse or create React components, extend their catalog, or define product styling/themes\n[Component architecture and design practices](architecture/web-components.md)\nModel failures and translate boundaries\n[Error handling](architecture/error-handling.md)\nAdd configuration\n[Configuration](architecture/configuration.md)\nChoose test coverage and execution layers\n[Testing strategy](architecture/testing-strategy.md), [validation availability](validation.md)\nChange independently deployed or persisted contracts\n[Versioning and compatibility](architecture/versioning-and-compatibility.md)\nHandle delivery, retries, and external side effects\n[Delivery and side effects](architecture/delivery-and-side-effects.md)\nImplement CI or dependency automation\n[Continuous integration](architecture/continuous-integration.md)\nChange backend execution or regenerate derived references\n[Backend execution and generated artifacts](architecture/backend-execution-and-generated-artifacts.md)\nRun or extend the current API feature\n[API runtime](../apps/api/README.md), [API-local instructions](../apps/api/AGENTS.md), [generated OpenAPI](generated/api/openapi.json)\nRun or extend the web workflow or generated SDK\n[Web workflow](../apps/web/README.md), [web-local instructions](../apps/web/AGENTS.md), [SDK source](../packages/sdk/src/index.ts)\nChange the SDK public surface or generated types\n[SDK package guide](../packages/sdk/README.md), [SDK-local instructions](../packages/sdk/AGENTS.md)\n"
   }
 ]

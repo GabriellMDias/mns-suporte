@@ -3,6 +3,9 @@ import type { AppInstance } from "../../module.js";
 export function registerWhatsAppDispatchWorker(
   app: AppInstance,
   dispatch: (signal: AbortSignal) => Promise<boolean>,
+  failureEvent:
+    | "whatsapp_dispatch_unavailable"
+    | "whatsapp_conversation_unavailable" = "whatsapp_dispatch_unavailable",
 ): void {
   const controller = new AbortController();
   let timer: NodeJS.Timeout | undefined;
@@ -19,7 +22,7 @@ export function registerWhatsAppDispatchWorker(
         },
         () => {
           if (!failureReported && !controller.signal.aborted)
-            app.log.warn("whatsapp_dispatch_unavailable");
+            app.log.warn(failureEvent);
           failureReported = true;
           schedule(5000);
         },

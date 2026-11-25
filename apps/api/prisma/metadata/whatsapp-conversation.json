@@ -1,0 +1,30 @@
+{
+  "tables": {
+    "whatsapp_conversations": {
+      "owner": "WhatsApp guided conversations",
+      "classification": "RESTRICTED",
+      "description": "Latest guided intake state and a resumable or confirmed draft for an authenticated WhatsApp sender scope.",
+      "lifecycle": "Created on first actionable inbound message and updated as the conversation advances. An unconfirmed draft can be cancelled. Drafts are disclosed only to the currently verified GLPI owner. Retention is release-plan work.",
+      "columns": {
+        "scope_key": {
+          "description": "Stable hash of the business phone ID and preferred sender identity.",
+          "classification": "RESTRICTED"
+        },
+        "state": {
+          "description": "Current stage, owning GLPI user, intake fields, attachment references and confirmation state where present.",
+          "classification": "RESTRICTED"
+        },
+        "updated_at": {
+          "description": "Clock instant of the last applied conversation move.",
+          "classification": "INTERNAL"
+        }
+      },
+      "objects": {
+        "whatsapp_conversations_pkey": "Keeps one current conversation and draft per WhatsApp sender scope."
+      }
+    }
+  },
+  "enums": {
+    "WhatsAppConversationAction": "Identity operation to request or confirm an employee email code after committing the preceding conversation move."
+  }
+}
