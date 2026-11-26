@@ -6,18 +6,18 @@
 
 ## whatsapp_closure_preferences
 
-Most recent explicit closure notice consent per WhatsApp sender scope and verified GLPI requester.
+Most recent ticket activity notice consent per WhatsApp sender scope and verified GLPI requester.
 
-Owner: WhatsApp closure notifications. Classification: RESTRICTED.
+Owner: WhatsApp ticket activity notifications. Classification: RESTRICTED.
 
-Lifecycle: An employee opts in or withdraws through WhatsApp. Withdrawal clears the delivery address. Re-enabling issues a new grant that cannot revive jobs under the previous grant.
+Lifecycle: An employee opts in on ticket confirmation or through the notification settings and can withdraw through WhatsApp. Withdrawal clears the delivery address. Re-enabling issues a new grant that cannot revive jobs under the previous grant.
 
 | Column | PostgreSQL type | Nullable | Default | Classification | Meaning | Null meaning | Unit |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `scope_key` | `text` | no | — | RESTRICTED | Stable hash binding the Meta business number and the sender scope. | — | — |
 | `glpi_user_id` | `bigint` | no | — | RESTRICTED | Verified GLPI requester who opted in. | — | — |
-| `grant_id` | `uuid` | no | — | INTERNAL | Unique consent epoch bound to eligible ticket watches and queued closure replies. | — | — |
-| `recipient` | `jsonb` | yes | — | RESTRICTED | Validated WhatsApp address for opted-in closure delivery. | The employee withdrew the grant and the address was cleared. | — |
+| `grant_id` | `uuid` | no | — | INTERNAL | Unique consent epoch bound to eligible ticket watches and queued ticket updates. | — | — |
+| `recipient` | `jsonb` | yes | — | RESTRICTED | Validated WhatsApp address for opted-in ticket updates. | The employee withdrew the grant and the address was cleared. | — |
 | `granted_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Time at which WhatsApp recorded the active or most recently withdrawn grant. | — | UTC instant |
 | `revoked_at` | `timestamp(3) with time zone` | yes | — | INTERNAL | Time at which the employee withdrew the grant. | The grant remains active. | UTC instant |
 
@@ -81,26 +81,34 @@ Lifecycle: A reserved challenge stays active until it is replaced, consumed, exp
 
 ## whatsapp_verified_identities
 
-Current proof of corporate mailbox control for a WhatsApp sender and its GLPI identity.
+Current proof associating a signed WhatsApp sender with a GLPI identity.
 
 Owner: WhatsApp employee verification. Classification: RESTRICTED.
 
-Lifecycle: Created or replaced only as a challenge is consumed. Proof expires after thirty days and requires a new challenge. Retention is release-plan work.
+Lifecycle: Each sender can verify independently for the same GLPI user. A new proof issues a fresh link ID. Proof expires after thirty days or on administrative revocation.
 
 | Column | PostgreSQL type | Nullable | Default | Classification | Meaning | Null meaning | Unit |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `scope_key` | `text` | no | — | RESTRICTED | Stable hash of the business phone ID and preferred sender identity. | — | — |
-| `glpi_user_id` | `bigint` | no | — | RESTRICTED | GLPI directory identity established by mailbox verification. | — | — |
-| `verified_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Time the matching challenge was consumed. | — | — |
+| `glpi_user_id` | `bigint` | no | — | RESTRICTED | GLPI directory identity established by mailbox verification or a matching directory phone. | — | — |
+| `verified_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Time the current proof was recorded. | — | — |
 | `expires_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Time after which the link cannot authorize work. | — | — |
+| `link_id` | `uuid` | no | `gen_random_uuid()` | INTERNAL | Opaque administrative identifier for the current verification. Changes on re-verification to fence stale actions. | — | — |
+| `phone_last_four` | `text` | yes | — | CONFIDENTIAL | Last four digits of the number supplied by a signed WhatsApp message. | Meta did not supply a phone number or no eligible historical message was retained. | — |
+| `revoked_at` | `timestamp(3) with time zone` | yes | — | INTERNAL | Time at which IT revoked this verification. | The verification was not revoked. | — |
+| `revoked_by` | `uuid` | yes | — | CONFIDENTIAL | Verified administration principal that first revoked the current link. | The current verification has no administrative revocation. | — |
 
 ### Constraints and indexes
 
 | Object | Physical definition | Purpose |
 | --- | --- | --- |
 | `whatsapp_verified_identities_expiration` | `CHECK ((expires_at > verified_at))` | Requires verification to precede expiration. |
+| `whatsapp_verified_identities_phone_suffix` | `CHECK ((phone_last_four ~ '^[0-9]{4}$'::text))` | Allows only a four-digit display suffix. |
 | `whatsapp_verified_identities_pkey` | `PRIMARY KEY (scope_key)` | Maintains one current verified GLPI identity for a WhatsApp sender scope. |
+| `whatsapp_verified_identities_revocation` | `CHECK ((((revoked_at IS NULL) AND (revoked_by IS NULL)) OR ((revoked_at IS NOT NULL) AND (revoked_by IS NOT NULL) AND (revoked_at >= verified_at))))` | Requires an attributable and chronologically valid revocation. |
 | `whatsapp_verified_identities_user` | `CHECK ((glpi_user_id > 0))` | Requires a positive GLPI directory identity. |
+| `whatsapp_verified_identities_link_id_key` | `CREATE UNIQUE INDEX whatsapp_verified_identities_link_id_key ON public.whatsapp_verified_identities USING btree (link_id)` | Identifies each current verification with an opaque unique identifier. |
+| `whatsapp_verified_identities_user_links_idx` | `CREATE INDEX whatsapp_verified_identities_user_links_idx ON public.whatsapp_verified_identities USING btree (glpi_user_id, link_id)` | Finds each independently verified WhatsApp sender associated with a GLPI user. |
 
 ## whatsapp_ticket_submissions
 
@@ -118,7 +126,7 @@ Lifecycle: Starts when an employee confirms a draft. Confirmed ticket creation c
 | `requester_id` | `bigint` | no | — | RESTRICTED | Verified GLPI requester chosen at confirmation. | — | — |
 | `recipient` | `jsonb` | yes | — | RESTRICTED | WhatsApp address for the eventual response. Cleared at the terminal outcome. | The submission no longer needs its reply address. | — |
 | `reply_expires_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Deadline of the customer service window associated with confirmation. | — | — |
-| `title` | `text` | yes | — | RESTRICTED | Ticket title derived from the confirmed category. Cleared after creation or terminal failure. | The title is no longer needed for creation. | — |
+| `title` | `text` | yes | — | RESTRICTED | Ticket title confirmed by the requester. Cleared after creation or terminal failure. | The title is no longer needed for creation. | — |
 | `description` | `text` | yes | — | RESTRICTED | Confirmed ticket summary with its opaque reconciliation reference. Cleared after creation or terminal failure. | The summary is no longer needed for creation. | — |
 | `media_ids` | `jsonb` | no | — | RESTRICTED | Ordered Meta media identifiers to resolve at delivery time. Cleared when processing ends. | — | — |
 | `attachment_count` | `integer` | no | — | INTERNAL | Number of media references in the confirmed draft. | — | — |
@@ -133,7 +141,8 @@ Lifecycle: Starts when an employee confirms a draft. Confirmed ticket creation c
 | `mutating` | `boolean` | no | `false` | INTERNAL | Durable evidence that a non-idempotent GLPI mutation may have been started. | — | — |
 | `updated_at` | `timestamp(3) with time zone` | no | — | INTERNAL | Instant of the latest claim or durable progress transition. | — | — |
 | `closure_consent_id` | `uuid` | yes | — | INTERNAL | Active notice grant recorded when the employee confirmed the draft. | There was no eligible notice grant when this submission was queued. | — |
-| `closure_check_at` | `timestamp(3) with time zone` | yes | — | INTERNAL | Time of the next GLPI closure check or the deadline of its active claim. | The watch is unscheduled, retired or has created a closure reply. | — |
+| `closure_check_at` | `timestamp(3) with time zone` | yes | — | INTERNAL | Time of the next GLPI activity check or the deadline of its active claim. | The activity watch is unscheduled or retired. | — |
+| `notice_cursor` | `jsonb` | yes | — | INTERNAL | Last notified GLPI status, processed follow-up ID and observed closure time for the ticket activity watch. | The legacy closure watch has no activity baseline yet. | — |
 
 ### Constraints and indexes
 

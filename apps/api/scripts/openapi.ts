@@ -68,7 +68,9 @@ export async function generateOpenApi(
       module.operations.map((operation) => ({
         operation,
         tag: module.tag,
-        authenticated: module.requires.includes("authentication"),
+        authenticated:
+          operation.authenticated === true ||
+          module.requires.includes("authentication"),
       })),
     ),
   ];

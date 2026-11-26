@@ -32,7 +32,7 @@
           "classification": "INTERNAL"
         },
         "title": {
-          "description": "Ticket title derived from the confirmed category. Cleared after creation or terminal failure.",
+          "description": "Ticket title confirmed by the requester. Cleared after creation or terminal failure.",
           "classification": "RESTRICTED",
           "nullMeaning": "The title is no longer needed for creation."
         },
@@ -97,9 +97,14 @@
           "nullMeaning": "There was no eligible notice grant when this submission was queued."
         },
         "closure_check_at": {
-          "description": "Time of the next GLPI closure check or the deadline of its active claim.",
+          "description": "Time of the next GLPI activity check or the deadline of its active claim.",
           "classification": "INTERNAL",
-          "nullMeaning": "The watch is unscheduled, retired or has created a closure reply."
+          "nullMeaning": "The activity watch is unscheduled or retired."
+        },
+        "notice_cursor": {
+          "description": "Last notified GLPI status, processed follow-up ID and observed closure time for the ticket activity watch.",
+          "classification": "INTERNAL",
+          "nullMeaning": "The legacy closure watch has no activity baseline yet."
         }
       },
       "objects": {

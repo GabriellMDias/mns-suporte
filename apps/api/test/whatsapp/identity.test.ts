@@ -383,3 +383,145 @@ it("enforces attempts, expiry and shared mailbox quotas without exposing directo
     }
   });
 }, 120_000);
+
+it("lists two independently verified WhatsApp accounts and revokes only the selected link", async () => {
+  await withMigratedDatabase(async (runtimeUrl) => {
+    const db = createDatabase(runtimeUrl);
+    const service = createIdentityVerification(
+      createPostgresIdentityRepository(db),
+      { codeSecret, allowedEmailDomains: ["company.example"] },
+      vi
+        .fn<Parameters<typeof createIdentityVerification>[2]>()
+        .mockResolvedValue({ kind: "found", userId: 37 }),
+      vi.fn(),
+    );
+    const mail = vi
+      .fn<Parameters<typeof createIdentityVerification>[3]>()
+      .mockResolvedValue(undefined);
+    let now = Date.now();
+    const identity = createIdentityVerification(
+      createPostgresIdentityRepository(db),
+      { codeSecret, allowedEmailDomains: ["company.example"] },
+      vi
+        .fn<Parameters<typeof createIdentityVerification>[2]>()
+        .mockResolvedValue({ kind: "found", userId: 37 }),
+      mail,
+      () => new Date(now),
+    );
+    const actor = "6d9bf45d-3d5e-4ef6-a47d-1c8bdfbe11fb";
+    const { app } = createApp(pino({ level: "silent" }), undefined, {
+      modules: activateModules(
+        apiModules,
+        {
+          database: db,
+          whatsappWebhook: {
+            appSecret,
+            verifyToken: "synthetic-verify-token",
+            phoneNumberId: phone,
+          },
+          verifier: {
+            verify: (authorization) =>
+              Promise.resolve(
+                authorization === "Bearer synthetic-admin"
+                  ? {
+                      id: actor,
+                      scopes: new Set([
+                        "whatsapp:links:read",
+                        "whatsapp:links:revoke",
+                      ]),
+                    }
+                  : authorization === "Bearer synthetic-reader"
+                    ? { id: actor, scopes: new Set(["whatsapp:links:read"]) }
+                    : null,
+              ),
+          },
+        },
+        "test",
+      ),
+    });
+    const root = "/admin/whatsapp/identity-links";
+    const admin = { authorization: "Bearer synthetic-admin" };
+    try {
+      for (const [index, messenger] of [first, second].entries()) {
+        await identity.requestVerification(messenger, "start-" + index, email);
+        const code = mail.mock.calls[index][1];
+        expect(
+          await identity.confirmVerification(
+            messenger,
+            "finish-" + index,
+            digest(code, messenger),
+          ),
+        ).toEqual({ kind: "verified", glpiUserId: 37 });
+      }
+      const query = root + "?glpiUserId=37";
+      expect((await app.inject({ url: query })).statusCode).toBe(401);
+      const page = await app.inject({ url: query, headers: admin });
+      expect(page.statusCode).toBe(200);
+      expect(page.headers["cache-control"]).toBe("no-store");
+      expect(page.body).not.toContain(first.senderPhone);
+      expect(page.body).not.toContain(second.senderBusinessId);
+      const { items } = page.json<{
+        items: { id: string; phoneLastFour: string; status: string }[];
+      }>();
+      expect(items.map((item) => item.phoneLastFour).sort()).toEqual([
+        "0100",
+        "0200",
+      ]);
+      expect(items.every((item) => item.status === "active")).toBe(true);
+      const personal = items.find((item) => item.phoneLastFour === "0100")!;
+      const revoke = {
+        method: "POST" as const,
+        url: root + "/" + personal.id + "/revoke",
+      };
+      expect(
+        (
+          await app.inject({
+            ...revoke,
+            headers: { authorization: "Bearer synthetic-reader" },
+          })
+        ).statusCode,
+      ).toBe(403);
+      await identity.requestVerification(first, "pending-code", email);
+      const pending = mail.mock.calls[2][1];
+      const [one, two] = await Promise.all([
+        app.inject({ ...revoke, headers: admin }),
+        app.inject({ ...revoke, headers: admin }),
+      ]);
+      expect(one.statusCode).toBe(200);
+      expect(two.body).toBe(one.body);
+      expect(await service.findVerifiedGlpiUser(first)).toBeUndefined();
+      expect(await service.findVerifiedGlpiUser(second)).toBe(37);
+      expect(
+        await identity.confirmVerification(
+          first,
+          "revoked-code",
+          digest(pending, first),
+        ),
+      ).toEqual({ kind: "invalid" });
+      expect(
+        await db.whatsAppVerifiedIdentity.findUnique({
+          where: { linkId: personal.id },
+          select: { revokedBy: true },
+        }),
+      ).toEqual({ revokedBy: actor });
+      now += 3_600_001;
+      await identity.requestVerification(first, "fresh-start", email);
+      const fresh = mail.mock.calls[3][1];
+      expect(
+        await identity.confirmVerification(
+          first,
+          "fresh-finish",
+          digest(fresh, first),
+        ),
+      ).toEqual({ kind: "verified", glpiUserId: 37 });
+      expect((await app.inject({ ...revoke, headers: admin })).statusCode).toBe(
+        404,
+      );
+      expect(await identity.findVerifiedGlpiUser(first)).toBe(37);
+      expect(await identity.findVerifiedGlpiUser(second)).toBe(37);
+    } finally {
+      await app.close();
+      await db.$disconnect();
+    }
+  });
+}, 120_000);

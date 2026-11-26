@@ -10,16 +10,12 @@ import {
   type GuidanceId,
 } from "./troubleshooting.js";
 
-const category = Type.Literal("category");
-const unit = Type.Literal("unit");
+const title = Type.Literal("title");
 const description = Type.Literal("description");
-const impact = Type.Literal("impact");
 const attachments = Type.Literal("attachments");
 const draftStep = Type.Union([
-  category,
-  unit,
+  title,
   description,
-  impact,
   attachments,
   Type.Literal("review"),
   Type.Literal("guidance"),
@@ -36,24 +32,24 @@ const attachment = Type.Object({
   mimeType: Type.Optional(Type.String({ maxLength: 255 })),
   caption: Type.Optional(Type.String({ maxLength: 4096 })),
 });
-const fieldLimits = {
-  category: 80,
-  unit: 80,
-  description: 1200,
-  impact: 300,
-} as const;
+const titleLimit = 120;
+const descriptionLimit = 1200;
 const draftSchema = Type.Object({
   id: Type.String({ minLength: 1 }),
   ownerId: Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
-  step: draftStep,
+  step: Type.Union([
+    draftStep,
+    Type.Literal("category"),
+    Type.Literal("unit"),
+    Type.Literal("impact"),
+  ]),
   revision: Type.Integer({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER }),
   editing: Type.Boolean(),
-  category: Type.Optional(Type.String({ maxLength: fieldLimits.category })),
-  unit: Type.Optional(Type.String({ maxLength: fieldLimits.unit })),
-  description: Type.Optional(
-    Type.String({ maxLength: fieldLimits.description }),
-  ),
-  impact: Type.Optional(Type.String({ maxLength: fieldLimits.impact })),
+  title: Type.Optional(Type.String({ minLength: 1, maxLength: titleLimit })),
+  category: Type.Optional(Type.String({ maxLength: 80 })),
+  unit: Type.Optional(Type.String({ maxLength: 80 })),
+  description: Type.Optional(Type.String({ maxLength: descriptionLimit })),
+  impact: Type.Optional(Type.String({ maxLength: 300 })),
   attachments: Type.Array(attachment, { maxItems: 5 }),
   confirmedAt: Type.Optional(Type.String()),
   submissionVersion: Type.Optional(Type.Literal(1)),
@@ -80,8 +76,13 @@ const inboxContent = Type.Union([
   attachment,
 ]);
 
-export type Conversation = Static<typeof conversationSchema>;
-type Draft = Static<typeof draftSchema>;
+type Draft = Omit<
+  Static<typeof draftSchema>,
+  "step" | "category" | "unit" | "impact"
+> & { step: Static<typeof draftStep> };
+export type Conversation = Omit<Static<typeof conversationSchema>, "draft"> & {
+  draft?: Draft;
+};
 export type ConversationInput = Static<typeof inboxContent>;
 type Reply = OutboundPayload["content"];
 export type IdentityAction = "request_code" | "confirm_code";
@@ -115,7 +116,7 @@ const buttons = (body: string, ...choices: [string, string][]): Reply => ({
   buttons: choices.map(([id, title]) => ({ id, title })),
 });
 const emailPrompt = text(
-  "Olá! Para liberar o atendimento, informe seu e-mail corporativo. Para falar com a TI, digite *Falar com a TI*.",
+  "Olá! Para liberar o atendimento, informe seu e-mail corporativo.",
 );
 const codePrompt = text(
   "Se o e-mail puder ser verificado, você receberá um código. Envie apenas o código completo, começando com MNS-. Para informar o e-mail novamente, digite *Reenviar*.",
@@ -127,7 +128,6 @@ const menu = buttons(
   "Como posso ajudar? Você pode retomar um rascunho em *Abrir chamado* ou digitar *Avisos* para gerenciar avisos de encerramento.",
   ["menu:open", "Abrir chamado"],
   ["menu:tickets", "Meus chamados"],
-  ["menu:it", "Falar com a TI"],
 );
 function draftButtons(
   draft: Draft,
@@ -145,44 +145,23 @@ function draftButtons(
 function mediaPrompt(draft: Draft): Reply {
   return draftButtons(
     draft,
-    "Envie até cinco anexos de até 10 MB cada. Aceitamos fotos JPEG/PNG, áudios OGG/MP3/AAC/MP4/AMR e documentos PDF. Selecione *Revisar rascunho* quando terminar.",
+    "Envie até cinco fotos, áudios ou PDFs de até 10 MB cada. Para remover todos, digite *Limpar anexos*. Toque em *Revisar rascunho* para voltar.",
     ["review", "Revisar rascunho"],
     ["cancel", "Cancelar"],
   );
 }
 const prompts = {
-  category: text(
-    "Qual é a categoria do problema? Por exemplo, acesso, sistema ou equipamento.",
-  ),
-  unit: text("Qual unidade ou setor precisa de ajuda?"),
+  title: text("Qual é o título do chamado? Resuma o problema em uma linha."),
   description: text(
-    "Descreva o problema e o que já tentou. Você pode incluir anexos na próxima etapa.",
-  ),
-  impact: text(
-    "Qual é o impacto? Informe quantas pessoas ou operações foram afetadas.",
+    "Descreva o problema em texto. Você pode enviar anexos ao revisar o chamado.",
   ),
   edit: text(
-    "Qual campo deseja editar? Responda com o número:\n1. Categoria\n2. Unidade ou setor\n3. Descrição\n4. Impacto\n5. Anexos",
+    "Digite *1* para editar o título, *2* para editar a descrição ou *3* para gerenciar os anexos.",
   ),
 };
-const fieldOrder = [
-  "category",
-  "unit",
-  "description",
-  "impact",
-  "attachments",
-] as const;
-const fieldNext = {
-  category: "unit",
-  unit: "description",
-  description: "impact",
-  impact: "attachments",
-} as const;
 const aliases: Readonly<Record<string, string>> = {
   "abrir chamado": "menu:open",
   retomar: "menu:open",
-  "falar com a ti": "menu:it",
-  "falar com ti": "menu:it",
   menu: "menu",
   cancelar: "draft:cancel",
   "revisar rascunho": "draft:review",
@@ -209,18 +188,18 @@ function withDraft(
   return draft ? { phase, draft } : { phase };
 }
 
-function review(draft: Draft): Reply {
+function review(draft: Draft, noticesEnabled: boolean): Reply {
   const summary =
-    "Revise o rascunho:\nCategoria: " +
-    (draft.category ?? "") +
-    "\nUnidade ou setor: " +
-    (draft.unit ?? "") +
+    "Revise o chamado:\nTítulo: " +
+    (draft.title ?? "") +
     "\nDescrição: " +
     (draft.description ?? "") +
-    "\nImpacto: " +
-    (draft.impact ?? "") +
     "\nAnexos: " +
-    draft.attachments.length;
+    draft.attachments.length +
+    "\nSe quiser anexar algo, envie até cinco fotos, áudios ou PDFs de até 10 MB cada antes de confirmar." +
+    (noticesEnabled
+      ? "\nAo confirmar, você aceita receber avisos do MNS Suporte sobre este chamado pelo WhatsApp. Para desativar, digite *Parar avisos*."
+      : "\nOs avisos deste chamado estão desativados.");
   // WhatsApp button bodies are limited to 1024 characters. Keep the full review.
   return summary.length <= 1024
     ? draftButtons(
@@ -246,13 +225,17 @@ function troubleshooting(draft: Draft): Reply {
   );
 }
 
-function intake(draft: Draft, reply?: Reply): ConversationMove {
+function intake(
+  draft: Draft,
+  reply?: Reply,
+  noticesEnabled = true,
+): ConversationMove {
   return {
     state: { phase: "intake", draft },
     reply:
       reply ??
       (draft.step === "review"
-        ? review(draft)
+        ? review(draft, noticesEnabled)
         : draft.step === "attachments"
           ? mediaPrompt(draft)
           : draft.step === "guidance"
@@ -261,14 +244,62 @@ function intake(draft: Draft, reply?: Reply): ConversationMove {
   };
 }
 
+function reviewAfterDescription(
+  draft: Draft,
+  noticesEnabled: boolean,
+): ConversationMove {
+  const guidanceId =
+    draft.editing || draft.guidanceId
+      ? undefined
+      : selectGuidance(draft.description);
+  return guidanceId
+    ? intake({ ...draft, step: "guidance", guidanceId })
+    : intake(
+        { ...draft, step: "review", editing: false },
+        undefined,
+        noticesEnabled,
+      );
+}
+
 function routeDraft(
   draft: Draft,
   input: ConversationInput,
   command: string | undefined,
   now: Date,
+  noticesEnabled: boolean,
 ): ConversationMove {
+  const show = (draft: Draft, reply?: Reply) =>
+    intake(draft, reply, noticesEnabled);
   if (draft.confirmedAt)
     return { state: withDraft("menu", draft), reply: pendingReply };
+  if (draft.step === "review" || draft.step === "attachments") {
+    if (command === "draft:clear-media")
+      return show({
+        ...draft,
+        revision: draft.revision + 1,
+        attachments: [],
+      });
+    if (
+      input.type === "image" ||
+      input.type === "audio" ||
+      input.type === "document"
+    ) {
+      if (draft.attachments.some(({ mediaId }) => mediaId === input.mediaId))
+        return show(draft, text("Este anexo já está no rascunho."));
+      if (draft.attachments.length >= 5)
+        return show(
+          draft,
+          text(
+            "O rascunho já tem cinco anexos. Digite *Limpar anexos* para remover todos.",
+          ),
+        );
+      return show({
+        ...draft,
+        revision: draft.revision + 1,
+        attachments: [...draft.attachments, input],
+      });
+    }
+  }
   switch (draft.step) {
     case "guidance": {
       if (!draft.guidanceId)
@@ -283,7 +314,7 @@ function routeDraft(
                 command === "menu:open"
               ? "SKIPPED"
               : undefined;
-      if (!outcome) return intake(draft);
+      if (!outcome) return show(draft);
       const feedback: TroubleshootingFeedback = {
         draftId: draft.id,
         guidanceId: draft.guidanceId,
@@ -292,21 +323,20 @@ function routeDraft(
       if (outcome === "RESOLVED")
         return {
           state: { phase: "menu" },
-          reply: buttons(
-            "Que bom que resolveu. Vou encerrar este rascunho.",
-            ["menu:open", "Abrir chamado"],
-            ["menu:it", "Falar com a TI"],
-          ),
+          reply: buttons("Que bom que resolveu. Vou encerrar este rascunho.", [
+            "menu:open",
+            "Abrir chamado",
+          ]),
           feedback,
         };
       return {
-        ...intake({ ...draft, step: "review", revision: draft.revision + 1 }),
+        ...show({ ...draft, step: "review", revision: draft.revision + 1 }),
         feedback,
       };
     }
     case "review":
-      if (command === "draft:edit") return intake({ ...draft, step: "edit" });
-      if (command === "draft:confirm")
+      if (command === "draft:edit") return show({ ...draft, step: "edit" });
+      if (command === "draft:confirm" && draft.title && draft.description)
         return {
           state: withDraft("menu", {
             ...draft,
@@ -317,99 +347,63 @@ function routeDraft(
           submission: {
             draftId: draft.id,
             requesterId: draft.ownerId,
-            title:
-              "Suporte via WhatsApp — " +
-              draft.category?.replace(/\p{Cc}+/gu, " "),
+            title: draft.title,
             description: [
-              "Categoria: " + draft.category,
-              "Unidade ou setor: " + draft.unit,
-              "Descrição: " + draft.description,
-              "Impacto: " + draft.impact,
+              draft.description,
               "Referência MNS: " + draft.id,
-            ].join("\n"),
+            ].join("\n\n"),
             mediaIds: draft.attachments.map(({ mediaId }) => mediaId),
           },
         };
-      return intake(draft);
+      return show(draft);
     case "edit": {
-      const field =
-        input.type === "text" && /^[1-5]$/.test(input.body.trim())
-          ? fieldOrder[Number(input.body.trim()) - 1]
-          : undefined;
-      return intake(field ? { ...draft, step: field, editing: true } : draft);
+      const choice = input.type === "text" ? input.body.trim() : "";
+      if (choice === "1")
+        return show({ ...draft, step: "title", editing: true });
+      if (choice === "2")
+        return show({ ...draft, step: "description", editing: true });
+      if (choice === "3")
+        return show({ ...draft, step: "attachments", editing: true });
+      return show(draft);
     }
     case "attachments":
-      if (command === "draft:review") {
-        // Editing an existing draft must not replay prior advice.
-        const guide =
-          draft.editing || draft.guidanceId
-            ? undefined
-            : selectGuidance(draft.description);
-        if (guide)
-          return intake({
-            ...draft,
-            step: "guidance",
-            guidanceId: guide,
-            revision: draft.revision + 1,
-          });
-        return intake({ ...draft, step: "review", editing: false });
-      }
-      if (command === "draft:clear-media")
-        return intake(
-          { ...draft, revision: draft.revision + 1, attachments: [] },
-          text(
-            "Anexos removidos do rascunho. Envie outros ou digite *Revisar rascunho*.",
-          ),
-        );
-      if (
-        input.type === "image" ||
-        input.type === "audio" ||
-        input.type === "document"
-      ) {
-        if (draft.attachments.some(({ mediaId }) => mediaId === input.mediaId))
-          return intake(
-            draft,
-            text(
-              "Este anexo já está no rascunho. Envie outro ou digite *Revisar rascunho*.",
-            ),
-          );
-        if (draft.attachments.length >= 5)
-          return intake(
-            draft,
-            text(
-              "O rascunho já tem cinco anexos. Digite *Revisar rascunho* ou *Limpar anexos*.",
-            ),
-          );
-        return intake(
-          {
-            ...draft,
-            revision: draft.revision + 1,
-            attachments: [...draft.attachments, input],
-          },
-          text("Anexo recebido. Envie outro ou digite *Revisar rascunho*."),
-        );
-      }
-      return intake(draft);
-    default: {
-      const step = draft.step;
-      const value = input.type === "text" ? input.body.trim() : "";
-      if (!value || value.length > fieldLimits[step])
-        return intake(
+      return command === "draft:review"
+        ? reviewAfterDescription(
+            { ...draft, revision: draft.revision + 1 },
+            noticesEnabled,
+          )
+        : show(draft);
+    case "title": {
+      const value =
+        input.type === "text" && !command
+          ? input.body.replace(/[\s\p{Cc}]+/gu, " ").trim()
+          : "";
+      if (!value || value.length > titleLimit || !value.isWellFormed())
+        return show(draft, text("Envie um título de até 120 caracteres."));
+      const updated = { ...draft, title: value, revision: draft.revision + 1 };
+      return draft.description
+        ? reviewAfterDescription(updated, noticesEnabled)
+        : show({ ...updated, step: "description" });
+    }
+    case "description": {
+      const value = input.type === "text" && !command ? input.body.trim() : "";
+      if (!value || value.length > descriptionLimit)
+        return show(
           draft,
           text(
-            "Envie este campo em texto, com até " +
-              fieldLimits[step] +
+            "Envie a descrição do problema em texto, com até " +
+              descriptionLimit +
               " caracteres.",
           ),
         );
-      const next = draft.editing ? "review" : fieldNext[step];
-      return intake({
-        ...draft,
-        revision: draft.revision + 1,
-        [step]: value,
-        step: next,
-        editing: false,
-      });
+      return reviewAfterDescription(
+        {
+          ...draft,
+          revision: draft.revision + 1,
+          description: value,
+        },
+        noticesEnabled,
+      );
     }
   }
 }
@@ -418,15 +412,52 @@ export function readConversationState(value: unknown): Conversation {
   if (value === undefined) return { phase: "new" };
   if (!Value.Check(conversationSchema, value))
     throw new Error("Invalid stored WhatsApp conversation");
-  return value;
+  const { phase, draft } = value;
+  if (!draft) return { phase };
+  const { step, category, unit, impact, ...fields } = draft;
+  const removedStep =
+    step === "category" || step === "unit" || step === "impact";
+  const needsTitle =
+    !fields.title &&
+    !fields.confirmedAt &&
+    !fields.uncertainSubmission &&
+    step !== "title";
+  const legacy =
+    removedStep ||
+    category !== undefined ||
+    unit !== undefined ||
+    impact !== undefined ||
+    needsTitle;
+  if (!legacy) return { phase, draft: { ...fields, step } };
+  // Older drafts keep their description and media, with a fresh review after the title.
+  return {
+    phase,
+    draft: {
+      ...fields,
+      step: needsTitle || removedStep ? "title" : step,
+      revision: fields.revision + 1,
+      editing: !!fields.description,
+    },
+  };
 }
 
-export function reopenTicketReview(draft: Draft): ConversationMove {
+export function reopenTicketReview(
+  draft: Draft,
+  noticesEnabled = true,
+): ConversationMove {
   const fields = { ...draft };
   delete fields.confirmedAt;
   delete fields.submissionVersion;
   delete fields.uncertainSubmission;
-  return intake({ ...fields, step: "review", revision: draft.revision + 1 });
+  return intake(
+    {
+      ...fields,
+      step: fields.title ? "review" : "title",
+      revision: draft.revision + 1,
+    },
+    undefined,
+    noticesEnabled,
+  );
 }
 
 export function uncertainTicket(
@@ -447,7 +478,6 @@ export function uncertainTicket(
         draft.id +
         ".",
       ["new", "Novo chamado"],
-      ["menu:it", "Falar com a TI"],
     ),
   };
 }
@@ -478,6 +508,7 @@ export function routeConversation(
     supportContact: string;
     draftId: string;
     now: Date;
+    noticesEnabled?: boolean;
   },
 ): ConversationMove {
   const raw = input.type === "text" ? input.body.trim().toLowerCase() : "";
@@ -487,17 +518,12 @@ export function routeConversation(
       : Object.hasOwn(aliases, raw)
         ? aliases[raw]
         : undefined;
-  const { userId, supportContact } = context;
-  if (command === "menu:it" || (raw === "3" && state.phase !== "intake"))
-    return {
-      state,
-      reply: text("Fale com a equipe de TI por " + supportContact + "."),
-    };
+  const { userId, supportContact, noticesEnabled = true } = context;
   if (command === "closure:disable")
     return {
       state,
       closurePreference: "disable",
-      reply: text("Avisos de encerramento desativados neste WhatsApp."),
+      reply: text("Avisos de chamados desativados neste WhatsApp."),
     };
 
   if (userId === undefined) {
@@ -521,7 +547,6 @@ export function routeConversation(
       return {
         state: withDraft("code", draft),
         action: "request_code",
-        reply: codePrompt,
       };
     return { state: withDraft("email", draft), reply: emailPrompt };
   }
@@ -533,7 +558,7 @@ export function routeConversation(
     return {
       state: currentState,
       reply: buttons(
-        "O MNS Suporte pode enviar um aviso neste WhatsApp quando um chamado futuro for encerrado. Para cancelar depois, digite *Parar avisos*.",
+        "O MNS Suporte envia avisos de resposta, mudança de status e fechamento de chamados. Para cancelar, digite *Parar avisos*.",
         ["closure:enable", "Ativar avisos"],
         ["closure:disable", "Desativar avisos"],
         ["menu", "Menu"],
@@ -554,7 +579,7 @@ export function routeConversation(
     return intake({
       id: context.draftId,
       ownerId: userId,
-      step: "category",
+      step: "title",
       revision: 1,
       editing: false,
       attachments: [],
@@ -566,7 +591,7 @@ export function routeConversation(
     !draft.submissionVersion &&
     command !== "draft:cancel"
   )
-    return reopenTicketReview(draft);
+    return reopenTicketReview(draft, noticesEnabled);
   if (draft?.submissionVersion && command === "draft:confirm")
     return { state: menuState, reply: pendingReply };
   if (command === "draft:cancel") {
@@ -574,11 +599,7 @@ export function routeConversation(
       return { state: menuState, reply: pendingReply };
     return {
       state: { phase: "menu" },
-      reply: buttons(
-        "Rascunho cancelado.",
-        ["menu:open", "Abrir chamado"],
-        ["menu:it", "Falar com a TI"],
-      ),
+      reply: buttons("Rascunho cancelado.", ["menu:open", "Abrir chamado"]),
     };
   }
   if (command === "menu:open" || (raw === "1" && state.phase === "menu")) {
@@ -588,37 +609,49 @@ export function routeConversation(
       state.phase === "intake" &&
       command === "menu:open"
     )
-      return routeDraft(draft, input, command, context.now);
+      return routeDraft(draft, input, command, context.now, noticesEnabled);
     return intake(
       draft ?? {
         id: context.draftId,
         ownerId: userId,
-        step: "category",
+        step: "title",
         revision: 1,
         editing: false,
         attachments: [],
       },
+      undefined,
+      noticesEnabled,
     );
   }
   if (state.phase === "intake" && draft)
-    return routeDraft(draft, input, command, context.now);
+    return routeDraft(draft, input, command, context.now, noticesEnabled);
   return { state: menuState, reply: menu };
 }
 
 export function finishVerification(
   state: Conversation,
   userId: number | undefined,
+  step: "email" | "code" = "code",
 ): ConversationMove {
   if (userId === undefined)
     return {
       state: withDraft("code", state.draft),
-      reply: text(
-        "Código inválido ou expirado. Envie o código completo ou digite *Reenviar*.",
-      ),
+      reply:
+        step === "email"
+          ? codePrompt
+          : text(
+              "Código inválido ou expirado. Envie o código completo ou digite *Reenviar*.",
+            ),
     };
   const draft = state.draft?.ownerId === userId ? state.draft : undefined;
   return {
     state: withDraft("menu", draft),
-    reply: { ...menu, body: "E-mail verificado. " + menu.body },
+    reply: {
+      ...menu,
+      body:
+        (step === "email"
+          ? "Número reconhecido no GLPI. "
+          : "E-mail verificado. ") + menu.body,
+    },
   };
 }

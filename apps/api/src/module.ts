@@ -25,6 +25,7 @@ export type ApiOperation = Readonly<{
   url: string;
   operationId: string;
   description: string;
+  authenticated?: true;
   schema: Readonly<{
     params?: TSchema;
     querystring?: TSchema;

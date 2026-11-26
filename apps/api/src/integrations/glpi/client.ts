@@ -1,8 +1,16 @@
+import { decodeHTML } from "entities";
 import { Type } from "typebox";
 import { Value } from "typebox/value";
 import type { GlpiConfig } from "../../config.js";
 import { normalizeEmail } from "../../email-address.js";
-import { directoryQuery, positiveId, readDirectoryPage } from "./directory.js";
+import {
+  directoryQuery,
+  isSupportedSenderPhone,
+  phoneDirectoryQuery,
+  positiveId,
+  readDirectoryPage,
+  readPhoneDirectoryPage,
+} from "./directory.js";
 import {
   isTicketRequester,
   readTicketCandidates,
@@ -21,8 +29,8 @@ type Session = { token: string };
 type OperationResult =
   HttpResult | { kind: "not_sent"; reason: RequestFailure };
 type DirectoryResult =
-  | { kind: "found"; userId: number; email: string }
-  | { kind: "not_found" | "ambiguous" | "invalid_email" }
+  | { kind: "found"; userId: number }
+  | { kind: "not_found" | "ambiguous" }
   | { kind: "unavailable"; reason: RequestFailure | "directory_limit" };
 type CreateTicketResult =
   | { kind: "created"; ticketId: number }
@@ -30,6 +38,10 @@ type CreateTicketResult =
   | { kind: "rejected"; reason: "session" | "permission" | "invalid_input" }
   | { kind: "uncertain"; reason: IoFailure };
 type MutationFailure = Exclude<CreateTicketResult, { kind: "created" }>;
+export type TicketActivity = {
+  followups: { id: number; text?: string }[];
+  solution?: string;
+};
 type UploadResult = MutationFailure | { kind: "attached" };
 
 type Ticket = Readonly<{
@@ -41,7 +53,10 @@ type Operation =
   | { path: "search/User"; query: URLSearchParams }
   | { path: "search/Ticket"; query: URLSearchParams }
   | { path: `Ticket/${number}`; query: URLSearchParams }
-  | { path: `Ticket/${number}/Ticket_User`; query: URLSearchParams }
+  | {
+      path: `Ticket/${number}/${"Ticket_User" | "ITILFollowup" | "ITILSolution"}`;
+      query: URLSearchParams;
+    }
   | { path: "Ticket"; input: object }
   | { path: "Document"; input: FormData };
 const tokenSchema = Type.Object({
@@ -160,6 +175,53 @@ function ticketInput(ticket: Ticket) {
   };
 }
 
+function publicText(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const text = decodeHTML(value.slice(0, 32_000))
+    .replace(/<(script|style|template)\b[^>]*>[\s\S]*?<\/\1\s*>/giu, "")
+    .replace(/<(?:br\b[^>]*|\/(?:p|div|li|tr|h[1-6])\s*)>/giu, "\n")
+    .replace(/<[^>]*>/gu, "")
+    .replace(/[\p{Cc}&&[^\n\t]]/gv, "")
+    .replace(/[\t ]+/gu, " ")
+    .replace(/\n{3,}/gu, "\n\n")
+    .trim();
+  return text.slice(0, 3000).toWellFormed() || undefined;
+}
+
+function publicFlag(flag: unknown, absentIsPublic = false): boolean {
+  return (
+    flag === false ||
+    flag === 0 ||
+    flag === "0" ||
+    (absentIsPublic && flag === undefined)
+  );
+}
+
+function children(payload: unknown, ticketId: number) {
+  if (!Array.isArray(payload)) return undefined;
+  const items = Type.Array(
+    Type.Object({
+      id: Type.Unknown(),
+      itemtype: Type.Literal("Ticket"),
+      items_id: Type.Unknown(),
+      content: Type.Optional(Type.Unknown()),
+      is_private: Type.Optional(Type.Unknown()),
+      users_id: Type.Optional(Type.Unknown()),
+      timeline_position: Type.Optional(Type.Unknown()),
+      status: Type.Optional(Type.Unknown()),
+      date_creation: Type.Optional(Type.Unknown()),
+    }),
+  );
+  if (
+    !Value.Check(items, payload) ||
+    !payload.every(
+      (row) => positiveId(row.items_id) === ticketId && positiveId(row.id),
+    )
+  )
+    return undefined;
+  return payload;
+}
+
 export function createGlpiClient(config: GlpiConfig, fetchGlpi = fetch) {
   type SessionResult =
     | { kind: "active"; session: Session }
@@ -261,59 +323,95 @@ export function createGlpiClient(config: GlpiConfig, fetchGlpi = fetch) {
     }
   }
 
-  return {
-    async findActiveUserByEmail(input: string): Promise<DirectoryResult> {
-      const email = normalizeEmail(input);
-      if (!email) return { kind: "invalid_email" };
-      const budget = AbortSignal.timeout(8000);
-      let offset = 0;
-      let expectedTotal: number | undefined;
-      let match: number | undefined;
-      const seen = new Set<number>();
-      for (let page = 0; page < pageLimit; page++) {
-        const reply = await run(
-          {
-            path: "search/User",
-            query: directoryQuery(email, offset, pageSize),
-          },
-          budget,
-        );
-        if (reply.kind === "not_sent")
-          return { kind: "unavailable", reason: reply.reason };
-        if (
-          reply.kind !== "response" ||
-          (reply.status !== 200 && reply.status !== 206)
-        )
-          return { kind: "unavailable", reason: responseFailure(reply) };
-        const batch = readDirectoryPage(reply.body, offset, pageSize);
-        if (
-          !batch ||
-          (expectedTotal !== undefined && expectedTotal !== batch.total)
-        )
-          return { kind: "unavailable", reason: "invalid_response" };
-        expectedTotal = batch.total;
+  async function searchDirectory(
+    query: (offset: number) => URLSearchParams,
+    readPage: (
+      payload: unknown,
+      offset: number,
+    ) =>
+      | { total: number; candidates: { id: number; matches: boolean }[] }
+      | undefined,
+  ): Promise<DirectoryResult> {
+    const budget = AbortSignal.timeout(8000);
+    let offset = 0;
+    let expectedTotal: number | undefined;
+    let match: number | undefined;
+    const seen = new Set<number>();
+    for (let page = 0; page < pageLimit; page++) {
+      const reply = await run(
+        {
+          path: "search/User",
+          query: query(offset),
+        },
+        budget,
+      );
+      if (reply.kind === "not_sent")
+        return { kind: "unavailable", reason: reply.reason };
+      if (
+        reply.kind !== "response" ||
+        (reply.status !== 200 && reply.status !== 206)
+      )
+        return { kind: "unavailable", reason: responseFailure(reply) };
+      const batch = readPage(reply.body, offset);
+      if (
+        !batch ||
+        (expectedTotal !== undefined && expectedTotal !== batch.total)
+      )
+        return { kind: "unavailable", reason: "invalid_response" };
+      expectedTotal = batch.total;
 
-        for (const user of batch.candidates) {
-          if (seen.has(user.id))
-            return { kind: "unavailable", reason: "invalid_response" };
-          seen.add(user.id);
-          if (
-            !user.active ||
-            !user.emails.some(
-              (candidate) => normalizeEmail(candidate) === email,
-            )
-          )
-            continue;
-          if (match !== undefined) return { kind: "ambiguous" };
-          match = user.id;
-        }
-        offset += batch.candidates.length;
-        if (offset === batch.total)
-          return match === undefined
-            ? { kind: "not_found" }
-            : { kind: "found", userId: match, email };
+      for (const user of batch.candidates) {
+        if (seen.has(user.id))
+          return { kind: "unavailable", reason: "invalid_response" };
+        seen.add(user.id);
+        if (!user.matches) continue;
+        if (match !== undefined) return { kind: "ambiguous" };
+        match = user.id;
       }
-      return { kind: "unavailable", reason: "directory_limit" };
+      offset += batch.candidates.length;
+      if (offset === batch.total)
+        return match === undefined
+          ? { kind: "not_found" }
+          : { kind: "found", userId: match };
+    }
+    return { kind: "unavailable", reason: "directory_limit" };
+  }
+
+  return {
+    async findActiveUserByEmail(input: string) {
+      const email = normalizeEmail(input);
+      if (!email) return { kind: "invalid_email" } as const;
+      const result = await searchDirectory(
+        (offset) => directoryQuery(email, offset, pageSize),
+        (payload, offset) => {
+          const batch = readDirectoryPage(payload, offset, pageSize);
+          if (!batch) return undefined;
+          return {
+            total: batch.total,
+            candidates: batch.candidates.map(({ id, active, emails }) => ({
+              id,
+              matches:
+                active &&
+                emails.some((candidate) => normalizeEmail(candidate) === email),
+            })),
+          };
+        },
+      );
+      return result.kind === "found" ? { ...result, email } : result;
+    },
+
+    async isUniqueActiveUserPhone(
+      this: void,
+      phone: string,
+      expectedUserId: number,
+    ) {
+      if (!isSupportedSenderPhone(phone)) return false;
+      const result = await searchDirectory(
+        (offset) => phoneDirectoryQuery(phone, offset, pageSize),
+        (payload, offset) =>
+          readPhoneDirectoryPage(payload, offset, pageSize, phone),
+      );
+      return result.kind === "found" && result.userId === expectedUserId;
     },
 
     async readOwnedTickets(
@@ -373,6 +471,128 @@ export function createGlpiClient(config: GlpiConfig, fetchGlpi = fetch) {
           ? { nextBefore: tickets[ticketPageSize - 1].id }
           : {}),
       };
+    },
+
+    async readTicketActivity(
+      this: void,
+      ticketId: number,
+      status: number,
+      afterFollowupId: number,
+      signal: AbortSignal,
+    ): Promise<TicketActivity | undefined> {
+      if (!positiveId(ticketId)) return undefined;
+      const budget = AbortSignal.any([signal, AbortSignal.timeout(12_000)]);
+      const base = `Ticket/${ticketId}` as const;
+      const actors = await run(
+        {
+          path: `${base}/Ticket_User`,
+          query: new URLSearchParams({ range: "0-199" }),
+        },
+        budget,
+      );
+      const actorList = Type.Array(
+        Type.Object({
+          tickets_id: Type.Unknown(),
+          type: Type.Unknown(),
+          users_id: Type.Unknown(),
+        }),
+      );
+      if (
+        actors.kind !== "response" ||
+        actors.status !== 200 ||
+        !Value.Check(actorList, actors.body)
+      )
+        return undefined;
+      const technicianIds = new Set(
+        actors.body.flatMap((actor) =>
+          positiveId(actor?.tickets_id) === ticketId &&
+          positiveId(actor?.type) === 2
+            ? [positiveId(actor.users_id)]
+            : [],
+        ),
+      );
+      const followups: TicketActivity["followups"] = [];
+      for (let page = 0; page < pageLimit; page++) {
+        const offset = page * pageSize;
+        const reply = await run(
+          {
+            path: `${base}/ITILFollowup`,
+            query: new URLSearchParams({
+              range: `${offset}-${offset + pageSize - 1}`,
+              sort: "id",
+              order: "ASC",
+            }),
+          },
+          budget,
+        );
+        if (reply.kind !== "response" || ![200, 206].includes(reply.status))
+          return undefined;
+        const batch = children(reply.body, ticketId);
+        if (!batch || (reply.status === 206 && batch.length !== pageSize))
+          return undefined;
+        for (const row of batch) {
+          const id = positiveId(row.id)!;
+          if (id <= afterFollowupId) continue;
+          const author = positiveId(row.users_id);
+          followups.push({
+            id,
+            text:
+              author &&
+              publicFlag(row.is_private) &&
+              (technicianIds.has(author) ||
+                positiveId(row.timeline_position) === 4)
+                ? publicText(row.content)
+                : undefined,
+          });
+        }
+        if (reply.status === 200) break;
+        if (page + 1 === pageLimit) return undefined;
+      }
+      followups.sort((left, right) => left.id - right.id);
+      if (status !== 6) return { followups };
+      const [ticket, solutions] = await Promise.all([
+        run(
+          { path: base, query: new URLSearchParams({ get_hateoas: "false" }) },
+          budget,
+        ),
+        run(
+          {
+            path: `${base}/ITILSolution`,
+            query: new URLSearchParams({
+              range: "0-49",
+              sort: "id",
+              order: "DESC",
+            }),
+          },
+          budget,
+        ),
+      ]);
+      const ticketSchema = Type.Object({
+        id: Type.Unknown(),
+        status: Type.Unknown(),
+        solvedate: Type.Optional(Type.Unknown()),
+      });
+      if (
+        ticket.kind !== "response" ||
+        ticket.status !== 200 ||
+        !Value.Check(ticketSchema, ticket.body) ||
+        positiveId(ticket.body.id) !== ticketId ||
+        positiveId(ticket.body.status) !== 6 ||
+        solutions.kind !== "response" ||
+        ![200, 206].includes(solutions.status)
+      )
+        return undefined;
+      const rows = children(solutions.body, ticketId);
+      if (!rows) return undefined;
+      const solvedAt = ticket.body.solvedate;
+      const active = rows.find(
+        (row) =>
+          typeof solvedAt === "string" &&
+          row.date_creation === solvedAt &&
+          positiveId(row.status) === 3 &&
+          publicFlag(row.is_private, true),
+      );
+      return { followups, solution: publicText(active?.content) };
     },
 
     async createTicket(

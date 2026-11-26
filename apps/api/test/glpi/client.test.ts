@@ -46,6 +46,50 @@ function requestUrl(input: Parameters<typeof fetch>[0]): URL {
   return input;
 }
 
+it("requires a unique exact match across the three GLPI phone fields", async () => {
+  const fetchGlpi = vi.fn<typeof fetch>();
+  const client = createGlpiClient(config, fetchGlpi);
+  const sender = "5511990000100";
+  const candidate = {
+    "2": 37,
+    "6": null,
+    "8": 1,
+    "10": null,
+    "11": "(11) 99000-0100",
+  };
+  const other = { ...candidate, "2": 48, "11": "5516990000100" };
+  fetchGlpi
+    .mockResolvedValueOnce(Response.json({ session_token: "test-session" }))
+    .mockResolvedValueOnce(page(2, [candidate, other]))
+    .mockResolvedValueOnce(
+      page(2, [candidate, { ...other, "10": "+55 (11) 99000-0100" }]),
+    )
+    .mockResolvedValueOnce(page(1, [{ ...candidate, "8": 0 }]))
+    .mockResolvedValueOnce(
+      page(1, [{ ...candidate, "11": "(11) 99000-0100 r.2" }]),
+    )
+    .mockResolvedValueOnce(
+      page(1, [{ ...candidate, "11": "(11) 99000-0100", "10": undefined }]),
+    )
+    .mockResolvedValueOnce(glpiError("synthetic_failure", 503));
+  expect(await client.isUniqueActiveUserPhone(sender, 37)).toBe(true);
+  const params = requestUrl(fetchGlpi.mock.calls[1][0]).searchParams;
+  for (const [index, field] of ["6", "10", "11"].entries()) {
+    expect(params.get("criteria[0][criteria][" + index + "][field]")).toBe(
+      field,
+    );
+    expect(params.get("criteria[0][criteria][" + index + "][value]")).toBe(
+      "0100",
+    );
+  }
+  expect(params.get("criteria[1][field]")).toBe("8");
+  for (let scenario = 0; scenario < 5; scenario++)
+    expect(await client.isUniqueActiveUserPhone(sender, 37)).toBe(false);
+  const requests = fetchGlpi.mock.calls.length;
+  expect(await client.isUniqueActiveUserPhone("11990000100", 37)).toBe(false);
+  expect(fetchGlpi).toHaveBeenCalledTimes(requests);
+});
+
 it("scopes open ticket pages and verifies the requester of every candidate before returning it", async () => {
   function providerResponse(input: Parameters<typeof fetch>[0]) {
     const url = requestUrl(input);
@@ -493,4 +537,99 @@ it("does not follow a provider redirect on the real HTTP transport", async () =>
       server.close((error) => (error ? reject(error) : resolve())),
     );
   }
+});
+
+it("reads only eligible public ticket replies and the current accepted solution", async () => {
+  const solvedate = "2026-11-26 11:00:00";
+  const item = { itemtype: "Ticket", items_id: 44 };
+  const provider = (...[input, init]: Parameters<typeof fetch>) => {
+    const url = requestUrl(input);
+    expect(init?.method).toBe("GET");
+    if (url.pathname.endsWith("/initSession"))
+      return Response.json({ session_token: "test-session" });
+    if (url.pathname.endsWith("/Ticket_User"))
+      return Response.json([{ tickets_id: 44, users_id: 52, type: 2 }]);
+    if (url.pathname.endsWith("/ITILFollowup"))
+      return Response.json([
+        {
+          ...item,
+          id: 4,
+          users_id: 52,
+          is_private: 0,
+          content: "<p>First &amp; second</p><p>Done.</p>",
+        },
+        {
+          ...item,
+          id: 5,
+          users_id: 52,
+          is_private: 1,
+          content: "Private notes",
+        },
+        {
+          ...item,
+          id: 6,
+          users_id: 37,
+          is_private: 0,
+          content: "Requester message",
+        },
+        {
+          ...item,
+          id: 7,
+          users_id: 58,
+          is_private: 0,
+          timeline_position: 4,
+          content: "Another technician",
+        },
+      ]);
+    if (url.pathname.endsWith("/ITILSolution"))
+      return Response.json([
+        {
+          ...item,
+          id: 11,
+          date_creation: solvedate,
+          status: 4,
+          content: "Rejected solution",
+        },
+        {
+          ...item,
+          id: 12,
+          date_creation: solvedate,
+          status: 3,
+          is_private: 1,
+          content: "Private solution",
+        },
+        {
+          ...item,
+          id: 13,
+          date_creation: "2026-11-20 11:00:00",
+          status: 3,
+          content: "Previous solution",
+        },
+        {
+          ...item,
+          id: 14,
+          date_creation: solvedate,
+          status: 3,
+          content: "<p>Relat&oacute;rio atualizado</p>",
+        },
+      ]);
+    return Response.json({ id: 44, status: 6, solvedate });
+  };
+  const fetchGlpi: typeof fetch = (...args) =>
+    Promise.resolve(provider(...args));
+  const result = await createGlpiClient(config, fetchGlpi).readTicketActivity(
+    44,
+    6,
+    3,
+    ticketSignal,
+  );
+  expect(result).toEqual({
+    followups: [
+      { id: 4, text: "First & second\nDone." },
+      { id: 5 },
+      { id: 6 },
+      { id: 7, text: "Another technician" },
+    ],
+    solution: "Relatório atualizado",
+  });
 });

@@ -46,6 +46,10 @@ The portal owns its layout and scoped styles; application UI remains independent
 
 Shared component examples/descriptions belong in [`components.docs.json`](src/components.docs.json) beside the real exports in `components.tsx`. `pnpm docs:references:write` produces [component Markdown](../../docs/generated/components/web.md) and a lightweight catalog, separately loaded pages, and search shards. All `docs/` Markdown and repository README/instruction files are rendered locally; normal documentation links stay in the portal. Regenerate after authored documentation edits too. API/database/error references come from their respective canonical generators. The portal is a presentation of those facts, not another authoring source.
 
+## WhatsApp links for IT
+
+Open `/ti/vinculos` and use the employee's GLPI user ID to view the verified WhatsApp accounts, their status and expiration. The panel keeps the operator access token in memory and asks for confirmation before revoking one link. The [API verifies the operator scopes](../api/README.md#whatsapp-identity-administration).
+
 ## Validate changes
 
 Run commands from the repository root. `pnpm -C apps/web typecheck`, `build`, `bundle:check`, `test:unit`, `test:browser`, and `test:e2e` are individual package scripts; use `pnpm validate` for the complete gate. After intentional contract changes, follow the [artifact workflow](../../docs/architecture/backend-execution-and-generated-artifacts.md) to regenerate API, SDK, and portal data in order. `pnpm references:check` and `pnpm docs:references:check` detect drift without repairing tracked output.

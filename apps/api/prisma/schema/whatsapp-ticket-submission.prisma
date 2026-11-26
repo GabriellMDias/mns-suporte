@@ -29,6 +29,8 @@ model WhatsAppTicketSubmission {
   closureConsentId     String?                       @map("closure_consent_id") @db.Uuid
   closureCheckAt       DateTime?                     @map("closure_check_at") @db.Timestamptz(3)
 
+  noticeCursor         Json?                         @map("notice_cursor")
+
   @@index([businessPhoneId, state, availableAt, draftId], map: "whatsapp_ticket_submissions_dispatch_idx")
   @@map("whatsapp_ticket_submissions")
 }

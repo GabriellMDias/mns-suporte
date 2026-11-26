@@ -1,0 +1,37 @@
+.identity-links-panel + .identity-links-panel {
+  margin-top: 1rem;
+}
+.identity-links-search,
+.identity-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+}
+.identity-table-wrap {
+  overflow-x: auto;
+}
+.identity-table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.identity-table-wrap th,
+.identity-table-wrap td {
+  padding: 0.7rem 0.55rem;
+  border-bottom: 1px solid var(--ui-color-border, #d7e0e7);
+  white-space: nowrap;
+}
+.identity-reference {
+  display: block;
+  margin-top: 0.2rem;
+  font-weight: 400;
+  color: var(--ui-color-muted, #536879);
+  font-size: 0.82rem;
+}
+.identity-revoke {
+  margin-top: 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--ui-color-border, #d7e0e7);
+  border-radius: 7px;
+}

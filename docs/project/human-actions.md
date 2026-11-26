@@ -6,40 +6,48 @@ The entries below cover access held outside this workspace. Implementation, tech
 
 ## PH-07
 
-- [ ] **Authorize access to the MNS Meta Business account and support number.**
+- [ ] **Grant access to the Meta assets required for cutover.**
 
-**Status** Pending for live testing and cutover. **Owner** MNS Meta Business account administrator.
+**Status** Pending for company cutover. **Owner** MNS Meta Business account administrator.
 
-The Meta MCP can access the supplied pilot sender. On 2026-11-25, Meta accepted one direct test message through that connection. The sender account subscription was present. The Meta business administrator can grant access to the relevant app and assets or provision the pilot runtime's scoped service token and Meta app secret in the secret store. If the live sender belongs to a separate portfolio, grant equivalent access there. The confirmed [closure template](../../apps/api/README.md#whatsapp-closure-notices) was submitted on 2026-11-25 and entered Meta review as Utility. Affects PJ-17 and PJ-18.
+The authorized temporary callback passed Meta verification. The MCP reported `messages` and the pilot account subscription to the intended app. A single approved recipient received a test message, and its delivery callback and reply reached the local receiver. The authorized participant completed guided intake through review after a worker restart. If the cutover sender belongs to a separate portfolio, grant equivalent access there. On 2026-11-25, the MCP confirmed the [Portuguese utility closure template](../../apps/api/README.md#whatsapp-closure-notices) was still pending Meta review. Affects PJ-18.
 
 ## PH-08
 
-- [ ] **Grant scoped access to the company GLPI environments.**
+- [x] **Authorize the synthetic GLPI ticket and its status transitions.**
 
-**Status** Pending for live testing and cutover. **Owner** MNS GLPI administrator.
+**Status** Completed for the production GLPI pilot. **Owner** MNS GLPI administrator and approved requester.
 
-The workspace has only the legacy integration copy. Issue a dedicated test service credential with directory lookup, ticket creation, ticket and requester-relation read access, and permission to create and verify ticket attachments. Grant equivalent restricted production access for deployment. Supply the endpoint and credential securely. Affects PJ-17 and PJ-18.
+The administrator supplied the applicable business rules and authorized a synthetic ticket and its configured notifications. The requester opted in to WhatsApp closure notices. The pilot verified the attachment and closure. Meta confirmed delivery of the closure notice. Affects PJ-17.
 
 ## PH-09
 
-- [ ] **Authorize an approved corporate mail sender.**
+- [x] **Enter the received verification code in the local pilot form.**
 
-**Status** Pending for live testing. **Owner** MNS mail administrator.
+**Status** Completed for the pilot mailbox. **Owner** Approved mailbox owner.
 
-Grant relay access or provide a service credential and verified From address for employee verification email. The workspace has no delegated corporate mail service. Affects PJ-17.
+The authorized mailbox matched an active GLPI user. The mailbox owner received the code through the configured SMTP relay and validated it in the temporary loopback-only form. The application persisted the verified identity for the approved WhatsApp conversation. Affects PJ-17.
 
 ## PH-10
 
 - [ ] **Grant access to the company hosting and ingress.**
 
-**Status** Pending for external pilot and cutover. **Owner** MNS infrastructure administrator.
+**Status** Pending for company cutover. **Owner** MNS infrastructure administrator.
 
-An MNS infrastructure administrator must grant deployment access, access to a company HTTPS endpoint for the Meta webhook, and permissions for the secret store, encrypted off-host backup destination, host scheduler and log collector. These systems require company credentials that are unavailable in the workspace. Affects PJ-17 and PJ-18. The implementation and checks are tracked in the [deployment and recovery runbook](../runbooks/v1-deployment.md).
+The local pilot uses a temporary HTTPS endpoint. The company cutover requires deployment access and permissions for the persistent HTTPS endpoint, secret store, encrypted off-host backup destination, host scheduler and log collector. Affects PJ-18. The implementation and checks are tracked in the [deployment and recovery runbook](../runbooks/v1-deployment.md).
 
 ## PH-11
 
-- [ ] **Grant GitHub plan eligibility for branch protection on the private repository.**
+- [x] **Enable GitHub branch protection eligibility.**
 
-**Status** Blocked. **Owner** GitHub account or organization administrator.
+**Status** Completed. **Owner** GitHub repository administrator.
 
-On 2026-11-25, GitHub returned HTTP 403 for branch protection and rulesets on the private project and required a plan that supports those controls. Enable a plan that supports protection on this private repository, or grant access to an eligible private organization. CI and the pull-request workflow are available under the current plan. Affects PJ-01.
+The owner made the repository public on 2026-11-26. The active ruleset now enforces the CI gate on the default branch. See PJ-01 in the [implementation plan](implementation-plan.md#v1-work).
+
+## PH-12
+
+- [ ] **Grant IT operator access in the corporate token issuer.**
+
+**Status** Pending for company deployment. **Owner** Corporate identity administrator.
+
+Provide the approved issuer, API audience and JWKS endpoint. Grant the read and revocation scopes to the appropriate IT staff. The service can continue to use its independently authenticated WhatsApp webhook while operator access is unavailable. Affects the enablement of PJ-20 in PJ-18.

@@ -22,10 +22,8 @@ const existingDraft: Conversation = {
     step: "attachments",
     revision: 5,
     editing: false,
-    category: "Equipamento",
-    unit: "Loja Centro",
+    title: "Impressora indisponível",
     description: "A impressora não imprime",
-    impact: "Um caixa",
     attachments: [{ type: "image", mediaId: "10002" }],
   },
 };

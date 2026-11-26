@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import type { Database } from "../../database.js";
 import type { IdentityRepository } from "./identity-service.js";
 
@@ -8,10 +8,14 @@ type IdentityTransaction = Pick<
   "$queryRaw" | "whatsAppIdentityEvent"
 >;
 
-async function lockIdentityScope(
+export async function lockIdentityScope(
   tx: IdentityTransaction,
-  key: string,
+  scopeKey: string,
 ): Promise<void> {
+  await lockIdentityKey(tx, "channel:" + scopeKey);
+}
+
+async function lockIdentityKey(tx: IdentityTransaction, key: string) {
   // Channel first, mailbox second. External requests happen after this transaction.
   await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtextextended(${key}, 0))`;
 }
@@ -30,6 +34,34 @@ async function recordReceipt(
   return result.count === 1;
 }
 
+async function saveLink(
+  tx: Pick<Database, "whatsAppVerifiedIdentity">,
+  {
+    scopeKey,
+    now,
+    linkExpiresAt,
+    phoneLastFour,
+  }:
+    | Parameters<IdentityRepository["linkDirectoryPhone"]>[0]
+    | Parameters<IdentityRepository["confirm"]>[0],
+  glpiUserId: bigint,
+) {
+  const link = {
+    glpiUserId,
+    verifiedAt: now,
+    expiresAt: linkExpiresAt,
+    linkId: randomUUID(),
+    phoneLastFour: phoneLastFour ?? null,
+    revokedAt: null,
+    revokedBy: null,
+  };
+  await tx.whatsAppVerifiedIdentity.upsert({
+    where: { scopeKey },
+    create: { scopeKey, ...link },
+    update: link,
+  });
+}
+
 export function createPostgresIdentityRepository(
   store: Database,
 ): IdentityRepository {
@@ -37,13 +69,13 @@ export function createPostgresIdentityRepository(
     reserve: (input) =>
       store.$transaction(async (tx) => {
         const { scopeKey, eventKey, now, mailboxKey, maximumStarts } = input;
-        await lockIdentityScope(tx, "channel:" + scopeKey);
+        await lockIdentityScope(tx, scopeKey);
         if (
           !(await recordReceipt(tx, eventKey, scopeKey, now, mailboxKey)) ||
           !mailboxKey
         )
           return false;
-        await lockIdentityScope(tx, "mailbox:" + mailboxKey);
+        await lockIdentityKey(tx, "mailbox:" + mailboxKey);
         const recent = {
           createdAt: { gt: input.windowStart },
           expiresAt: { not: null },
@@ -85,10 +117,39 @@ export function createPostgresIdentityRepository(
       return prepared.count === 1;
     },
 
+    linkDirectoryPhone: (input) =>
+      store.$transaction(async (tx) => {
+        const { scopeKey, eventKey, now, userId } = input;
+        await lockIdentityScope(tx, scopeKey);
+        const current = await tx.whatsAppVerifiedIdentity.findUnique({
+          where: { scopeKey },
+          select: { glpiUserId: true, revokedAt: true, expiresAt: true },
+        });
+        if (
+          current &&
+          (current.revokedAt || current.glpiUserId !== BigInt(userId))
+        )
+          return false;
+        const reserved = await tx.whatsAppIdentityEvent.updateMany({
+          where: {
+            eventKey,
+            scopeKey,
+            active: true,
+            expiresAt: { gt: now },
+            codeDigest: null,
+          },
+          data: clearChallenge,
+        });
+        if (reserved.count !== 1) return false;
+        if (!current || current.expiresAt <= now)
+          await saveLink(tx, input, BigInt(userId));
+        return true;
+      }),
+
     confirm: (input) =>
       store.$transaction(async (tx) => {
         const { scopeKey, eventKey, now, digest } = input;
-        await lockIdentityScope(tx, "channel:" + scopeKey);
+        await lockIdentityScope(tx, scopeKey);
         if (!(await recordReceipt(tx, eventKey, scopeKey, now)))
           return { kind: "duplicate" };
 
@@ -124,22 +185,13 @@ export function createPostgresIdentityRepository(
         }
 
         await tx.whatsAppIdentityEvent.update({ where, data: clearChallenge });
-        const link = {
-          glpiUserId,
-          verifiedAt: now,
-          expiresAt: input.linkExpiresAt,
-        };
-        await tx.whatsAppVerifiedIdentity.upsert({
-          where: { scopeKey },
-          create: { scopeKey, ...link },
-          update: link,
-        });
+        await saveLink(tx, input, glpiUserId);
         return { kind: "verified", glpiUserId: Number(glpiUserId) };
       }),
 
     async findVerifiedUser(scopeKey, now) {
       const link = await store.whatsAppVerifiedIdentity.findUnique({
-        where: { scopeKey, expiresAt: { gt: now } },
+        where: { scopeKey, expiresAt: { gt: now }, revokedAt: null },
         select: { glpiUserId: true },
       });
       return link ? Number(link.glpiUserId) : undefined;

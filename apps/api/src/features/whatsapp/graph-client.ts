@@ -106,7 +106,10 @@ export function createWhatsAppGraphSender(
     const needsTemplate =
       payload.closure &&
       (!customerWindowEndsAt || customerWindowEndsAt.getTime() <= Date.now());
-    if (needsTemplate && !config.closureTemplateName)
+    if (
+      needsTemplate &&
+      (payload.closure?.event || !config.closureTemplateName)
+    )
       return { kind: "expired" };
     try {
       const response = await fetchMessage(url, {

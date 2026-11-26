@@ -1,10 +1,10 @@
 {
   "tables": {
     "whatsapp_closure_preferences": {
-      "owner": "WhatsApp closure notifications",
+      "owner": "WhatsApp ticket activity notifications",
       "classification": "RESTRICTED",
-      "description": "Most recent explicit closure notice consent per WhatsApp sender scope and verified GLPI requester.",
-      "lifecycle": "An employee opts in or withdraws through WhatsApp. Withdrawal clears the delivery address. Re-enabling issues a new grant that cannot revive jobs under the previous grant.",
+      "description": "Most recent ticket activity notice consent per WhatsApp sender scope and verified GLPI requester.",
+      "lifecycle": "An employee opts in on ticket confirmation or through the notification settings and can withdraw through WhatsApp. Withdrawal clears the delivery address. Re-enabling issues a new grant that cannot revive jobs under the previous grant.",
       "columns": {
         "scope_key": {
           "description": "Stable hash binding the Meta business number and the sender scope.",
@@ -15,11 +15,11 @@
           "classification": "RESTRICTED"
         },
         "grant_id": {
-          "description": "Unique consent epoch bound to eligible ticket watches and queued closure replies.",
+          "description": "Unique consent epoch bound to eligible ticket watches and queued ticket updates.",
           "classification": "INTERNAL"
         },
         "recipient": {
-          "description": "Validated WhatsApp address for opted-in closure delivery.",
+          "description": "Validated WhatsApp address for opted-in ticket updates.",
           "classification": "RESTRICTED",
           "nullMeaning": "The employee withdrew the grant and the address was cleared."
         },

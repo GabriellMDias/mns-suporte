@@ -58,6 +58,9 @@ const payloadSchema = Type.Object(
         {
           consentId: deliveryIdSchema,
           ticketId: glpiIdentifier,
+          event: Type.Optional(
+            Type.Union([Type.Literal("status"), Type.Literal("followup")]),
+          ),
         },
         { additionalProperties: false },
       ),

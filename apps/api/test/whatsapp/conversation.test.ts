@@ -20,6 +20,7 @@ import { scopeOf } from "../../src/features/whatsapp/identity-code.js";
 import { createPostgresIdentityRepository } from "../../src/features/whatsapp/identity-repository.js";
 import { createIdentityVerification } from "../../src/features/whatsapp/identity-service.js";
 import { isOutboundPayload } from "../../src/features/whatsapp/outbound-contract.js";
+import * as verificationMail from "../../src/integrations/mail/verification.js";
 import { activateModules } from "../../src/module.js";
 import { apiModules } from "../../src/modules.js";
 
@@ -114,34 +115,88 @@ it("reviews long descriptions, clears attachments, and keeps another GLPI user's
     state = response.state;
     return response;
   };
-  route(chatText("Abrir chamado"));
-  route(chatText("Sistemas"));
-  route(chatText("Financeiro"));
+  expect(route(chatText("Abrir chamado")).reply?.body).toContain(
+    "título do chamado",
+  );
+  route(chatText("Falha no caixa"));
   route(chatText("x".repeat(1201)));
   expect(state.draft?.step).toBe("description");
-  route(chatText("x".repeat(1200)));
-  route(chatText("Equipe parada"));
+  const review = route(chatText("x".repeat(1200)));
+  expect(state.draft?.step).toBe("review");
+  expect(review.reply).toMatchObject({ type: "text" });
+  expect(review.reply?.body).toContain("Título: Falha no caixa");
+  expect(review.reply?.body).toContain("x".repeat(1200));
   for (let i = 1; i <= 6; i++)
     route({ type: "document", mediaId: "synthetic-" + i });
   expect(state.draft?.attachments).toHaveLength(5);
   route(chatText("Limpar anexos"));
   expect(state.draft?.attachments).toEqual([]);
-  const review = route(chatText("Revisar rascunho"));
-  expect(review.reply).toMatchObject({ type: "text" });
-  expect(review.reply?.body).toContain("x".repeat(1200));
   const differentEmployee = routeConversation(state, chatText("retomar"), {
     ...context,
     userId: 99,
     draftId: "new-draft",
   });
-  expect(differentEmployee.reply?.body).not.toContain("Financeiro");
+  expect(differentEmployee.reply?.body).not.toContain("x".repeat(80));
   expect(differentEmployee.state.draft).toMatchObject({
     id: "new-draft",
     ownerId: 99,
-    step: "category",
+    step: "title",
   });
   route(chatText("Cancelar"));
   expect(state).toEqual({ phase: "menu" });
+});
+
+it("resumes legacy drafts without the removed fields and requires a fresh review", () => {
+  const context = {
+    userId: 37,
+    supportContact,
+    draftId: "new-draft",
+    now: new Date(),
+  };
+  const legacy = {
+    id: "legacy-draft",
+    ownerId: 37,
+    revision: 5,
+    editing: false,
+    category: "Sistema",
+    unit: "Centro",
+    attachments: [{ type: "document", mediaId: "existing-file" }],
+  };
+  const incomplete = readConversationState({
+    phase: "intake",
+    draft: { ...legacy, step: "unit" },
+  });
+  expect(incomplete.draft?.step).toBe("title");
+  const stored = readConversationState({
+    phase: "intake",
+    draft: {
+      ...legacy,
+      step: "review",
+      description: "  Erro\tno caixa\nErro ao concluir o pagamento.",
+      impact: "Um caixa",
+    },
+  });
+  expect(
+    routeConversation(stored, chatText("Confirmar"), context).submission,
+  ).toBeUndefined();
+  const resumed = routeConversation(stored, chatText("Erro no caixa"), context);
+  expect(resumed.reply?.body).toContain("Título: Erro no caixa");
+  const stale = routeConversation(
+    resumed.state,
+    { type: "reply", replyId: "draft:confirm:legacy-draft:5" },
+    context,
+  );
+  expect(stale.submission).toBeUndefined();
+  expect(
+    routeConversation(resumed.state, chatText("Confirmar"), context).submission,
+  ).toEqual({
+    draftId: legacy.id,
+    requesterId: 37,
+    title: "Erro no caixa",
+    description:
+      "  Erro\tno caixa\nErro ao concluir o pagamento.\n\nReferência MNS: legacy-draft",
+    mediaIds: ["existing-file"],
+  });
 });
 
 function delivery(
@@ -150,6 +205,19 @@ function delivery(
   message: object,
   phoneNumberId = businessPhoneId,
 ) {
+  return signedWebhook(phoneNumberId, {
+    messages: [
+      {
+        id,
+        from_user_id: sender.senderBusinessId,
+        timestamp: String(Math.floor(timestamp / 1000)),
+        ...message,
+      },
+    ],
+  });
+}
+
+function signedWebhook(phoneNumberId: string, events: object) {
   const payload = JSON.stringify({
     object: "whatsapp_business_account",
     entry: [
@@ -160,14 +228,7 @@ function delivery(
             value: {
               messaging_product: "whatsapp",
               metadata: { phone_number_id: phoneNumberId },
-              messages: [
-                {
-                  id,
-                  from_user_id: sender.senderBusinessId,
-                  timestamp: String(Math.floor(timestamp / 1000)),
-                  ...message,
-                },
-              ],
+              ...events,
             },
           },
         ],
@@ -214,6 +275,10 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
     const sendCode = vi
       .fn<(email: string, code: string) => Promise<void>>()
       .mockResolvedValue(undefined);
+    const directoryPhone = "5511990000100";
+    const matchPhone = vi.fn((phone: string, userId: number) =>
+      Promise.resolve(phone === directoryPhone && userId === 37),
+    );
     const identity = () =>
       createIdentityVerification(
         createPostgresIdentityRepository(database),
@@ -221,6 +286,7 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
         lookup,
         sendCode,
         clock,
+        matchPhone,
       );
     const appFor = () =>
       createApp(logger, undefined, {
@@ -298,25 +364,13 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
     }
 
     try {
-      expect((await send(metaText("Falar com a TI"))).reply.body).toContain(
-        supportContact,
-      );
       expect((await send(metaText("Oi"))).reply.body).toContain(
         "e-mail corporativo",
       );
-      sendCode.mockImplementationOnce(async () => {
-        const pending = await database.whatsAppOutboundMessage.findMany({
-          where: { state: "PENDING" },
-        });
-        expect(
-          pending.some(
-            ({ payload }) =>
-              isOutboundPayload(payload) &&
-              payload.content.body.includes("Se o e-mail puder"),
-          ),
-        ).toBe(true);
-      });
-      const { request } = await send(metaText("funcionario@company.example"));
+      const { request, reply } = await send(
+        metaText("funcionario@company.example"),
+      );
+      expect(reply.body).toContain("Se o e-mail puder");
       expect(lookup).toHaveBeenCalledExactlyOnceWith(
         "funcionario@company.example",
       );
@@ -352,21 +406,18 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
       expect((await draftState()).phase).toBe("menu");
 
       expect((await send(metaButton("menu:open"))).reply.body).toContain(
-        "categoria",
+        "título do chamado",
       );
-      await send(metaText("Equipamentos"));
+      await send(metaText("Impressora do caixa"));
       await restart();
-      expect((await draftState()).draft?.step).toBe("unit");
+      expect((await draftState()).draft?.step).toBe("description");
       expect((await send(metaText("menu"))).reply.body).toContain("retomar");
-      expect((await send(metaText("retomar"))).reply.body).toContain("unidade");
-      await send(metaText("Loja Centro"));
-      await send(metaText("A impressora não imprime durante a emissão."));
-      await send(metaText("Um caixa afetado"));
-      await send({
-        type: "image",
-        image: { id: "10002", mime_type: "image/jpeg" },
-      });
-      const offer = (await send(metaText("Revisar rascunho"))).reply;
+      expect((await send(metaText("retomar"))).reply.body).toContain(
+        "Descreva o problema",
+      );
+      const offer = (
+        await send(metaText("A impressora não imprime durante a emissão."))
+      ).reply;
       expect(offer.body).toContain("Impressora indisponível");
       if (offer.type !== "buttons")
         throw new Error("Expected troubleshooting buttons");
@@ -380,7 +431,7 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
       await restart();
       expect((await draftState()).draft?.step).toBe("guidance");
       const feedbackInput = await send(metaButton(continueButton.id));
-      const review = feedbackInput.reply;
+      expect(feedbackInput.reply.body).toContain("Anexos: 0");
       expect((await app.inject(feedbackInput.request)).statusCode).toBe(200);
       expect(await process(signal)).toBe(false);
       expect(
@@ -388,6 +439,12 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
       ).toMatchObject([
         { draftId, guidanceId: "printer_offline_v1", outcome: "NOT_RESOLVED" },
       ]);
+      const review = (
+        await send({
+          type: "image",
+          image: { id: "10002", mime_type: "image/jpeg" },
+        })
+      ).reply;
       expect(review.body).toContain("Anexos: 1");
       if (review.type !== "buttons") throw new Error("Expected review buttons");
       const oldConfirm = review.buttons.find(
@@ -396,21 +453,21 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
       if (!oldConfirm) throw new Error("Expected confirmation button");
 
       await send(metaText("Editar"));
-      await send(metaText("3"));
+      await send(metaText("2"));
       const edited = (
         await send(metaText("Impressora travou mesmo após reiniciar."))
       ).reply;
-      expect(edited.body).toContain("após reiniciar");
+      expect(edited.body).toContain("Título: Impressora do caixa");
       await send(metaButton(oldConfirm));
       expect((await draftState()).draft?.confirmedAt).toBeUndefined();
       expect((await send(metaText("Avisos"))).reply.body).toContain(
-        "quando um chamado futuro for encerrado",
+        "mudança de status",
       );
       expect((await send(metaButton("closure:enable"))).reply.body).toContain(
         "Avisos ativados",
       );
       const consentScope = scopeOf(sender)!;
-      const consent =
+      const previousConsent =
         await database.whatsAppClosurePreference.findUniqueOrThrow({
           where: { scopeKey: consentScope },
         });
@@ -420,12 +477,22 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
           where: { scopeKey: consentScope },
         }),
       ).toMatchObject({
-        grantId: consent.grantId,
+        grantId: previousConsent.grantId,
         glpiUserId: 37n,
         revokedAt: null,
       });
+      await inspector.whatsAppClosurePreference.update({
+        where: { scopeKey: consentScope },
+        data: { glpiUserId: 38n },
+      });
       const confirmed = await send(metaText("Confirmar"));
       expect(confirmed.reply.body).toContain("Rascunho confirmado");
+      const consent =
+        await database.whatsAppClosurePreference.findUniqueOrThrow({
+          where: { scopeKey: consentScope },
+        });
+      expect(consent).toMatchObject({ glpiUserId: 37n, revokedAt: null });
+      expect(consent.grantId).not.toBe(previousConsent.grantId);
       expect((await app.inject(confirmed.request)).statusCode).toBe(200);
       await send(metaText("Confirmar"));
       expect(await database.whatsAppTicketSubmission.findMany()).toMatchObject([
@@ -512,40 +579,63 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
       expect(await process(signal)).toBe(true);
       expect(options.readOwnedTickets).toHaveBeenCalledTimes(2);
       expect(await database.whatsAppOutboundMessage.count()).toBe(before);
-      // Exercise the real module wiring for a second number and stub only provider HTTP.
+      const knownSender = {
+        businessPhoneId,
+        senderBusinessId: "BR.directory-phone",
+        senderPhone: directoryPhone,
+      };
+      const fromKnownSender = (body: string) => ({
+        ...metaText(body),
+        from_user_id: knownSender.senderBusinessId,
+        from: knownSender.senderPhone,
+      });
+      expect((await send(fromKnownSender("Oi"))).reply.body).toContain(
+        "e-mail corporativo",
+      );
+      expect(
+        (await send(fromKnownSender("funcionario@company.example"))).reply.body,
+      ).toContain("Número reconhecido no GLPI");
+      expect(matchPhone).toHaveBeenCalledWith(directoryPhone, 37);
+      expect(sendCode).toHaveBeenCalledTimes(1);
+      const knownScope = scopeOf(knownSender)!;
+      expect(
+        await database.whatsAppVerifiedIdentity.findUnique({
+          where: { scopeKey: knownScope },
+        }),
+      ).toMatchObject({
+        glpiUserId: 37n,
+        expiresAt: new Date(now + 30 * 24 * 60 * 60 * 1000),
+        phoneLastFour: "0100",
+      });
+      await inspector.whatsAppVerifiedIdentity.update({
+        where: { scopeKey: knownScope },
+        data: {
+          revokedAt: clock(),
+          revokedBy: "6d9bf45d-3d5e-4ef6-a47d-1c8bdfbe11fb",
+        },
+      });
+      await send(fromKnownSender("Oi"));
+      expect(
+        (await send(fromKnownSender("funcionario@company.example"))).reply.body,
+      ).toContain("receberá um código");
+      expect(sendCode).toHaveBeenCalledTimes(2);
+      // Exercise the normal route, worker, and database composition with synthetic providers.
       const wiredPhone = "20202";
       const wiredScope = scopeOf({ ...sender, businessPhoneId: wiredPhone })!;
-      await database.whatsAppVerifiedIdentity.create({
-        data: {
-          scopeKey: wiredScope,
-          glpiUserId: 37,
-          verifiedAt: clock(),
-          expiresAt: new Date(now + 86_400_000),
-        },
-      });
-      const wiredDraftId = "00000000-0000-4000-8000-000000000001";
-      await database.whatsAppConversation.create({
-        data: {
-          scopeKey: wiredScope,
-          state: {
-            phase: "intake",
-            draft: {
-              id: wiredDraftId,
-              ownerId: 37,
-              step: "review",
-              revision: 8,
-              editing: false,
-              category: "Equipamentos",
-              unit: "Loja Centro",
-              description: "Impressora <travou>.",
-              impact: "Um caixa afetado",
-              attachments: [{ type: "image", mediaId: "10003" }],
-            },
-          },
-          updatedAt: clock(),
-        },
-      });
+      const account = "piloto@company.example";
+      const templateName = "mns_chamado_encerrado_v1";
+      const notificationId = "wamid.synthetic-closure";
+      let wiredDraftId: string;
+      let closed = false;
+      let createCalls = 0;
+      const noticeAttempts: unknown[] = [];
       const replies: string[] = [];
+      const relay = vi
+        .fn<(recipient: string, code: string) => Promise<void>>()
+        .mockResolvedValue(undefined);
+      const mailer = vi
+        .spyOn(verificationMail, "createVerificationMailer")
+        .mockReturnValue(relay);
       const fakeFetch = vi.fn<typeof fetch>(async (input, init) => {
         const request = new Request(input, init);
         const url = new URL(request.url);
@@ -553,11 +643,21 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
           const body = (await request.json()) as {
             text?: { body: string };
             interactive?: { body: { text: string } };
+            template?: unknown;
             requiredGlpiUserId?: number;
           };
+          expect(body.requiredGlpiUserId).toBeUndefined();
+          if (body.template) {
+            noticeAttempts.push(body);
+            if (noticeAttempts.length === 1)
+              return Response.json(
+                { error: { code: 130429 } },
+                { status: 429, headers: { "retry-after": "1" } },
+              );
+            return Response.json({ messages: [{ id: notificationId }] });
+          }
           const rendered = body.text?.body ?? body.interactive?.body.text;
           if (!rendered) throw new Error("Missing WhatsApp content");
-          expect(body.requiredGlpiUserId).toBeUndefined();
           replies.push(rendered);
           return Response.json({
             messages: [{ id: "wamid.synthetic-runtime-" + replies.length }],
@@ -565,6 +665,17 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
         }
         if (url.pathname.endsWith("/initSession"))
           return Response.json({ session_token: "synthetic-session" });
+        if (url.pathname.endsWith("/search/User")) {
+          expect(url.searchParams.get("criteria[0][value]")).toBe(account);
+          return Response.json({
+            totalcount: 2,
+            count: 2,
+            data: [
+              { "2": 37, "5": account, "8": 1 },
+              { "2": 93, "5": "outro." + account, "8": 1 },
+            ],
+          });
+        }
         if (url.pathname.endsWith("/search/Ticket")) {
           const filter = url.searchParams.get("criteria[1][value]");
           const candidates =
@@ -579,7 +690,15 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
                       "19": "2026-08-20 13:14:15",
                     },
                   ]
-                : [];
+                : filter === "112"
+                  ? [
+                      {
+                        "1": "Suporte via WhatsApp",
+                        "2": "112",
+                        "12": closed ? "6" : "2",
+                      },
+                    ]
+                  : [];
           return Response.json({
             totalcount: candidates.length,
             count: candidates.length,
@@ -592,11 +711,12 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
         }
         if (url.pathname.endsWith("/Ticket")) {
           expect(request.method).toBe("POST");
+          createCalls += 1;
           expect(await request.json()).toEqual({
             input: {
-              name: "Suporte via WhatsApp — Equipamentos",
+              name: "Impressora do caixa",
               content:
-                "Categoria: Equipamentos<br>Unidade ou setor: Loja Centro<br>Descrição: Impressora &lt;travou&gt;.<br>Impacto: Um caixa afetado<br>Referência MNS: " +
+                "Impressora &lt;travou&gt;.<br><br>Referência MNS: " +
                 wiredDraftId,
               _users_id_requester: 37,
             },
@@ -633,58 +753,161 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
           );
           return Response.json({ id: "19" }, { status: 201 });
         }
+        if (url.pathname.endsWith("/ITILFollowup")) return Response.json([]);
+        if (url.pathname.endsWith("/ITILSolution"))
+          return Response.json([
+            {
+              id: 22,
+              itemtype: "Ticket",
+              items_id: 112,
+              status: 3,
+              date_creation: "2026-11-26 11:00:00",
+              content: "<p>Equipamento normalizado.</p>",
+            },
+          ]);
         if (url.pathname.endsWith("/Ticket/112")) {
-          expect(url.searchParams.get("with_documents")).toBe("true");
+          if (url.searchParams.get("with_documents") !== "true")
+            return Response.json({
+              id: 112,
+              status: closed ? 6 : 2,
+              solvedate: "2026-11-26 11:00:00",
+            });
           return Response.json({ id: 112, _documents: [{ id: 19 }] });
         }
         throw new Error("Unexpected provider request");
       });
+      const networkFetch = fetch;
       vi.stubGlobal("fetch", fakeFetch);
-      const wiredApp = createApp(logger, undefined, {
-        modules: activateModules(
-          apiModules,
-          {
-            database,
-            whatsappWebhook: {
-              appSecret,
-              verifyToken: verificationToken,
-              phoneNumberId: wiredPhone,
-              verificationCodeSecret: codeSecret,
-              outbound: {
-                accessToken: "synthetic-graph-token",
-                graphVersion: "v27.0",
+      const wiredAppFor = () =>
+        createApp(logger, undefined, {
+          modules: activateModules(
+            apiModules,
+            {
+              database,
+              whatsappWebhook: {
+                appSecret,
+                verifyToken: verificationToken,
+                phoneNumberId: wiredPhone,
+                verificationCodeSecret: codeSecret,
+                outbound: {
+                  accessToken: "synthetic-graph-token",
+                  graphVersion: "v27.0",
+                  closureTemplateName: templateName,
+                },
               },
-            },
-            whatsappConversation: {
-              supportContact,
-              glpi: {
-                apiUrl: "https://glpi.company.example/apirest.php",
-                appToken: "synthetic-app",
-                userToken: "synthetic-user",
-              },
-              identity: {
-                ...identitySettings,
-                smtp: {
-                  host: "relay.company.example",
-                  port: 587,
-                  user: "synthetic-user",
-                  password: "synthetic-password",
-                  from: "help@company.example",
+              whatsappConversation: {
+                supportContact,
+                glpi: {
+                  apiUrl: "https://glpi.company.example/apirest.php",
+                  appToken: "synthetic-app",
+                  userToken: "synthetic-user",
+                },
+                identity: {
+                  ...identitySettings,
+                  smtp: {
+                    host: "relay.company.example",
+                    port: 587,
+                    user: "synthetic-user",
+                    password: "synthetic-password",
+                    from: "help@company.example",
+                  },
                 },
               },
             },
-          },
-          "test",
-        ),
-      }).app;
+            "test",
+          ),
+        }).app;
+      let wiredApp = wiredAppFor();
       try {
+        const listen = () => wiredApp.listen({ host: "127.0.0.1", port: 0 });
+        let address = await listen();
+        const post = async ({
+          method,
+          url,
+          headers,
+          payload,
+        }: ReturnType<typeof delivery>) => {
+          const response = await networkFetch(new URL(url, address), {
+            method,
+            headers,
+            body: payload,
+            signal: AbortSignal.timeout(4000),
+          });
+          await response.arrayBuffer();
+          expect(response.status).toBe(200);
+        };
+        const challenge = new URL("/webhooks/whatsapp", address);
+        challenge.search = new URLSearchParams({
+          "hub.mode": "subscribe",
+          "hub.verify_token": verificationToken,
+          "hub.challenge": "00001234",
+        }).toString();
+        const verified = await networkFetch(challenge, {
+          signal: AbortSignal.timeout(4000),
+        });
+        expect(verified.status).toBe(200);
+        expect(await verified.text()).toBe("00001234");
+
+        async function consult(id: string, message: object) {
+          const previous = replies.length;
+          const request = delivery(Date.now(), id, message, wiredPhone);
+          await post(request);
+          await vi.waitFor(() => expect(replies).toHaveLength(previous + 1), {
+            timeout: 8000,
+          });
+          return { body: replies[previous], request };
+        }
+        const step = async (id: string, body: string) =>
+          (await consult("wamid.pilot-" + id, metaText(body))).body;
+        expect(await step("greeting", "Oi")).toContain("e-mail corporativo");
+        expect(await step("mail", account)).toContain("receberá um código");
+        await vi.waitFor(() => expect(relay).toHaveBeenCalledTimes(1));
+        const [recipient, receivedCode] = relay.mock.calls[0];
+        expect(recipient).toBe(account);
+        expect(await step("verification", receivedCode)).toContain(
+          "E-mail verificado",
+        );
+        expect(await step("intake", "Abrir chamado")).toContain(
+          "título do chamado",
+        );
+        expect(await step("title", "Impressora do caixa")).toContain(
+          "Descreva o problema",
+        );
+
+        await vi.waitFor(async () => {
+          const accepted = await database.whatsAppOutboundMessage.count({
+            where: { businessPhoneId: wiredPhone, state: "ACCEPTED" },
+          });
+          expect(accepted).toBe(replies.length);
+        });
+        await wiredApp.close();
+        wiredApp = wiredAppFor();
+        address = await listen();
+        expect(await step("resume", "retomar")).toContain(
+          "Descreva o problema",
+        );
+        expect(await step("description", "Impressora <travou>.")).toContain(
+          "Título: Impressora do caixa",
+        );
+        const attachment = await consult("wamid.pilot-attachment", {
+          type: "image",
+          image: { id: "10003", mime_type: "image/jpeg" },
+        });
+        expect(attachment.body).toContain("Anexos: 1");
+        const store = await database.whatsAppConversation.findUniqueOrThrow({
+          where: { scopeKey: wiredScope },
+        });
+        const draft = readConversationState(store.state).draft;
+        if (!draft) throw new Error("Expected a persisted pilot draft");
+        wiredDraftId = draft.id;
+        const repliesBefore = replies.length;
         const incoming = delivery(
-          now,
+          Date.now(),
           "wamid.runtime-guided",
-          metaButton("draft:confirm:" + wiredDraftId + ":8"),
+          metaText("Confirmar"),
           wiredPhone,
         );
-        expect((await wiredApp.inject(incoming)).statusCode).toBe(200);
+        await Promise.all([post(incoming), post(incoming), post(incoming)]);
         await vi.waitFor(
           async () => {
             const sent = await database.whatsAppOutboundMessage.findMany({
@@ -701,27 +924,21 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
           },
           { timeout: 6000 },
         );
-        expect(replies).toHaveLength(2);
-        expect(
+        expect(replies).toHaveLength(repliesBefore + 2);
+        expect(createCalls).toBe(1);
+        const submitted =
           await database.whatsAppTicketSubmission.findUniqueOrThrow({
             where: { draftId: wiredDraftId },
-          }),
-        ).toMatchObject({
+          });
+        expect(submitted).toMatchObject({
           state: "COMPLETED",
           ticketId: 112n,
           attachedCount: 1,
           mediaIds: [],
           recipient: null,
         });
-        async function consult(id: string, message: object) {
-          const previous = replies.length;
-          const request = delivery(now, id, message, wiredPhone);
-          expect((await wiredApp.inject(request)).statusCode).toBe(200);
-          await vi.waitFor(() => expect(replies).toHaveLength(previous + 1), {
-            timeout: 8000,
-          });
-          return { body: replies[previous], request };
-        }
+        expect(submitted.closureConsentId).toBeTruthy();
+        expect(submitted.closureCheckAt).toBeInstanceOf(Date);
         const listed = await consult(
           "wamid.legacy-list",
           metaButton("menu:tickets"),
@@ -729,7 +946,7 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
         expect(listed.body).toContain(
           "#76 · Chamado antigo em atendimento · Em atendimento",
         );
-        expect((await wiredApp.inject(listed.request)).statusCode).toBe(200);
+        await post(listed.request);
         const detail = await consult(
           "wamid.legacy-detail",
           metaText("Chamado 80"),
@@ -774,9 +991,78 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
             new Request(input).url.includes("/search/Ticket"),
           ),
         ).toHaveLength(searchCallsBefore);
+
+        // Advance only this synthetic conversation beyond the service window and
+        // make its scheduled watch due without changing the runtime clock.
+        const pastWindow = new Date(Date.now() - 25 * 60 * 60_000);
+        await inspector.whatsAppInboundMessage.updateMany({
+          where: {
+            businessPhoneId: wiredPhone,
+            senderBusinessId: sender.senderBusinessId,
+          },
+          data: { occurredAt: pastWindow, receivedAt: pastWindow },
+        });
+        closed = true;
+        await inspector.whatsAppTicketSubmission.update({
+          where: { draftId: wiredDraftId },
+          data: { closureCheckAt: new Date() },
+        });
+        const notice = () =>
+          database.whatsAppOutboundMessage.findUnique({
+            where: { id: wiredDraftId },
+          });
+        await vi.waitFor(
+          async () => {
+            expect(await notice()).toMatchObject({
+              state: "ACCEPTED",
+              providerMessageId: notificationId,
+              attempts: 2,
+            });
+          },
+          { timeout: 12_000 },
+        );
+        expect(noticeAttempts).toHaveLength(2);
+        expect(noticeAttempts[1]).toEqual(noticeAttempts[0]);
+        expect(noticeAttempts[1]).toMatchObject({
+          recipient: sender.senderBusinessId,
+          biz_opaque_callback_data: wiredDraftId,
+          type: "template",
+          template: {
+            name: templateName,
+            language: { code: "pt_BR" },
+            components: [
+              { type: "body", parameters: [{ type: "text", text: "112" }] },
+            ],
+          },
+        });
+        const callback = signedWebhook(wiredPhone, {
+          statuses: [
+            {
+              id: notificationId,
+              status: "delivered",
+              timestamp: String(Math.floor(Date.now() / 1000)),
+              biz_opaque_callback_data: wiredDraftId,
+            },
+          ],
+        });
+        await post(callback);
+        await post(callback);
+        expect(await notice()).toMatchObject({
+          state: "DELIVERED",
+          attempts: 2,
+        });
+        expect(await step("opt-out", "Parar avisos")).toContain("desativados");
+        const preference =
+          await database.whatsAppClosurePreference.findUniqueOrThrow({
+            where: { scopeKey: wiredScope },
+          });
+        expect(preference.revokedAt).toBeInstanceOf(Date);
+        expect(createCalls).toBe(1);
+        expect(noticeAttempts).toHaveLength(2);
       } finally {
         await wiredApp.close();
         vi.unstubAllGlobals();
+        mailer.mockRestore();
       }
     } finally {
       await app.close();
