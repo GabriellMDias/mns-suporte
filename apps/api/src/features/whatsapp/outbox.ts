@@ -133,6 +133,7 @@ export async function dispatchNextWhatsAppReply(
         where: {
           scopeKey,
           glpiUserId: payload.requiredGlpiUserId,
+          revokedAt: null,
           expiresAt: { gt: clock() },
         },
         select: { scopeKey: true },

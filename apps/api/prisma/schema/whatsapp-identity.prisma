@@ -20,5 +20,11 @@ model WhatsAppVerifiedIdentity {
   verifiedAt DateTime @map("verified_at") @db.Timestamptz(3)
   expiresAt  DateTime @map("expires_at") @db.Timestamptz(3)
 
+  linkId        String    @unique(map: "whatsapp_verified_identities_link_id_key") @default(dbgenerated("gen_random_uuid()")) @map("link_id") @db.Uuid
+  phoneLastFour String?   @map("phone_last_four")
+  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz(3)
+  revokedBy     String?   @map("revoked_by") @db.Uuid
+
+  @@index([glpiUserId, linkId], map: "whatsapp_verified_identities_user_links_idx")
   @@map("whatsapp_verified_identities")
 }

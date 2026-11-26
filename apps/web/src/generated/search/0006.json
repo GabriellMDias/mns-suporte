@@ -1,5 +1,158 @@
 [
   {
+    "id": "repository/docs/architecture/testing-strategy",
+    "title": "Testing Strategy",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Canonical Test Commands",
+    "anchor": "canonical-test-commands",
+    "text": "Canonical Test Commands\n[Validation](../validation.md) owns the available script list and prerequisites; [setup](../setup.md) owns reproducible installation/browser/container preparation. Iterate with the relevant owning package command, then run the repository-required `pnpm validate` gate before substantial completion. CI calls the same gate. Runtime tests do not replace TypeScript, architectural checks, or generated-source validation.\nThe repository gate includes API tests, web Node/browser tests, emitted builds/smokes, and full E2E. Release-history tests intentionally use Node's built-in runner for isolated tooling. No generic root `test:integration` or coverage command should be assumed. Report missing prerequisites, failed checks, and unrun remote checks honestly.\nCoverage percentages and branch coverage can reveal missing paths but cannot prove assertions, authorization, or concurrency correct. Use risk-based review instead of arbitrary targets. A complete change preserves meaningful tests, contracts, architecture, and the broader [completion criteria](../contributing.md#change-workflow).\n"
+  },
+  {
+    "id": "repository/docs/architecture/testing-strategy",
+    "title": "Testing Strategy",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Initial Testing Policy",
+    "anchor": "initial-testing-policy",
+    "text": "Initial Testing Policy\nThe implemented baseline above remains the default for new features. Additional suites must serve actual risk; load/stress tests run only in isolated authorized environments, never as accidental production traffic. Never run destructive integration suites against production data. Any production test must be narrowly scoped and safe, such as an authorized synthetic health check. Production synthetic monitoring and deployment validation require separate operational design and authority; this testing strategy does not start deployment work.\n"
+  },
+  {
+    "id": "repository/docs/architecture/versioning-and-compatibility",
+    "title": "Versioning and Compatibility",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Versioning and Compatibility",
+    "anchor": "versioning-and-compatibility",
+    "text": "Versioning and Compatibility\n[Documentation index](../README.md) · [API versioning](../api/versioning.md) · [Database release evolution](../database/release-evolution.md)\nCompatibility protects consumers that cannot change atomically. This page owns cross-boundary evolution; API, database, configuration, and security policies own their specific contracts. Prefer compatible evolution over reflexively adding versions or preserving obsolete internal interfaces forever. Significant support/versioning strategies require an ADR; ordinary compatible changes do not.\n"
+  },
+  {
+    "id": "repository/docs/architecture/versioning-and-compatibility",
+    "title": "Versioning and Compatibility",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Compatibility Boundary",
+    "anchor": "compatibility-boundary",
+    "text": "Compatibility Boundary\nIdentify the producer, consumer, canonical contract, independent deployment/distribution, persisted-state lifetime, release status, support window, and rollback requirements. Internal monorepo code can often change atomically; installed clients, queued jobs, durable database state, published SDKs, external automation, and independently managed configuration cannot necessarily do so.\nCompatibility includes structure, meaning, behavior, wire serialization, source compilation, security, and operational assumptions such as capacity or startup requirements. An additive field can still break a strict consumer; an unchanged string type can conceal changed meaning. Binary compatibility becomes relevant only if compiled/native artifacts are distributed.\nDefine the required combinations explicitly: new provider with old consumer, old reader with new data, and both directions during overlap where necessary. No universal compatibility matrix or global system version is required. Application release, API version, database migration state, SDK/package version, and configuration schema version serve different purposes; a release can identify a compatible set without changing all their versions.\n"
+  },
+  {
+    "id": "repository/docs/architecture/versioning-and-compatibility",
+    "title": "Versioning and Compatibility",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Released vs Unreleased Behavior",
+    "anchor": "released-vs-unreleased-behavior",
+    "text": "Released vs Unreleased Behavior\n“Released” includes behavior deployed, persisted, published, installed, queued, or consumed independently, not only public release. Verified unreleased contracts may be refined when no durable consumer depends on them. Git preserves development history; ADRs preserve decisions; migration history preserves durable database transitions. Released contracts may evolve compatibly, but released migrations retain their distinct immutability requirements.\nCurrent API, SDK, and web code evolve together. The [release registry](../../apps/api/prisma/release-history.json) records durable database releases; absence of an entry is not proof that no persistent environment exists. Verify release status before editing migration history. [Release evolution](../database/release-evolution.md) owns the evidence and upgrade procedure. No published SDK versioning scheme, released API baseline, client-support period, or production rollback window is implied by current scripts.\n"
+  },
+  {
+    "id": "repository/docs/architecture/versioning-and-compatibility",
+    "title": "Versioning and Compatibility",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Expand–Migrate–Contract",
+    "anchor": "expandmigratecontract",
+    "text": "Expand–Migrate–Contract\nFor changes that cannot occur atomically:\n**Expand:** introduce compatible fields, schema capabilities, accepted payloads, configuration, or infrastructure while existing consumers still work.\n**Migrate:** update readers/writers/consumers, backfill durable data, and switch traffic or activation in a safe order.\n**Contract:** remove old behavior only after supported consumers, retained data, and rollback obligations no longer need it.\nSpecify the application/schema/configuration/infrastructure state at each step. Rolling/canary deployment creates mixed versions; blue-green can shorten but does not eliminate compatibility during shared data use, traffic switches, or rollback. Feature flags may separate activation from deployment but do not solve incompatible data formats.\nTemporary adapters, dual reads/writes, legacy config fallbacks, and feature flags need identifiable ownership, purpose, tests, tracking, and removal conditions. Define the canonical representation, failure handling, and reconciliation for dual writes. Fallback reads must not conceal an incomplete migration indefinitely. Preserve durable meaning; compatibility is never a justification for silent data loss.\nChoose and document rollback or forward recovery for a significant transition. Application rollback does not undo a schema migration or recover dropped data. Do not contract schema/configuration while a supported rollback application still needs it. Before activating a new writer, ask whether old readers can understand its output; delaying new writes may be necessary even when new readers understand old data.\n"
+  },
+  {
+    "id": "repository/docs/architecture/versioning-and-compatibility",
+    "title": "Versioning and Compatibility",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Persisted Data Compatibility",
+    "anchor": "persisted-data-compatibility",
+    "text": "Persisted Data Compatibility\nDatabase enums/JSON, cached documents, events, job payloads, sessions, stored files, and encrypted serialization can outlive the code that wrote them. Determine which old shapes actually exist, where they live, their retention/replay lifetime, which versions read them, whether they can be migrated/rebuilt, and how both read/write directions are tested.\nExplicit payload versions are useful when incompatible shapes coexist and parsing needs identification; do not add them to every record preemptively. Shape detection may suffice for simple transitions. Defaults must accurately represent historical meaning, not merely make deserialization succeed. Preserve unknown values or reject unsupported shapes explicitly instead of mapping them to an incorrect known state.\nEvents need an owned type, schema, meaning, producer, and consumers. Prefer compatible evolution when consumers permit it; a different business fact deserves a semantic new event type rather than a misleading version of the old one. Queues, logs, dead letters, archives, and replay extend compatibility obligations; long-lived retries may span several releases. Consumers may ignore additive unknown fields only where the contract permits, never required semantics.\nCaches may be migrated, safely invalidated, or assigned new key namespaces; old namespaces must expire/be removed. Search indexes are derived state and may use reindexing, dual indexes, or alias switches instead of indefinite legacy support. Prefer mature standard serialization formats; custom binary formats need a concrete benefit and explicit compatibility design.\n"
+  },
+  {
+    "id": "repository/docs/architecture/versioning-and-compatibility",
+    "title": "Versioning and Compatibility",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Other Compatibility Surfaces",
+    "anchor": "other-compatibility-surfaces",
+    "text": "Other Compatibility Surfaces\nSurface\nRequired considerations\nPackages and SDK\nInternal atomic changes usually need no compatibility layer. Independently published packages need a deliberate distribution/version policy and intentional exports. SDK programming API compatibility and SDK-to-server compatibility are distinct; generated public interfaces can become commitments even though output is rebuildable.\nAPIs and public errors\nFollow [API versioning](../api/versioning.md). Consumer-visible errors, ordering, defaults, authorization, pagination, idempotency, and side effects can break without a schema diff.\nConfiguration\nNew required keys may need provisioning before code. Renames need deterministic old/new precedence; removal must preserve rollback. Follow [configuration policy](configuration.md).\nCredentials and identity\nIssuer, audience, claim, algorithm, key, token-lifetime, and session-format changes affect existing clients/sessions. Rotation may sign with new keys while accepting previous keys temporarily under security policy. Mass logout must be deliberate.\nAuthorization/classification\nPersisted permission identifiers may need migration. Review both tighter and looser access; apply stricter current data classification to telemetry, exports, analytics, access, and retention. Required security corrections can override compatibility, with impact managed explicitly.\nCLIs and scripts\nPublic command names, arguments, output, and exit codes can be contracts. Internal scripts within one revision may evolve atomically; external CI/operations consumers may not.\nInfrastructure/providers\nCoordinate resources and permissions before dependent consumers and remove them after migration. Provider API versions are dependencies, not this API's versions; test upgrades and track deprecation deadlines near the integration.\nToolchain/dependencies\nRuntime/compiler upgrades can affect output, library compatibility, and behavior. Use repository pins, lockfile, and frozen installation; assess actual breaking impact rather than trusting labels or allowing uncontrolled upgrades.\nGenerated references\nCanonical contract semantics govern compatibility, not incidental formatting. If external automation consumes a machine-readable artifact, its intended schema becomes explicit.\nSecurity takes priority over retaining vulnerable behavior. Safe release metadata should support correlation without conflating release identity with API/schema versions.\n"
+  },
+  {
+    "id": "repository/docs/architecture/versioning-and-compatibility",
+    "title": "Versioning and Compatibility",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Deprecation and Removal",
+    "anchor": "deprecation-and-removal",
+    "text": "Deprecation and Removal\nDeprecation needs a replacement, migration path, support/removal condition, and owner. Remove compatibility complexity once the real consumer is gone, not just because current source no longer uses it. Check installed clients, external users, queued/persisted historical shapes, and rollback; source search alone may be insufficient.\nUse safe runtime usage evidence when available. Telemetry can correlate release, operation, bounded contract/error category, migration, and configuration changes; it must not create unbounded labels for arbitrary consumer/payload identities. Alerts should reflect impact from unsupported clients or deployment ordering failures. Document supported versions only where support exists; metadata such as introduced/deprecated/replacement belongs in canonical contracts only when useful, never a parallel manually duplicated manifest.\n"
+  },
+  {
+    "id": "repository/docs/architecture/versioning-and-compatibility",
+    "title": "Versioning and Compatibility",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Compatibility Testing",
+    "anchor": "compatibility-testing",
+    "text": "Compatibility Testing\nTest actual supported combinations at their boundary: old request/new server, new application/transitional schema, old reader/new message, new worker/retained old job, active/deprecated configuration, or rollback application/current schema. Do not maintain arbitrary historical combinations. Use the real release baseline for migrations; fresh-install checks alone do not prove upgrade safety.\nReleased fixtures/baselines are immutable evidence, not snapshots to silently rewrite when tests fail. Add distinct historical shapes when necessary. Structural API comparisons, canonical event/schema checks, and property-based serializer tests can help where justified; semantic review remains required.\n`pnpm release:check` and its tests protect recorded migration/release history. Current API/SDK/reference freshness checks detect drift from current sources, not released-consumer compatibility. Dedicated historical API diffing, event versioning, and package-publication compatibility tooling are not selected merely by this policy.\nFail before unsafe work when a dependency/schema is unsupported and expose stable safe diagnostics. Prefer capability detection when the real dependency is a capability; numeric comparisons are appropriate only with precise version semantics. Accept supported old forms during transition, then reject removed forms explicitly rather than failing later with unrelated SQL/property errors.\n"
+  },
+  {
+    "id": "repository/docs/architecture/versioning-and-compatibility",
+    "title": "Versioning and Compatibility",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Breaking Change Checklist",
+    "anchor": "breaking-change-checklist",
+    "text": "Breaking Change Checklist\nBefore completing a compatibility-sensitive change, establish:\nConsumers, release evidence, independence, persistence/replay lifetime, and required direction/window.\nStructural, semantic, behavioral, operational, and security impact; whether atomic or additive evolution is possible.\nOrdered application, schema, configuration, infrastructure, credential, and message states, including new-writer/old-reader safety.\nRollback or forward-recovery expectations and any urgent security override.\nCanonical transition state, tests for supported combinations, safe usage evidence, and completion criteria.\nOwnership and removal conditions for every temporary compatibility path.\nDo not introduce `v2`, a package major, or a payload schema version merely to avoid this analysis. Compatibility exists to protect real consumers while keeping the foundation maintainable.\n"
+  },
+  {
+    "id": "repository/docs/architecture/web-components",
+    "title": "React Components and Design Practices",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "React Components and Design Practices",
+    "anchor": "react-components-and-design-practices",
+    "text": "React Components and Design Practices\n[Web application](../../apps/web/README.md) · [Living Documentation](living-documentation.md) · [Component reference](../generated/components/web.md)\nThis policy owns component reuse, classification, documentation and styling in the existing React application. It extends the application-owned UI direction in [ADR-0008](../adr/0008-select-react-vite-and-tanstack-for-web-applications.md) and the source/distribution separation in [ADR-0018](../adr/0018-isolate-internal-documentation-from-product-distribution.md). No separate UI package, framework, component vendor or theme provider is selected.\n"
+  },
+  {
+    "id": "repository/docs/architecture/web-components",
+    "title": "React Components and Design Practices",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Inspect before implementing",
+    "anchor": "inspect-before-implementing",
+    "text": "Inspect before implementing\nBefore implementing equivalent UI, contributors and AI agents must inspect the shared [component entry point](../../apps/web/src/components.tsx), its [metadata](../../apps/web/src/components.docs.json), applicable feature-owned `components.docs.json` files, and the generated reference or local `/docs/components` catalog. Use `rg --files apps/web/src` and targeted searches for the responsibility and existing controls, then read candidate implementation and tests. The catalog is curated; absence from it is not proof that equivalent private UI does not exist.\nCompare responsibility, native semantics, props, states, accessibility, styling hooks and ownership before choosing reuse. Reuse when these genuinely match. Extend an existing component compatibly when the responsibility remains the same. Similar appearance alone does not justify sharing; keep business validation, permissions, credential handling, API calls and workflow state in their feature.\nIf no suitable component exists, start with native HTML or a local feature component. Extract shared presentation only for demonstrated reuse or a concrete stable primitive, with a narrow contract and an owner. Do not create a wrapper for every element, a speculative component for every category, a large configurable component for unrelated workflows, or a second implementation of equivalent behavior. Explain meaningful reuse or extraction decisions in the change; static checks cannot prove that an agent inspected existing UI.\n"
+  },
+  {
+    "id": "repository/docs/architecture/web-components",
+    "title": "React Components and Design Practices",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Responsibility and placement",
+    "anchor": "responsibility-and-placement",
+    "text": "Responsibility and placement\nReuse scope\nResponsibility\nPlacement and documentation\n`shared`\nSmall reusable UI primitives with native semantics and no domain behavior, such as Button.\nThe web application's explicit `components.tsx` public entry point; every named uppercase runtime export needs owned metadata. Extract files only when it improves local reasoning.\n`composed`\nCohesive reusable presentation built from primitives/native controls, such as a labeled TextField or ErrorNotice.\nThe same public entry point when shared across features; document the composition's own responsibility and states rather than duplicating every native prop.\n`feature-specific`\nA component tied to one workflow's terminology, state, permissions or side effects.\nIts feature directory. Catalog notable reusable-within-feature components through local metadata when useful; private helpers and every React export elsewhere do not require catalog entries.\n`owner` names the maintaining boundary or module, not an invented team. Source ownership and reuse scope do not grant new dependency edges: features may consume shared UI; reusable UI and generic portal modules must not depend on feature workflows. Explicit application-specific example registrations follow the preview boundary below. A feature-specific component is not promoted by adding it to the catalog. Keep hooks, domain utilities and type exports outside the curated component export inventory. Type-only exports are exempt; prefer explicit named exports so humans and tools can discover the public surface. The existing generator uses the installed TypeScript parser to verify functions, component values and local re-exports, without executing source modules. Full type checking remains the compiler's responsibility.\n"
+  },
+  {
+    "id": "repository/docs/architecture/web-components",
+    "title": "React Components and Design Practices",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Categories and discovery",
+    "anchor": "categories-and-discovery",
+    "text": "Categories and discovery\nThe default categories are **Actions, Inputs, Forms, Data Display, Feedback, Navigation, Overlays and Layout**. They describe UI responsibility rather than require implementations. A metadata file may add categories through its `categories` string array; additions should represent a useful discovery distinction. Unknown explicit categories fail validation, helping catch typos. Legacy entries without a category use `Uncategorized` until their owner classifies them.\nThe internal catalog offers category links with URL-owned selection, searchable ownership/scope/usage, props, states, accessibility, code examples, optional live previews, and source/metadata links. Existing `/docs/components/<name>` URLs remain stable; optional `id` supports namespaced identifiers when features use the same component name. Changing a name need not change an explicitly recorded ID. The generated manifest indexes category, scope, owner and source; its per-component JSON pages contain the normalized metadata. These files and the generated Markdown reference remain machine-readable for agents even when production builds exclude the portal.\n"
+  },
+  {
+    "id": "repository/docs/architecture/web-components",
+    "title": "React Components and Design Practices",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Owned metadata and compatibility",
+    "anchor": "owned-metadata-and-compatibility",
+    "text": "Owned metadata and compatibility\nThe canonical root [components.docs.json](../../apps/web/src/components.docs.json) remains valid in its existing shape. Additional `components.docs.json` files are discovered under `apps/web/src/` through Git's tracked and non-ignored files. Each uses a `components` array and may declare additional `categories` or a default `source`. Each entry may set:\nField\nContract\n`name`, `summary`, `usage`, `accessibility`, `props`, `states`, `examples`\nExisting required fields remain supported. Props may be empty for a component without props; states and examples must be meaningful and nonempty.\n`source`\nRepository-relative owned source under `apps/web/src/`; defaults to `components.tsx` beside the metadata file. The named export must exist.\n`exportName`\nActual named export when it differs from the displayed name; defaults to `name`.\n`id`\nStable unique catalog identifier using letters, digits, dot, underscore or hyphen; defaults to `name`.\n`category`, `scope`, `owner`\nExplicit discovery and maintenance fields. Legacy defaults are `Uncategorized`, `shared` for a matching public entry-point export or `feature-specific` elsewhere, and the source path as owner. A public re-export retains shared scope when its metadata references the implementation file. New or substantially changed entries should specify all three.\nProp `required`, `default`\nOptional boolean and explanatory string. Existing `name`, `type`, and `meaning` remain canonical authored guidance; native prop inheritance can be described as a rest-props row.\nExample `code`, `live`\nOptional JSX/TSX text and live-preview selection. Code-only examples default to static. Existing examples without code retain their registered live renderer. `live: true` requires the existing explicit renderer in `documentation/examples.tsx`; metadata never instantiates arbitrary code.\nRegister a feature component locally with its actual source, owner, `feature-specific` scope and a code example by default. Existing projects' root-owned entries, extension fields and custom registered live examples remain supported; migration is additive. An explicitly maintained application example renderer may compose a feature's presentation with synthetic props and local state. It must not connect credentials, use production adapters, call domain APIs or cause workflow side effects; cover interactions with browser checks that assert no such requests. Generic catalog/rendering modules do not import features or instantiate metadata as code. Orion's foundation-only feature examples remain static so derivation never leaves a shared import of removed implementation. Only metadata owned by a foundation-only feature is removed with that feature; product-owned metadata and registrations remain the project's responsibility. Resolve canonical sources and preserve product examples before regenerating upgrade conflicts.\nRun `pnpm docs:references:write` after metadata, public exports, examples or relevant documentation changes. `pnpm docs:references:check` and `pnpm docs:references:test` detect missing public metadata, invalid IDs/categories/scopes/props, duplicate entries/examples, broken source/re-export references, unsafe paths and missing live renderers. Source discovery follows only selected component files and their local re-exports, rejects symlinks and ignored sources, and does not index private source bodies. Generated files are never independently edited. These checks do not verify every prop's runtime meaning, visual quality or reuse decision; review and behavior tests remain required.\n"
+  },
+  {
+    "id": "repository/docs/architecture/web-components",
+    "title": "React Components and Design Practices",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Styling, themes and accessibility",
+    "anchor": "styling-themes-and-accessibility",
+    "text": "Styling, themes and accessibility\nThe small [reference stylesheet](../../apps/web/src/ui.css) uses component-scoped classes and inherited semantic CSS variables with neutral fallbacks. `--ui-font-family`, `--ui-font-size` and `--ui-font-weight-semibold` control typography; `--ui-space-2`, `--ui-space-3` and `--ui-space-4` are the implemented spacing hooks; `--ui-radius` controls shape. Semantic `--ui-color-*` values cover surface, text, border, action/on-action, focus, muted text and danger/surface/border. Add a token only for a demonstrated shared visual meaning, and retain one source for each value rather than duplicating unexplained literals across shared controls.\nProducts own token values, typography, theme selection, brand assets, shell and layout. Override tokens on the application root or a scoped theme container; controls inherit them without a React provider or a mandatory light/dark palette. The catalog's token-override example is synthetic, scoped to the preview, and imposes no product identity. Preserve existing class hooks when evolving a shared component compatibly; migrate legacy feature styling incrementally when touched, rather than redesigning the entire application as a side effect.\nUse native semantics and preserve native props/ref forwarding where practical. Define default, hover, focus, disabled, pending, validation and empty/populated states as relevant. Keep focus visible, disabled activation reliable, labels persistent, hint/error relationships explicit and errors understandable without color alone. Preserve keyboard operation and native form behavior; use links for navigation and explicit submit buttons for form submission. Test themes for readable contrast and relevant accessibility at the browser boundary. Features own asynchronous work, validation and live announcements; a visual component never grants authorization or retries an unknown write outcome.\nThe reference set intentionally stays small: **Button**, **TextField**, and **ErrorNotice**, exercised in real composition and local examples. No modal, grid, form engine or general layout library is implied by a taxonomy entry. More complex keyboard/focus patterns require their own concrete requirement and proportional tests before introduction.\n"
+  },
+  {
     "id": "repository/docs/contributing",
     "title": "Contributing and Documentation",
     "group": "Project guides",
@@ -492,7 +645,7 @@
     "kind": "repository",
     "heading": "API Error Registry",
     "anchor": "api-error-registry",
-    "text": "API Error Registry\n[Error contract](../../api/error-contract.md) · [API runtime](../../../apps/api/README.md)\nCode\nHTTP status\nCategory\nRetryable\nPublic message\n`AUTHENTICATION_REQUIRED`\n401\nauthentication\nno\nAuthentication is required.\n`VALIDATION_FAILED`\n400\nvalidation\nno\nThe request is invalid.\n`RESOURCE_NOT_FOUND`\n404\nnot_found\nno\nThe resource was not found.\n`RATE_LIMITED`\n429\nrate_limit\nyes\nToo many requests. Try again later.\n`INTERNAL_ERROR`\n500\ninternal\nno\nAn unexpected error occurred.\n`SERVICE_UNAVAILABLE`\n503\navailability\nyes\nThe service is unavailable.\n`WHATSAPP_WEBHOOK_UNVERIFIED`\n403\nauthentication\nno\nThe webhook request could not be verified.\n`WHATSAPP_WEBHOOK_TOO_LARGE`\n413\nvalidation\nno\nThe webhook payload is too large.\n`WHATSAPP_WEBHOOK_UNSUPPORTED_MEDIA_TYPE`\n415\nvalidation\nno\nThe webhook must use JSON.\n"
+    "text": "API Error Registry\n[Error contract](../../api/error-contract.md) · [API runtime](../../../apps/api/README.md)\nCode\nHTTP status\nCategory\nRetryable\nPublic message\n`AUTHENTICATION_REQUIRED`\n401\nauthentication\nno\nAuthentication is required.\n`VALIDATION_FAILED`\n400\nvalidation\nno\nThe request is invalid.\n`RESOURCE_NOT_FOUND`\n404\nnot_found\nno\nThe resource was not found.\n`RATE_LIMITED`\n429\nrate_limit\nyes\nToo many requests. Try again later.\n`INTERNAL_ERROR`\n500\ninternal\nno\nAn unexpected error occurred.\n`SERVICE_UNAVAILABLE`\n503\navailability\nyes\nThe service is unavailable.\n`WHATSAPP_WEBHOOK_UNVERIFIED`\n403\nauthentication\nno\nThe webhook request could not be verified.\n`WHATSAPP_WEBHOOK_TOO_LARGE`\n413\nvalidation\nno\nThe webhook payload is too large.\n`WHATSAPP_WEBHOOK_UNSUPPORTED_MEDIA_TYPE`\n415\nvalidation\nno\nThe webhook must use JSON.\n`WHATSAPP_IDENTITY_ADMIN_FORBIDDEN`\n403\nauthorization\nno\nYou do not have permission to manage WhatsApp identity links.\n"
   },
   {
     "id": "repository/docs/generated/components/web",
@@ -636,7 +789,7 @@
     "kind": "repository",
     "heading": "whatsapp_closure_preferences",
     "anchor": "whatsapp_closure_preferences",
-    "text": "whatsapp_closure_preferences\nMost recent explicit closure notice consent per WhatsApp sender scope and verified GLPI requester.\nOwner: WhatsApp closure notifications. Classification: RESTRICTED.\nLifecycle: An employee opts in or withdraws through WhatsApp. Withdrawal clears the delivery address. Re-enabling issues a new grant that cannot revive jobs under the previous grant.\nColumn\nPostgreSQL type\nNullable\nDefault\nClassification\nMeaning\nNull meaning\nUnit\n`scope_key`\n`text`\nno\n—\nRESTRICTED\nStable hash binding the Meta business number and the sender scope.\n—\n—\n`glpi_user_id`\n`bigint`\nno\n—\nRESTRICTED\nVerified GLPI requester who opted in.\n—\n—\n`grant_id`\n`uuid`\nno\n—\nINTERNAL\nUnique consent epoch bound to eligible ticket watches and queued closure replies.\n—\n—\n`recipient`\n`jsonb`\nyes\n—\nRESTRICTED\nValidated WhatsApp address for opted-in closure delivery.\nThe employee withdrew the grant and the address was cleared.\n—\n`granted_at`\n`timestamp(3) with time zone`\nno\n—\nINTERNAL\nTime at which WhatsApp recorded the active or most recently withdrawn grant.\n—\nUTC instant\n`revoked_at`\n`timestamp(3) with time zone`\nyes\n—\nINTERNAL\nTime at which the employee withdrew the grant.\nThe grant remains active.\nUTC instant\n"
+    "text": "whatsapp_closure_preferences\nMost recent ticket activity notice consent per WhatsApp sender scope and verified GLPI requester.\nOwner: WhatsApp ticket activity notifications. Classification: RESTRICTED.\nLifecycle: An employee opts in on ticket confirmation or through the notification settings and can withdraw through WhatsApp. Withdrawal clears the delivery address. Re-enabling issues a new grant that cannot revive jobs under the previous grant.\nColumn\nPostgreSQL type\nNullable\nDefault\nClassification\nMeaning\nNull meaning\nUnit\n`scope_key`\n`text`\nno\n—\nRESTRICTED\nStable hash binding the Meta business number and the sender scope.\n—\n—\n`glpi_user_id`\n`bigint`\nno\n—\nRESTRICTED\nVerified GLPI requester who opted in.\n—\n—\n`grant_id`\n`uuid`\nno\n—\nINTERNAL\nUnique consent epoch bound to eligible ticket watches and queued ticket updates.\n—\n—\n`recipient`\n`jsonb`\nyes\n—\nRESTRICTED\nValidated WhatsApp address for opted-in ticket updates.\nThe employee withdrew the grant and the address was cleared.\n—\n`granted_at`\n`timestamp(3) with time zone`\nno\n—\nINTERNAL\nTime at which WhatsApp recorded the active or most recently withdrawn grant.\n—\nUTC instant\n`revoked_at`\n`timestamp(3) with time zone`\nyes\n—\nINTERNAL\nTime at which the employee withdrew the grant.\nThe grant remains active.\nUTC instant\n"
   },
   {
     "id": "repository/docs/generated/database/schema",
@@ -690,159 +843,6 @@
     "kind": "repository",
     "heading": "whatsapp_verified_identities",
     "anchor": "whatsapp_verified_identities",
-    "text": "whatsapp_verified_identities\nCurrent proof of corporate mailbox control for a WhatsApp sender and its GLPI identity.\nOwner: WhatsApp employee verification. Classification: RESTRICTED.\nLifecycle: Created or replaced only as a challenge is consumed. Proof expires after thirty days and requires a new challenge. Retention is release-plan work.\nColumn\nPostgreSQL type\nNullable\nDefault\nClassification\nMeaning\nNull meaning\nUnit\n`scope_key`\n`text`\nno\n—\nRESTRICTED\nStable hash of the business phone ID and preferred sender identity.\n—\n—\n`glpi_user_id`\n`bigint`\nno\n—\nRESTRICTED\nGLPI directory identity established by mailbox verification.\n—\n—\n`verified_at`\n`timestamp(3) with time zone`\nno\n—\nINTERNAL\nTime the matching challenge was consumed.\n—\n—\n`expires_at`\n`timestamp(3) with time zone`\nno\n—\nINTERNAL\nTime after which the link cannot authorize work.\n—\n—\n"
-  },
-  {
-    "id": "repository/docs/generated/database/schema",
-    "title": "Database Reference",
-    "group": "Generated references",
-    "kind": "repository",
-    "heading": "Constraints and indexes",
-    "anchor": "constraints-and-indexes-3",
-    "text": "Constraints and indexes\nObject\nPhysical definition\nPurpose\n`whatsapp_verified_identities_expiration`\n`CHECK ((expires_at > verified_at))`\nRequires verification to precede expiration.\n`whatsapp_verified_identities_pkey`\n`PRIMARY KEY (scope_key)`\nMaintains one current verified GLPI identity for a WhatsApp sender scope.\n`whatsapp_verified_identities_user`\n`CHECK ((glpi_user_id > 0))`\nRequires a positive GLPI directory identity.\n"
-  },
-  {
-    "id": "repository/docs/generated/database/schema",
-    "title": "Database Reference",
-    "group": "Generated references",
-    "kind": "repository",
-    "heading": "whatsapp_ticket_submissions",
-    "anchor": "whatsapp_ticket_submissions",
-    "text": "whatsapp_ticket_submissions\nDurable work and outcome for one verified, confirmed WhatsApp draft submitted to GLPI.\nOwner: WhatsApp ticket submission. Classification: RESTRICTED.\nLifecycle: Starts when an employee confirms a draft. Confirmed ticket creation clears the work summary. Terminal results clear the active reply address and media references. Retain durable outcomes for reconciliation and deduplication under the project retention policy.\nColumn\nPostgreSQL type\nNullable\nDefault\nClassification\nMeaning\nNull meaning\nUnit\n`draft_id`\n`uuid`\nno\n—\nINTERNAL\nUnique opaque identifier of the confirmed draft and GLPI reconciliation reference.\n—\n—\n`business_phone_id`\n`text`\nno\n—\nINTERNAL\nMeta business phone number ID owning the submission job.\n—\n—\n`scope_key`\n`text`\nno\n—\nRESTRICTED\nVerified sender scope used to update the correct conversation.\n—\n—\n`requester_id`\n`bigint`\nno\n—\nRESTRICTED\nVerified GLPI requester chosen at confirmation.\n—\n—\n`recipient`\n`jsonb`\nyes\n—\nRESTRICTED\nWhatsApp address for the eventual response. Cleared at the terminal outcome.\nThe submission no longer needs its reply address.\n—\n`reply_expires_at`\n`timestamp(3) with time zone`\nno\n—\nINTERNAL\nDeadline of the customer service window associated with confirmation.\n—\n—\n`title`\n`text`\nyes\n—\nRESTRICTED\nTicket title derived from the confirmed category. Cleared after creation or terminal failure.\nThe title is no longer needed for creation.\n—\n`description`\n`text`\nyes\n—\nRESTRICTED\nConfirmed ticket summary with its opaque reconciliation reference. Cleared after creation or terminal failure.\nThe summary is no longer needed for creation.\n—\n`media_ids`\n`jsonb`\nno\n—\nRESTRICTED\nOrdered Meta media identifiers to resolve at delivery time. Cleared when processing ends.\n—\n—\n`attachment_count`\n`integer`\nno\n—\nINTERNAL\nNumber of media references in the confirmed draft.\n—\n—\n`next_attachment`\n`integer`\nno\n`0`\nINTERNAL\nZero-based position of the next media reference to process.\n—\n—\n`attached_count`\n`integer`\nno\n`0`\nINTERNAL\nNumber of documents whose association to the ticket was confirmed.\n—\n—\n`uncertain_attachments`\n`integer`\nno\n`0`\nINTERNAL\nNumber of document writes whose association or outcome could not be confirmed.\n—\n—\n`ticket_id`\n`bigint`\nyes\n—\nRESTRICTED\nAuthoritative GLPI ticket ID returned by successful creation.\nGLPI has not confirmed a ticket for the draft.\n—\n`state`\n`\"WhatsAppTicketSubmissionState\"`\nno\n`'PENDING'::\"WhatsAppTicketSubmissionState\"`\nINTERNAL\nCurrent dispatch or terminal state for the confirmed draft.\n—\n—\n`attempts`\n`integer`\nno\n`0`\nINTERNAL\nNumber of worker claims for the current ticket or attachment step.\n—\n—\n`available_at`\n`timestamp(3) with time zone`\nno\n—\nINTERNAL\nEarliest retry instant or deadline of the active worker claim.\n—\n—\n`claim_id`\n`uuid`\nyes\n—\nINTERNAL\nTemporary worker ownership token that fences stale writes.\nNo worker holds a claim for the current step.\n—\n`mutating`\n`boolean`\nno\n`false`\nINTERNAL\nDurable evidence that a non-idempotent GLPI mutation may have been started.\n—\n—\n`updated_at`\n`timestamp(3) with time zone`\nno\n—\nINTERNAL\nInstant of the latest claim or durable progress transition.\n—\n—\n`closure_consent_id`\n`uuid`\nyes\n—\nINTERNAL\nActive notice grant recorded when the employee confirmed the draft.\nThere was no eligible notice grant when this submission was queued.\n—\n`closure_check_at`\n`timestamp(3) with time zone`\nyes\n—\nINTERNAL\nTime of the next GLPI closure check or the deadline of its active claim.\nThe watch is unscheduled, retired or has created a closure reply.\n—\n"
-  },
-  {
-    "id": "repository/docs/generated/database/schema",
-    "title": "Database Reference",
-    "group": "Generated references",
-    "kind": "repository",
-    "heading": "Constraints and indexes",
-    "anchor": "constraints-and-indexes-4",
-    "text": "Constraints and indexes\nObject\nPhysical definition\nPurpose\n`whatsapp_ticket_submissions_closure_watch`\n`CHECK (((closure_check_at IS NULL) OR ((closure_consent_id IS NOT NULL) AND (ticket_id IS NOT NULL))))`\nRequires a confirmed GLPI ticket and an explicit consent grant for any scheduled check.\n`whatsapp_ticket_submissions_pkey`\n`PRIMARY KEY (draft_id)`\nPrevents two jobs for the same verified draft.\n`whatsapp_ticket_submissions_progress_check`\n`CHECK ((((attachment_count >= 0) AND (attachment_count <= 5)) AND ((next_attachment >= 0) AND (next_attachment <= attachment_count)) AND (attached_count >= 0) AND (uncertain_attachments >= 0) AND ((attached_count + uncertain_attachments) <= next_attachment) AND (attempts >= 0) AND ((state <> 'COMPLETED'::\"WhatsAppTicketSubmissionState\") OR ((ticket_id IS NOT NULL) AND (next_attachment = attachment_count))) AND ((state <> ALL (ARRAY['FAILED'::\"WhatsAppTicketSubmissionState\", 'UNCERTAIN'::\"WhatsAppTicketSubmissionState\"])) OR (ticket_id IS NULL)) AND ((NOT mutating) OR (claim_id IS NOT NULL))))`\nEnforces consistent progress, result and claim counts.\n`whatsapp_ticket_submissions_closure_idx`\n`CREATE INDEX whatsapp_ticket_submissions_closure_idx ON public.whatsapp_ticket_submissions USING btree (business_phone_id, closure_check_at, draft_id) WHERE (closure_check_at IS NOT NULL)`\nFinds due ticket closure checks within one business number.\n`whatsapp_ticket_submissions_dispatch_idx`\n`CREATE INDEX whatsapp_ticket_submissions_dispatch_idx ON public.whatsapp_ticket_submissions USING btree (business_phone_id, state, available_at, draft_id)`\nFinds eligible jobs for one Meta business phone number.\n"
-  },
-  {
-    "id": "repository/docs/generated/database/schema",
-    "title": "Database Reference",
-    "group": "Generated references",
-    "kind": "repository",
-    "heading": "whatsapp_troubleshooting_feedback",
-    "anchor": "whatsapp_troubleshooting_feedback",
-    "text": "whatsapp_troubleshooting_feedback\nA single employee response to a versioned static troubleshooting guide offered during ticket intake.\nOwner: WhatsApp guided conversations. Classification: INTERNAL.\nLifecycle: Recorded once as the conversation leaves the guidance step. The result survives dismissal of the draft and carries no contact, description or attachment fields.\nColumn\nPostgreSQL type\nNullable\nDefault\nClassification\nMeaning\nNull meaning\nUnit\n`draft_id`\n`uuid`\nno\n—\nINTERNAL\nOpaque identifier of the draft whose guidance was rated or skipped.\n—\n—\n`guidance_id`\n`text`\nno\n—\nINTERNAL\nStable, versioned identifier of the instructions shown.\n—\n—\n`outcome`\n`\"WhatsAppTroubleshootingOutcome\"`\nno\n—\nINTERNAL\nEmployee choice to report resolution, ask for more help or skip the suggestion.\n—\n—\n`recorded_at`\n`timestamp(3) with time zone`\nno\n—\nINTERNAL\nInstant at which the conversation accepted the response.\n—\n—\n"
-  },
-  {
-    "id": "repository/docs/generated/database/schema",
-    "title": "Database Reference",
-    "group": "Generated references",
-    "kind": "repository",
-    "heading": "Constraints and indexes",
-    "anchor": "constraints-and-indexes-5",
-    "text": "Constraints and indexes\nObject\nPhysical definition\nPurpose\n`whatsapp_troubleshooting_feedback_pkey`\n`PRIMARY KEY (draft_id)`\nKeeps one guidance outcome per draft across retries.\n`whatsapp_troubleshooting_feedback_outcome_idx`\n`CREATE INDEX whatsapp_troubleshooting_feedback_outcome_idx ON public.whatsapp_troubleshooting_feedback USING btree (guidance_id, outcome)`\nSupports aggregate reporting by guide and outcome.\n"
-  },
-  {
-    "id": "repository/docs/generated/database/schema",
-    "title": "Database Reference",
-    "group": "Generated references",
-    "kind": "repository",
-    "heading": "whatsapp_inbound_messages",
-    "anchor": "whatsapp_inbound_messages",
-    "text": "whatsapp_inbound_messages\nDurable intake of supported and authenticated Meta messages for the configured business number.\nOwner: WhatsApp webhook. Classification: RESTRICTED.\nLifecycle: Created before acknowledging the webhook. Redelivery preserves the original row. Processing and retention are release-plan work.\nColumn\nPostgreSQL type\nNullable\nDefault\nClassification\nMeaning\nNull meaning\nUnit\n`message_id`\n`text`\nno\n—\nRESTRICTED\nOpaque Meta message identifier used to deduplicate redelivery.\n—\n—\n`business_phone_id`\n`text`\nno\n—\nINTERNAL\nMeta asset identifier of the business number that received the event.\n—\n—\n`sender_business_id`\n`text`\nyes\n—\nRESTRICTED\nMeta sender identifier scoped to the business portfolio.\nMeta supplied only the sender phone number.\n—\n`sender_phone`\n`text`\nyes\n—\nRESTRICTED\nSender number supplied by Meta to support directory linking and routing.\nMeta supplied a business-scoped sender identifier without a phone number.\n—\n`occurred_at`\n`timestamp(3) with time zone`\nno\n—\nINTERNAL\nTimestamp reported by Meta as the message time.\n—\nUTC instant\n`received_at`\n`timestamp(3) with time zone`\nno\n`CURRENT_TIMESTAMP`\nINTERNAL\nDatabase timestamp of the first accepted delivery.\n—\nUTC instant\n`content`\n`jsonb`\nno\n—\nRESTRICTED\nNormalized text, action identifier, media reference or protected verification-code digest consumed by the conversation flow.\n—\n—\n`conversation_processed_at`\n`timestamp(3) with time zone`\nyes\n—\nINTERNAL\nTime the guided worker completed processing this input and committed its effects.\nThe guided worker has not completed this message.\n—\n`conversation_action`\n`\"WhatsAppConversationAction\"`\nyes\n—\nINTERNAL\nDurable identity or ticket lookup operation owned by this inbound event.\nThere is no outstanding deferred conversation operation.\n—\n`conversation_claim_id`\n`uuid`\nyes\n—\nINTERNAL\nUnique fence for the worker currently allowed to finalize the conversation operation.\nThe event has no deferred work claim.\n—\n`conversation_claim_until`\n`timestamp(3) with time zone`\nyes\n—\nINTERNAL\nTime after which another conversation worker may reclaim an unfinished operation.\nThe event has no active work claim.\n—\n`conversation_requester_id`\n`bigint`\nyes\n—\nRESTRICTED\nVerified GLPI requester bound to a claimed ticket consultation. Cleared when the event completes.\nThe event has no pending ticket consultation.\n—\n"
-  },
-  {
-    "id": "repository/docs/generated/database/schema",
-    "title": "Database Reference",
-    "group": "Generated references",
-    "kind": "repository",
-    "heading": "Constraints and indexes",
-    "anchor": "constraints-and-indexes-6",
-    "text": "Constraints and indexes\nObject\nPhysical definition\nPurpose\n`whatsapp_inbound_messages_conversation_claim`\n`CHECK ((((conversation_claim_id IS NULL) AND (conversation_claim_until IS NULL)) OR ((conversation_claim_id IS NOT NULL) AND (conversation_claim_until IS NOT NULL) AND (conversation_action IS NOT NULL) AND (conversation_processed_at IS NULL))))`\nRequires a complete claim only on an outstanding operation and keeps completed events unlocked.\n`whatsapp_inbound_messages_pkey`\n`PRIMARY KEY (message_id)`\nKeeps one accepted event per Meta message ID across retries and concurrent delivery.\n`whatsapp_inbound_messages_requester_claim`\n`CHECK (((conversation_requester_id IS NULL) OR ((conversation_requester_id > 0) AND (conversation_claim_id IS NOT NULL))))`\nRestricts a stored GLPI requester to a positive ID on a claimed event.\n`whatsapp_inbound_messages_sender_required`\n`CHECK (((sender_business_id IS NOT NULL) OR (sender_phone IS NOT NULL)))`\nRequires at least one sender identifier so a message can be associated with a conversation.\n`whatsapp_inbound_messages_conversation_idx`\n`CREATE INDEX whatsapp_inbound_messages_conversation_idx ON public.whatsapp_inbound_messages USING btree (business_phone_id, conversation_processed_at, received_at, occurred_at, message_id)`\nSupports finding the earliest unprocessed message for one business number.\n"
-  },
-  {
-    "id": "repository/docs/generated/database/schema",
-    "title": "Database Reference",
-    "group": "Generated references",
-    "kind": "repository",
-    "heading": "whatsapp_outbound_messages",
-    "anchor": "whatsapp_outbound_messages",
-    "text": "whatsapp_outbound_messages\nDurable intent and dispatch evidence for one WhatsApp reply or closure notice.\nOwner: WhatsApp dispatch. Classification: RESTRICTED.\nLifecycle: Enqueued before dispatch. Retried only after an explicit provider throttle rejection and while the service window remains open. An unresolved attempt enters UNCERTAIN for reconciliation. Automated retention is release-plan work.\nColumn\nPostgreSQL type\nNullable\nDefault\nClassification\nMeaning\nNull meaning\nUnit\n`id`\n`uuid`\nno\n—\nINTERNAL\nCaller-assigned immutable UUID for one reply intent and the opaque identifier echoed by Meta on delivery callbacks.\n—\n—\n`business_phone_id`\n`text`\nno\n—\nINTERNAL\nMeta business phone number ID that owns and sends the reply.\n—\n—\n`payload`\n`jsonb`\nno\n—\nRESTRICTED\nImmutable destination, validated text or interactive content and optional verified identity and notice consent requirements.\n—\n—\n`state`\n`\"WhatsAppOutboundState\"`\nno\n`'PENDING'::\"WhatsAppOutboundState\"`\nINTERNAL\nCurrent queue, provider acceptance or delivery evidence state.\n—\n—\n`expires_at`\n`timestamp(3) with time zone`\nno\n—\nINTERNAL\nLast allowed dispatch deadline under the reply's service window or utility notice lifetime.\n—\nUTC instant\n`available_at`\n`timestamp(3) with time zone`\nno\n`CURRENT_TIMESTAMP`\nINTERNAL\nEarliest eligible time for the next dispatch attempt.\n—\nUTC instant\n`attempt_started_at`\n`timestamp(3) with time zone`\nyes\n—\nINTERNAL\nMost recent claim time used to detect an abandoned dispatch.\nThe queue has not claimed this reply.\nUTC instant\n`attempts`\n`integer`\nno\n`0`\nINTERNAL\nNumber of claims recorded before making a provider request.\n—\nclaims\n`provider_message_id`\n`text`\nyes\n—\nRESTRICTED\nMeta message identifier returned on acceptance or on a correlated delivery callback.\nProvider acceptance or delivery has not supplied an identifier.\n—\n`provider_error_code`\n`integer`\nyes\n—\nINTERNAL\nInteger Graph error code from an explicit rejection or delivery failure.\nThe current evidence has no provider error code.\n—\n`delivery_status_at`\n`timestamp(3) with time zone`\nyes\n—\nINTERNAL\nProvider timestamp of the accepted delivery status update.\nNo delivery callback has advanced this reply.\nUTC instant\n`created_at`\n`timestamp(3) with time zone`\nno\n`CURRENT_TIMESTAMP`\nINTERNAL\nDatabase timestamp when the reply intent was first enqueued.\n—\nUTC instant\n"
-  },
-  {
-    "id": "repository/docs/generated/database/schema",
-    "title": "Database Reference",
-    "group": "Generated references",
-    "kind": "repository",
-    "heading": "Constraints and indexes",
-    "anchor": "constraints-and-indexes-7",
-    "text": "Constraints and indexes\nObject\nPhysical definition\nPurpose\n`whatsapp_outbound_messages_attempts_nonnegative`\n`CHECK ((attempts >= 0))`\nRejects invalid negative dispatch attempt counts.\n`whatsapp_outbound_messages_pkey`\n`PRIMARY KEY (id)`\nPrevents another reply intent with the same durable identifier.\n`whatsapp_outbound_messages_dispatch_idx`\n`CREATE INDEX whatsapp_outbound_messages_dispatch_idx ON public.whatsapp_outbound_messages USING btree (business_phone_id, state, available_at)`\nSupports finding due messages for a configured sender and tracking current states.\n`whatsapp_outbound_messages_provider_key`\n`CREATE UNIQUE INDEX whatsapp_outbound_messages_provider_key ON public.whatsapp_outbound_messages USING btree (business_phone_id, provider_message_id)`\nCorrelates delivery by provider message ID within one business phone number and prevents conflicting associations.\n"
-  },
-  {
-    "id": "repository/docs/generated/database/schema",
-    "title": "Database Reference",
-    "group": "Generated references",
-    "kind": "repository",
-    "heading": "Database enums",
-    "anchor": "database-enums",
-    "text": "Database enums\nEnum\nValues\nMeaning\n`WhatsAppConversationAction`\nREQUEST_CODE, CONFIRM_CODE, QUERY_TICKETS\nDeferred operation to request or confirm an email code or consult GLPI tickets after committing the preceding conversation move.\n`WhatsAppOutboundState`\nPENDING, SENDING, ACCEPTED, SENT, DELIVERED, READ, FAILED, UNCERTAIN, EXPIRED\nTracks work from pending and claimed through acceptance, delivery, read, known failure, uncertainty, or service-window expiry.\n`WhatsAppTicketSubmissionState`\nPENDING, COMPLETED, FAILED, UNCERTAIN\nPENDING covers dispatch and bounded retries. COMPLETED confirms a ticket and records attachment outcomes. FAILED confirms no ticket was created. UNCERTAIN requires checking GLPI before a repeat.\n`WhatsAppTroubleshootingOutcome`\nRESOLVED, NOT_RESOLVED, SKIPPED\nEmployee response to optional guidance. RESOLVED closes the draft. NOT_RESOLVED and SKIPPED keep the draft for review.\n"
-  },
-  {
-    "id": "repository/docs/project-derivation",
-    "title": "Start and Upgrade a Project from Orion",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "Start and Upgrade a Project from Orion",
-    "anchor": "start-and-upgrade-a-project-from-orion",
-    "text": "Start and Upgrade a Project from Orion\n[Repository README](../README.md) · [Development setup](setup.md) · [Validation](validation.md) · [Foundation versioning](versioning.md) · [ADR-0014](adr/0014-derive-projects-from-orion-through-git-ancestry-with-recorded-provenance.md) · [ADR-0017](adr/0017-start-derived-projects-from-a-clean-foundation-baseline.md)\nThis is the practical reference for turning a revision of Orion into a new, independent project and for keeping that project's foundation current: what to decide and provide, how to run the initialization, what the new repository contains, what to do next, and how provenance and foundation upgrades work. [ADR-0014](adr/0014-derive-projects-from-orion-through-git-ancestry-with-recorded-provenance.md) records the ancestry and provenance decision; [ADR-0017](adr/0017-start-derived-projects-from-a-clean-foundation-baseline.md) records the clean-baseline contract. The commands exist in every Orion checkout; the canonical Orion repository itself is never initialized as a project.\n"
-  },
-  {
-    "id": "repository/docs/project-derivation",
-    "title": "Start and Upgrade a Project from Orion",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "Model",
-    "anchor": "model",
-    "text": "Model\nThe canonical `GabriellMDias/Orion` repository is the upstream development foundation. A derived project is an independent Git repository with its own `origin`, branches, pull requests, CI history, human actions, product decisions, and releases. It starts from a clean clone of Orion and keeps Orion's commit history, so Git can compute what changed upstream and merge it later, but its first commit removes Orion's own reference implementation and development history and gives the repository the project's identity.\nConcern\nMechanism\nIdentity and provenance\n[`.orion/project.json`](../.orion/project.json), validated by `pnpm orion:check`\nClean-baseline contract\n[`.orion/derivation.json`](../.orion/derivation.json): foundation-only paths, project-owned files and their templates, and the foundation workspace package scope\nImmutable starting point\n`foundation.initializedFromCommit`: the published Orion commit the project was initialized from; never changes\nCurrent foundation\n`foundation.baselineCommit`: the newest Orion commit integrated and validated through a reviewed merge\nCanonical upstream\nLocal remote `orion-upstream`: fetch-only (its push URL is disabled), fetches no tags, and is tracked by no local branch\nProduct repository\nRecorded as `repository.url`; each clone's `origin` is that repository or a fork or mirror of it, never the foundation ([remote rules](#remote-rules))\nIn the Orion repository the manifest has `\"kind\": \"foundation\"` and only describes Orion. A derived project's manifest (schema version 2) has `\"kind\": \"project\"` and additionally records its npm `packageScope` and its foundation ancestry. The Living Documentation Portal links source files to the manifest's repository.\nA derived project inherits [Apache-2.0-licensed Orion source](../LICENSE). The project remains responsible for licensing its independently created product code and for applicable obligations of inherited and third-party material; Orion's license does not choose the project's overall license.\n"
-  },
-  {
-    "id": "repository/docs/project-derivation",
-    "title": "Start and Upgrade a Project from Orion",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "Before you start",
-    "anchor": "before-you-start",
-    "text": "Before you start\n"
-  },
-  {
-    "id": "repository/docs/project-derivation",
-    "title": "Start and Upgrade a Project from Orion",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "What you decide and provide",
-    "anchor": "what-you-decide-and-provide",
-    "text": "What you decide and provide\nOnly the first two inputs are required. Product decisions such as scope, license, identity provider, deployment, and branding are not needed to initialize; the new project's plan and human actions track them afterward.\nInput\nOption\nHow the project uses it\nRules\nProject name\n`--name`, required\nManifest `name`, README and documentation titles, browser title, web shell, portal, OpenAPI title (`<name> API`), plan, human actions, and the initialization commit message\n1–80 letters, digits, spaces, dots, underscores, or hyphens, starting with a letter or digit; accented letters are allowed\nProduct repository\n`--repository`, required\nRecorded, normalized, as `repository.url`; configured as `origin`\nHTTPS, SSH, or scp-like URL of the repository the project will publish to; it need not exist yet. It must not embed credentials, use a non-default SSH port (supply its HTTPS URL instead), or identify Orion ([repository identities](#remote-rules))\nPackage scope\n`--package-scope`, optional\nWorkspace packages `@<scope>/api`, `@<scope>/web`, and `@<scope>/sdk`, the root package `<scope>`, and the telemetry service name `<scope>-api`\nDefaults to the name in lowercase, without accents, with other characters replaced by hyphens (`Pedido Fácil` → `@pedido-facil`). Otherwise `@` and 1–50 lowercase letters, digits, or hyphens, starting with a letter or digit, and not the foundation scope `@orion`\nOrion revision\noptional\nBecomes `foundation.initializedFromCommit` and the first `foundation.baselineCommit`\nDefaults to the latest commit on Orion's `main`. Any commit on `main` that contains `.orion/derivation.json` may be chosen; [stable tags](versioning.md) name released points. A revision from before the clean-baseline contract runs its own older initialization and produces that revision's layout instead\n"
-  },
-  {
-    "id": "repository/docs/project-derivation",
-    "title": "Start and Upgrade a Project from Orion",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "Prerequisites",
-    "anchor": "prerequisites",
-    "text": "Prerequisites\nGit with `user.name` and `user.email` configured, Node.js 24.13.0, and pnpm 11.25.0.\nA running Testcontainers-compatible container runtime: initialization regenerates the database reference from a migrated PostgreSQL.\nPlaywright Chromium for the browser tests in `pnpm validate` ([setup](setup.md#prepare-a-clean-checkout)).\nA fresh, full clone of Orion that contains no other work. Shallow clones cannot preserve Orion's ancestry.\nPermission to create the product repository before publishing. Initialization never contacts the product repository: it creates no repositories and pushes nothing.\n"
-  },
-  {
-    "id": "repository/docs/project-derivation",
-    "title": "Start and Upgrade a Project from Orion",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "Start a new project",
-    "anchor": "start-a-new-project",
-    "text": "Start a new project\nClone Orion and install its dependencies. To start from an older published Orion revision, run `git reset --hard <commit>` on `main` before initializing.\ngit clone https://github.com/GabriellMDias/Orion.git acme-ledger\ncd acme-ledger\npnpm install --frozen-lockfile\n\nRun a dry run. It checks every precondition and lists the actions without changing anything.\npnpm orion:init-project --name \"Acme Ledger\" --repository git@github.com:acme/acme-ledger.git\n\nInitialize. Add `--package-scope @acme` to choose a scope other than the default.\npnpm orion:init-project --name \"Acme Ledger\" --repository git@github.com:acme/acme-ledger.git --apply\n\nVerify the result. `pnpm orion:status` shows the identity, package scope, and recorded Orion commits; the last commit is `Initialize Acme Ledger from Orion <commit>` on top of Orion's history.\npnpm orion:status\ngit log --oneline -2\npnpm validate\n\nCreate an empty repository at the URL you supplied, without a generated README, license, or ignore file (project human action PH-01), and publish:\ngit push -u origin main\n\nInitialization refuses, without changing anything, when:\nthe checkout is not the repository root, is shallow, or has uncommitted or untracked changes (ignored files such as `node_modules/` and `.env.local` are allowed);\nthe manifest already describes a project, `docs/project/` exists, or an `orion-upstream` remote exists;\n`main` is not checked out, any configured `origin` URL does not identify the canonical Orion repository, or `HEAD` has commits that are not on `origin/main`;\nthe project name is invalid, the package scope is not a valid npm scope or equals the foundation scope, the repository URL embeds credentials, uses a non-default SSH port (see [repository identities](#remote-rules)), or identifies the Orion repository;\nthe derivation contract is invalid or a template is missing;\nthe migration release registry records durable releases, which would describe another deployment;\nGit has no committer identity.\nWith `--apply`, it:\nwrites the project manifest;\nremoves every foundation-only path;\nrenders the project-owned files with the project name, repository, package scope, date, and Orion baseline;\nrenames the workspace package scope in package manifests, `pnpm-lock.yaml`, and source, and names the root package after the scope (authored Markdown and ADRs are not rewritten);\nregenerates workspace links, the Prisma client, API and database references, SDK types, and portal data;\ncommits `Initialize <name> from Orion <commit>` on top of Orion's history, renames `origin` to the protected `orion-upstream`, and adds the project repository as `origin`.\nIt never creates remote repositories or pushes. If a step before the commit fails, it restores the clean checkout; run `pnpm install --frozen-lockfile` before retrying.\n"
-  },
-  {
-    "id": "repository/docs/project-derivation",
-    "title": "Start and Upgrade a Project from Orion",
-    "group": "Project guides",
-    "kind": "repository",
-    "heading": "What carries over, what is removed, and what is adapted",
-    "anchor": "what-carries-over-what-is-removed-and-what-is-adapted",
-    "text": "What carries over, what is removed, and what is adapted\nOutcome\nContent\nPreserved from the foundation\nArchitecture, principles, policies, accepted ADRs, setup and validation guides, runbook guidance, and this guide; the validation gate, agent instructions, CI workflow, and Renovate configuration; the API runtime (configuration, telemetry, health, error registry, module contract, PostgreSQL client, optional JWT verification); the web shell and Living Documentation Portal; the SDK package; the derivation tooling and contract; Orion's full Git history\nRemoved as foundation-only\nOrion's Approval Request reference implementation: its API feature, Prisma models, migration, metadata, runtime grants, smoke, tests, web module, browser tests and journeys, and domain documentation. Orion's own implementation plan, human actions, and acceptance and release history\nAdapted or created for the project\nThe manifest (`kind: project`, name, package scope, provenance); `README.md`; the API and web composition files, which compose no modules; a neutral brand mark and touch icon; the project's plan and human actions in `docs/project/`; workspace package names, the lockfile, and imports; generated OpenAPI, SDK types, configuration, error, and database references, and portal data; the remotes `origin` and `orion-upstream`\nKept as the foundation's technical namespace\n`ORION_*` configuration names, `orion_*` token claims and database role names, the `Orion required gate` check name, the `.orion/` directory, the `orion:*` commands, and the `orion-upstream` remote. Renaming them would touch shared files throughout the repository and conflict on every upgrade; the check name is also referenced by branch protection. Accepted ADRs keep their original wording\nThe [content ownership](#content-ownership) contract defines these categories precisely and how each behaves during upgrades.\n"
+    "text": "whatsapp_verified_identities\nCurrent proof associating a signed WhatsApp sender with a GLPI identity.\nOwner: WhatsApp employee verification. Classification: RESTRICTED.\nLifecycle: Each sender can verify independently for the same GLPI user. A new proof issues a fresh link ID. Proof expires after thirty days or on administrative revocation.\nColumn\nPostgreSQL type\nNullable\nDefault\nClassification\nMeaning\nNull meaning\nUnit\n`scope_key`\n`text`\nno\n—\nRESTRICTED\nStable hash of the business phone ID and preferred sender identity.\n—\n—\n`glpi_user_id`\n`bigint`\nno\n—\nRESTRICTED\nGLPI directory identity established by mailbox verification or a matching directory phone.\n—\n—\n`verified_at`\n`timestamp(3) with time zone`\nno\n—\nINTERNAL\nTime the current proof was recorded.\n—\n—\n`expires_at`\n`timestamp(3) with time zone`\nno\n—\nINTERNAL\nTime after which the link cannot authorize work.\n—\n—\n`link_id`\n`uuid`\nno\n`gen_random_uuid()`\nINTERNAL\nOpaque administrative identifier for the current verification. Changes on re-verification to fence stale actions.\n—\n—\n`phone_last_four`\n`text`\nyes\n—\nCONFIDENTIAL\nLast four digits of the number supplied by a signed WhatsApp message.\nMeta did not supply a phone number or no eligible historical message was retained.\n—\n`revoked_at`\n`timestamp(3) with time zone`\nyes\n—\nINTERNAL\nTime at which IT revoked this verification.\nThe verification was not revoked.\n—\n`revoked_by`\n`uuid`\nyes\n—\nCONFIDENTIAL\nVerified administration principal that first revoked the current link.\nThe current verification has no administrative revocation.\n—\n"
   }
 ]

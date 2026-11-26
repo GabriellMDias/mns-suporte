@@ -1,10 +1,10 @@
 {
   "kind": "database",
   "name": "whatsapp_verified_identities",
-  "description": "Current proof of corporate mailbox control for a WhatsApp sender and its GLPI identity.",
+  "description": "Current proof associating a signed WhatsApp sender with a GLPI identity.",
   "owner": "WhatsApp employee verification",
   "classification": "RESTRICTED",
-  "lifecycle": "Created or replaced only as a challenge is consumed. Proof expires after thirty days and requires a new challenge. Retention is release-plan work.",
+  "lifecycle": "Each sender can verify independently for the same GLPI user. A new proof issues a fresh link ID. Proof expires after thirty days or on administrative revocation.",
   "columns": [
     {
       "Column": "scope_key",
@@ -22,7 +22,7 @@
       "Nullable": "no",
       "Default": "—",
       "Classification": "RESTRICTED",
-      "Meaning": "GLPI directory identity established by mailbox verification.",
+      "Meaning": "GLPI directory identity established by mailbox verification or a matching directory phone.",
       "Null meaning": "—",
       "Unit": "—"
     },
@@ -32,7 +32,7 @@
       "Nullable": "no",
       "Default": "—",
       "Classification": "INTERNAL",
-      "Meaning": "Time the matching challenge was consumed.",
+      "Meaning": "Time the current proof was recorded.",
       "Null meaning": "—",
       "Unit": "—"
     },
@@ -45,6 +45,46 @@
       "Meaning": "Time after which the link cannot authorize work.",
       "Null meaning": "—",
       "Unit": "—"
+    },
+    {
+      "Column": "link_id",
+      "PostgreSQL type": "uuid",
+      "Nullable": "no",
+      "Default": "gen_random_uuid()",
+      "Classification": "INTERNAL",
+      "Meaning": "Opaque administrative identifier for the current verification. Changes on re-verification to fence stale actions.",
+      "Null meaning": "—",
+      "Unit": "—"
+    },
+    {
+      "Column": "phone_last_four",
+      "PostgreSQL type": "text",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "CONFIDENTIAL",
+      "Meaning": "Last four digits of the number supplied by a signed WhatsApp message.",
+      "Null meaning": "Meta did not supply a phone number or no eligible historical message was retained.",
+      "Unit": "—"
+    },
+    {
+      "Column": "revoked_at",
+      "PostgreSQL type": "timestamp(3) with time zone",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "INTERNAL",
+      "Meaning": "Time at which IT revoked this verification.",
+      "Null meaning": "The verification was not revoked.",
+      "Unit": "—"
+    },
+    {
+      "Column": "revoked_by",
+      "PostgreSQL type": "uuid",
+      "Nullable": "yes",
+      "Default": "—",
+      "Classification": "CONFIDENTIAL",
+      "Meaning": "Verified administration principal that first revoked the current link.",
+      "Null meaning": "The current verification has no administrative revocation.",
+      "Unit": "—"
     }
   ],
   "constraints": [
@@ -54,14 +94,34 @@
       "Purpose": "Requires verification to precede expiration."
     },
     {
+      "Object": "whatsapp_verified_identities_phone_suffix",
+      "Physical definition": "CHECK ((phone_last_four ~ '^[0-9]{4}$'::text))",
+      "Purpose": "Allows only a four-digit display suffix."
+    },
+    {
       "Object": "whatsapp_verified_identities_pkey",
       "Physical definition": "PRIMARY KEY (scope_key)",
       "Purpose": "Maintains one current verified GLPI identity for a WhatsApp sender scope."
     },
     {
+      "Object": "whatsapp_verified_identities_revocation",
+      "Physical definition": "CHECK ((((revoked_at IS NULL) AND (revoked_by IS NULL)) OR ((revoked_at IS NOT NULL) AND (revoked_by IS NOT NULL) AND (revoked_at >= verified_at))))",
+      "Purpose": "Requires an attributable and chronologically valid revocation."
+    },
+    {
       "Object": "whatsapp_verified_identities_user",
       "Physical definition": "CHECK ((glpi_user_id > 0))",
       "Purpose": "Requires a positive GLPI directory identity."
+    },
+    {
+      "Object": "whatsapp_verified_identities_link_id_key",
+      "Physical definition": "CREATE UNIQUE INDEX whatsapp_verified_identities_link_id_key ON public.whatsapp_verified_identities USING btree (link_id)",
+      "Purpose": "Identifies each current verification with an opaque unique identifier."
+    },
+    {
+      "Object": "whatsapp_verified_identities_user_links_idx",
+      "Physical definition": "CREATE INDEX whatsapp_verified_identities_user_links_idx ON public.whatsapp_verified_identities USING btree (glpi_user_id, link_id)",
+      "Purpose": "Finds each independently verified WhatsApp sender associated with a GLPI user."
     }
   ]
 }

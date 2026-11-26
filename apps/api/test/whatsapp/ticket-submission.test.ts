@@ -57,10 +57,8 @@ async function setup(database: ReturnType<typeof createDatabase>) {
     step: "review",
     revision: 1,
     editing: false,
-    category: "Sistema",
-    unit: "Centro",
+    title: "Falha no caixa",
     description: "Falha no caixa",
-    impact: "Uma operação",
     attachments: [],
   };
   const job = () =>
@@ -134,6 +132,14 @@ async function setup(database: ReturnType<typeof createDatabase>) {
     send,
   };
 }
+
+it("keeps a first-time opt-out when the employee confirms a ticket", async () => {
+  await fixture(async ({ send, confirm, job }) => {
+    await send({ phase: "menu" }, "Parar avisos");
+    await confirm();
+    expect(await job()).toMatchObject({ closureConsentId: null });
+  });
+}, 120_000);
 
 it("claims a single creation and resumes safe attachment failures without creating or uploading twice", async () => {
   await fixture(
@@ -254,7 +260,7 @@ it("requires checking the external ticket after a crash at creation and never se
       expect(await worker()(signal)).toBe(false);
       expect(createTicket).toHaveBeenCalledTimes(1);
       await send(await conversation(), "Novo chamado");
-      expect((await conversation()).draft?.step).toBe("category");
+      expect((await conversation()).draft?.step).toBe("title");
       expect((await conversation()).draft?.id).not.toBe(saved.draft?.id);
     },
   );
@@ -285,6 +291,7 @@ it("keeps a fully reviewed draft after bounded pre-write failures and allows rec
       expect(await job()).toMatchObject({ state: "FAILED", ticketId: null });
       expect((await conversation()).draft).toMatchObject({
         step: "review",
+        title: "Falha no caixa",
         description: "Falha no caixa",
       });
       expect(await worker()(signal)).toBe(false);

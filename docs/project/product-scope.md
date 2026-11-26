@@ -2,15 +2,15 @@
 
 [Implementation plan](implementation-plan.md) · [Project README](../../README.md)
 
-MNS Suporte is an internal IT support channel for MNS employees. Employees use WhatsApp to open and consult GLPI tickets or find the IT contact. The IT team receives and resolves the tickets in GLPI. The V1 menu and employee-facing prompts use Brazilian Portuguese.
+MNS Suporte is an internal IT support channel for MNS employees. Employees use WhatsApp to open and consult GLPI tickets and receive progress notices. The IT team receives and resolves the tickets in GLPI. The V1 menu and employee-facing prompts use Brazilian Portuguese.
 
 ## V1 workflow
 
-1. Verify the employee with a short-lived code delivered to their corporate mailbox after an exact, unique lookup in the corporate directory exposed by GLPI. Bind the verified GLPI identity to the WhatsApp account. Limit challenges and attempts, and use neutral replies during lookup.
-2. Offer to open a ticket, list the employee's open tickets, or direct them to IT. The human contact is an explicit menu option and remains available during intake.
-3. Collect category, unit or department, description, impact, and optional photos, audio or documents. Keep a resumable draft. Offer a relevant static instruction when one exists. The employee can mark it helpful, request more support, or skip to ticket creation.
-4. Present a draft summary for review. On confirmation, create the ticket and attach media in GLPI. Confirm creation only after obtaining the GLPI ticket ID. Surface attachment failures independently from ticket creation.
-5. Check ownership in GLPI before displaying ticket details. Record permission for outbound updates, check for closure and send a notification. Use the approved Meta utility template outside the customer service window.
+1. Ask for the employee's corporate email and verify it against one active GLPI user. Recognize a signed WhatsApp number when it matches the contact fields of that user uniquely and exactly. In other cases, verify control of the corporate mailbox with a short-lived code. Bind each WhatsApp account independently in MNS Suporte. IT can list and individually revoke links in the protected administration panel. Limit challenges and attempts, and use neutral replies during lookup.
+2. Offer to open a ticket or list the employee's open tickets.
+3. Ask the employee for a title and a description and keep a resumable draft. Offer a relevant static instruction when one exists. The employee can mark it helpful, request more support, or skip to the review.
+4. Show the employee's title and allow optional photos, audio or PDFs at review. Explain that confirmation includes opt-in to WhatsApp ticket updates and provide an opt-out command. On confirmation, send the title and description to GLPI and attach any media. Leave category, location and impact to GLPI defaults, business rules and IT triage. Confirm creation after obtaining the GLPI ticket ID. Surface attachment failures independently from ticket creation.
+5. Check ownership in GLPI before displaying ticket details. Notify opted-in requesters of public support replies and observed status changes. Include the accepted solution in the closure notice during the customer service window. Use the approved closure template outside that window when available.
 
 Email password reset was retired from the product scope. The verification code proves access to the mailbox for onboarding.
 
@@ -29,7 +29,7 @@ The conversation service owns its state and the complete guided flow. An optiona
 ## Release acceptance
 
 - An employee can verify ownership of their corporate mailbox, resume a draft after restart, open a ticket with an attachment, consult their own tickets and receive a closure notice in the test environment.
-- Direct access to IT and every core flow work with the guided messages alone.
+- Every core flow works with the guided messages alone.
 - Replayed or concurrent inbound deliveries do not duplicate tickets. A GLPI outage preserves the draft and permits safe recovery.
 - Another employee cannot view ticket details or trigger actions with a stale or unverified messenger identity.
 - Release evidence includes local validation, a pilot on real service boundaries, backup and restore checks, and a supervised cutover rehearsal.

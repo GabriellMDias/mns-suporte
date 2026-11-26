@@ -8,6 +8,7 @@ import {
 } from "../../src/features/whatsapp/closure-preferences.js";
 import { createClosureWorker } from "../../src/features/whatsapp/closure-worker.js";
 import type { SendReply } from "../../src/features/whatsapp/graph-client.js";
+import { isOutboundPayload } from "../../src/features/whatsapp/outbound-contract.js";
 import { scopeOf } from "../../src/features/whatsapp/identity-code.js";
 import {
   applyWhatsAppDeliveryStatuses,
@@ -272,5 +273,99 @@ it("waits for a service window without a template and suppresses queued notices 
     expect(
       await db.whatsAppOutboundMessage.findUnique({ where: { id: draftId } }),
     ).toMatchObject({ state: "EXPIRED" });
+  });
+}, 120_000);
+
+it("queues a public reply, status change and full solution once", async () => {
+  await withClosureFixture(async (db, clock, advance, grantId) => {
+    const draftId = randomUUID();
+    await db.whatsAppTicketSubmission.create({
+      data: {
+        draftId,
+        businessPhoneId,
+        scopeKey,
+        requesterId,
+        closureConsentId: grantId,
+        ticketId,
+        state: "COMPLETED",
+        closureCheckAt: clock(),
+        replyExpiresAt: clock(),
+        noticeCursor: { status: 1, followupId: 0 },
+        mediaIds: [],
+        attachmentCount: 0,
+        availableAt: clock(),
+        updatedAt: clock(),
+      },
+    });
+    await db.whatsAppInboundMessage.create({
+      data: {
+        messageId: "wamid.activity-window",
+        businessPhoneId,
+        senderBusinessId: recipient.value,
+        occurredAt: clock(),
+        receivedAt: clock(),
+        content: { type: "text", body: "Oi" },
+      },
+    });
+    let status = 2;
+    const ticket = () => ({
+      id: ticketId,
+      status,
+      title: "Contrato de experiência",
+    });
+    const lookup = vi
+      .fn<Parameters<typeof createClosureWorker>[2]>()
+      .mockImplementation(() =>
+        Promise.resolve({ kind: "ready", tickets: [ticket()] }),
+      );
+    const activity = vi.fn().mockImplementation(() =>
+      Promise.resolve({
+        followups: [{ id: 8, text: "Dados recebidos." }, { id: 9 }],
+        ...(status === 6 ? { solution: "Relatório atualizado." } : {}),
+      }),
+    );
+    const worker = () =>
+      createClosureWorker(
+        db,
+        { businessPhoneId, templateConfigured: false },
+        lookup,
+        clock,
+        activity,
+      );
+    await Promise.all([worker()(signal), worker()(signal)]);
+    const replies = (await db.whatsAppOutboundMessage.findMany()).flatMap(
+      ({ payload }) => (isOutboundPayload(payload) ? [payload] : []),
+    );
+    expect(
+      replies.find((reply) => reply.closure?.event === "followup")?.content
+        .body,
+    ).toContain("Resposta da equipe de TI:\nDados recebidos.");
+    expect(
+      replies.find((reply) => reply.closure?.event === "status")?.content.body,
+    ).toContain("Status: Em atendimento");
+    for (const reply of replies)
+      expect(reply.closure).toMatchObject({ consentId: grantId, ticketId });
+    expect(await db.whatsAppOutboundMessage.count()).toBe(2);
+    advance(closurePollIntervalMs);
+    status = 6;
+    expect(await worker()(signal)).toBe(true);
+    expect(
+      await db.whatsAppOutboundMessage.findUnique({ where: { id: draftId } }),
+    ).toMatchObject({
+      payload: {
+        content: {
+          type: "text",
+          body: "Atualização do seu chamado #781\n\nStatus: Fechado\nTítulo: Contrato de experiência\n\nSolução:\nRelatório atualizado.\n\nSeu chamado foi finalizado pela equipe de TI.",
+        },
+      },
+    });
+    advance(closurePollIntervalMs);
+    expect(await worker()(signal)).toBe(true);
+    expect(await db.whatsAppOutboundMessage.count()).toBe(3);
+    expect(
+      await db.whatsAppTicketSubmission.findUnique({ where: { draftId } }),
+    ).toMatchObject({
+      noticeCursor: { status: 6, followupId: 9 },
+    });
   });
 }, 120_000);

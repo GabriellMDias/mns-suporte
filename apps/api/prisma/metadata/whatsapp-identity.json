@@ -59,30 +59,53 @@
     "whatsapp_verified_identities": {
       "owner": "WhatsApp employee verification",
       "classification": "RESTRICTED",
-      "description": "Current proof of corporate mailbox control for a WhatsApp sender and its GLPI identity.",
-      "lifecycle": "Created or replaced only as a challenge is consumed. Proof expires after thirty days and requires a new challenge. Retention is release-plan work.",
+      "description": "Current proof associating a signed WhatsApp sender with a GLPI identity.",
+      "lifecycle": "Each sender can verify independently for the same GLPI user. A new proof issues a fresh link ID. Proof expires after thirty days or on administrative revocation.",
       "columns": {
         "scope_key": {
           "description": "Stable hash of the business phone ID and preferred sender identity.",
           "classification": "RESTRICTED"
         },
         "glpi_user_id": {
-          "description": "GLPI directory identity established by mailbox verification.",
+          "description": "GLPI directory identity established by mailbox verification or a matching directory phone.",
           "classification": "RESTRICTED"
         },
         "verified_at": {
-          "description": "Time the matching challenge was consumed.",
+          "description": "Time the current proof was recorded.",
           "classification": "INTERNAL"
         },
         "expires_at": {
           "description": "Time after which the link cannot authorize work.",
           "classification": "INTERNAL"
+        },
+        "link_id": {
+          "description": "Opaque administrative identifier for the current verification. Changes on re-verification to fence stale actions.",
+          "classification": "INTERNAL"
+        },
+        "phone_last_four": {
+          "description": "Last four digits of the number supplied by a signed WhatsApp message.",
+          "classification": "CONFIDENTIAL",
+          "nullMeaning": "Meta did not supply a phone number or no eligible historical message was retained."
+        },
+        "revoked_at": {
+          "description": "Time at which IT revoked this verification.",
+          "classification": "INTERNAL",
+          "nullMeaning": "The verification was not revoked."
+        },
+        "revoked_by": {
+          "description": "Verified administration principal that first revoked the current link.",
+          "classification": "CONFIDENTIAL",
+          "nullMeaning": "The current verification has no administrative revocation."
         }
       },
       "objects": {
         "whatsapp_verified_identities_pkey": "Maintains one current verified GLPI identity for a WhatsApp sender scope.",
         "whatsapp_verified_identities_user": "Requires a positive GLPI directory identity.",
-        "whatsapp_verified_identities_expiration": "Requires verification to precede expiration."
+        "whatsapp_verified_identities_expiration": "Requires verification to precede expiration.",
+        "whatsapp_verified_identities_phone_suffix": "Allows only a four-digit display suffix.",
+        "whatsapp_verified_identities_revocation": "Requires an attributable and chronologically valid revocation.",
+        "whatsapp_verified_identities_link_id_key": "Identifies each current verification with an opaque unique identifier.",
+        "whatsapp_verified_identities_user_links_idx": "Finds each independently verified WhatsApp sender associated with a GLPI user."
       }
     }
   },

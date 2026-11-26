@@ -42,6 +42,7 @@ export type ReplyAddress = {
   scopeKey: string;
   recipient: OutboundPayload["recipient"];
   expiresAt: Date;
+  requiredGlpiUserId?: number;
 };
 type Claim = {
   kind: "claim";
@@ -94,7 +95,7 @@ export async function verifiedUser(
   now: Date,
 ): Promise<number | undefined> {
   const link = await tx.whatsAppVerifiedIdentity.findUnique({
-    where: { scopeKey, expiresAt: { gt: now } },
+    where: { scopeKey, expiresAt: { gt: now }, revokedAt: null },
     select: { glpiUserId: true },
   });
   return link ? Number(link.glpiUserId) : undefined;
@@ -131,10 +132,24 @@ export async function applyMove(
       address.recipient,
       move.closurePreference,
       now,
+      move.closurePreference === "disable"
+        ? await verifiedUser(tx, address.scopeKey, now)
+        : undefined,
     );
   if (move.submission) {
     const { draftId, requesterId, title, description, mediaIds } =
       move.submission;
+    const preference = await tx.whatsAppClosurePreference.findUnique({
+      where: { scopeKey: address.scopeKey },
+    });
+    if (!preference)
+      await saveClosurePreference(
+        tx,
+        address.scopeKey,
+        address.recipient,
+        { requesterId },
+        now,
+      );
     const consent = await tx.whatsAppClosurePreference.findUnique({
       where: {
         scopeKey: address.scopeKey,
@@ -181,12 +196,19 @@ export async function applyMove(
       data: { ...move.feedback, recordedAt: now },
       skipDuplicates: true,
     });
+  const requiredGlpiUserId =
+    address.requiredGlpiUserId ??
+    (move.state.phase === "intake" ? move.state.draft?.ownerId : undefined);
   if (move.reply && address.expiresAt > now)
     await enqueueWhatsAppReply(tx, {
       id: randomUUID(),
       businessPhoneId,
       expiresAt: address.expiresAt,
-      payload: { recipient: address.recipient, content: move.reply },
+      payload: {
+        recipient: address.recipient,
+        content: move.reply,
+        ...(requiredGlpiUserId === undefined ? {} : { requiredGlpiUserId }),
+      },
     });
 }
 
@@ -247,6 +269,10 @@ export function createConversationProcessor(
         const move = routeConversation(state, input, {
           userId,
           supportContact,
+          noticesEnabled: !(await tx.whatsAppClosurePreference.findUnique({
+            where: { scopeKey: address.scopeKey, revokedAt: { not: null } },
+            select: { scopeKey: true },
+          })),
           draftId: randomUUID(),
           now,
         });
@@ -345,8 +371,8 @@ export function createConversationProcessor(
         });
         return;
       }
-      if (action !== "CONFIRM_CODE") return;
-      // If the worker restarted after consuming the code, the durable link
+      if (action !== "CONFIRM_CODE" && action !== "REQUEST_CODE") return;
+      // If the worker restarted after verifying the sender, the durable link
       // is the source of truth for the response.
       const userId = await verifiedUser(tx, address.scopeKey, now);
       const state = await stateFor(tx, address.scopeKey);
@@ -354,7 +380,11 @@ export function createConversationProcessor(
         tx,
         address,
         businessPhoneId,
-        finishVerification(state, userId),
+        finishVerification(
+          state,
+          userId,
+          action === "REQUEST_CODE" ? "email" : "code",
+        ),
         now,
       );
     });

@@ -1,12 +1,54 @@
 # V1 Deployment and Recovery
 
-The operator authorized for the MNS Suporte Compose project owns these procedures. They apply to the packaged API, migration job, PostgreSQL, maintenance worker and encrypted backup job. Company ingress, log routing and secret-store access are pilot prerequisites. Follow the [production access policy](../security/production-access.md) and [incident response policy](../security/incident-response.md).
+The operator authorized for the MNS Suporte Compose project owns these procedures. They apply to the packaged API, migration job, PostgreSQL, maintenance worker and encrypted backup job. A company deployment requires company ingress, log routing and secret-store access. Follow the [production access policy](../security/production-access.md) and [incident response policy](../security/incident-response.md).
 
 ## Disposable rehearsal
 
 Run `pnpm ops:rehearse` from the repository root with Docker Compose and `tar` available. The command builds the current images and the preceding Git revision as an API image. Use `MNS_REHEARSAL_PREVIOUS` to select a tested compatible revision when the immediate parent is unsuitable. CI uses its comparison base.
 
 The rehearsal uses two generated project names, isolated database volumes, temporary synthetic credentials and ephemeral loopback ports. It checks API readiness, production startup with missing settings, database grants, retention, sanitized alerts, encrypted backup integrity, a restore into a fresh volume and a rollback to the previous image with the original volume intact. It removes only its generated projects and temporary artifacts.
+
+## Local webhook pilot
+
+Use this procedure for the authorized Meta test number. The local receiver starts against the dedicated `mns_suporte` PostgreSQL on `127.0.0.1:55432`. It uses the webhook signing secret and verification token from the ignored `.env.local`. The receiver has no outbound WhatsApp, GLPI, or SMTP credentials, so it can acknowledge signed callbacks without dispatching replies or creating tickets. The full conversation pilot requires separately authorized test data and delivery.
+
+1. Confirm the local PostgreSQL container is healthy, `.env.local` selects its restricted runtime role, and Meta identifies the configured phone number and app as the intended pilot assets. Confirm the app's existing callback and fields before requesting a change. A callback configured on the app applies to its subscribed accounts. Keep established integrations on their authorized endpoints.
+2. From the repository root, generate and build the API, then start the pilot with the approved Phone Number ID. Run this in the foreground for a manual session.
+
+   ```powershell
+   pnpm db:generate
+   pnpm -C apps/api build
+   $pilotPhoneId = Read-Host 'Authorized Meta pilot Phone Number ID'
+   node infra/pilot-webhook.mjs $pilotPhoneId
+   ```
+
+   Cloudflared must be available on `PATH`. The script prints `local_api_ready` after checking the API's loopback health and `pilot_callback` when the temporary HTTPS URL is allocated. Share only the callback URL. The loopback proxy admits `GET` and `POST` on the exact `/webhooks/whatsapp` path.
+
+3. Check that the public `/health/ready` returns 404, an invalid challenge token and an unsigned POST return 403, and the actual verification token echoes the challenge. A signed empty envelope should return `EVENT_RECEIVED`. Construct those requests from the ignored file in memory and record only the statuses.
+4. Configure the exact HTTPS callback and existing verification token in the authorized Meta app once its confirmation gate is satisfied. Confirm that `messages` is listed and that the app is subscribed to the pilot phone's WhatsApp Business Account. Record the verified callback response separately from a delivered WhatsApp message. For a test sent to an approved recipient, confirm delivery from the associated local outbox record after a signed Meta status callback.
+5. Before closing an active pilot, remove the temporary callback in the Meta app or restore its authorized prior callback. End the foreground session with Ctrl+C. For a background session with a recorded PID on Windows, stop the verified launcher and its children from the repository root.
+
+   ```powershell
+   $pilotProcessId = [int](Get-Content -Raw -LiteralPath '.env.local.d/pilot.pid')
+   $pilotProcess = Get-CimInstance Win32_Process -Filter "ProcessId=$pilotProcessId"
+   if ($pilotProcess.Name -eq 'node.exe' -and $pilotProcess.CommandLine -match 'infra[/\\]pilot-webhook\.mjs\s') {
+     taskkill.exe /PID $pilotProcessId /T /F
+   }
+   ```
+
+   Verify the public URL is unavailable after stopping.
+
+### Resume after a restart
+
+If the launcher is gone after a workstation restart, confirm the same dedicated PostgreSQL is healthy and start the receiver again using steps 1–3. Reuse the existing database so verified identities, consent and delivery history survive. Each Quick Tunnel launch allocates a new URL. In the authorized Meta app, replace the previous pilot callback with the newly printed `pilot_callback`. In the dashboard, open **Configure Webhooks**, reenter `WHATSAPP_WEBHOOK_VERIFY_TOKEN` from `.env.local` in **Verify token**, then select **Verify and save**. Do not share the token or change the existing `messages` subscription to rotate the URL.
+
+Confirm that the app shows the new URL, `messages` is still subscribed, and the intended WhatsApp Business Account still lists the app. Then use a Meta test event or a new message from the authorized participant to verify receipt through the new tunnel. A direct challenge against the URL checks reachability and token acceptance. Meta delivery also requires its saved callback and a signed POST.
+
+For a manual inbound test, the approved participant replies `Oi` to the test message or sends it to the pilot number. Verify that the signed callback was acknowledged and the inbound count for the pilot number increased in the local database. The receiver only acknowledges webhooks. Guided replies and GLPI submission belong to the separately authorized full conversation pilot.
+
+In the full conversation pilot, start onboarding with `Oi` and submit the corporate email from each WhatsApp account. Use one number listed uniquely on the corresponding active GLPI user and another number that is absent from the directory. Verify that the listed number receives the menu without email delivery and the unlisted number requires its own code. Inspect both links under the same GLPI user in MNS Suporte.
+
+For the next live checks, use an approved corporate mailbox and verify receipt of its test code separately from SMTP authentication. Use the GLPI homologation environment, or obtain explicit authorization for the legacy environment and the synthetic record scope. Record the approved requester and unique draft reference before the first submission. Confirm the resulting ticket ID in GLPI. If the create outcome is ambiguous, search for that reference before considering another create request. Enable the closure template only after Meta reports approval for the pilot account.
 
 ## Deploy
 

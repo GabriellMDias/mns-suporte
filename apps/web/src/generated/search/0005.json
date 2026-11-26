@@ -1,5 +1,275 @@
 [
   {
+    "id": "repository/docs/architecture/configuration",
+    "title": "Configuration",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Evolution and Operational Changes",
+    "anchor": "evolution-and-operational-changes",
+    "text": "Evolution and Operational Changes\nConfiguration changes can break deployment or rollback even without code changes. For a rename/removal, identify old/new applications, supported rolling/rollback combinations, CI, local examples, deployment scripts, secret stores, and documentation. Introduce replacements, support both temporarily if required, migrate consumers, then remove old usage/configuration/secrets. Do not remove keys while a supported old version still requires them or retain unused keys indefinitely. Follow [compatibility policy](versioning-and-compatibility.md), including coordinated database/configuration transitions.\nA separate configuration schema version is justified only if independently managed configuration needs it; application releases and Git may suffice. Deployment definitions, when introduced, should expose requirements and reject invalid mandatory configuration before activation. Validate secret presence/references without exposing values.\nPrefer static startup configuration initially. Dynamic/remote configuration creates availability, authentication, caching, fallback, consistency, concurrency, rollback, auditability, and test obligations. If introduced, distinguish startup-only, reloadable, and process-immutable values. High-impact changes need risk-appropriate safe audit context (key, actor/system, time), not secret old/new values. Feature flags need explicit rollout/removal criteria unless they are permanent product settings; they are not automatically ordinary environment variables.\n"
+  },
+  {
+    "id": "repository/docs/architecture/configuration",
+    "title": "Configuration",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Verification and Enforcement",
+    "anchor": "verification-and-enforcement",
+    "text": "Verification and Enforcement\nTests construct explicit configuration and synthetic credentials instead of relying on machine state. Unit tests inject the minimum values; parser tests exercise missing/invalid input, defaults, secret-safe errors, conditional modes, and cross-field behavior. Integration tests exercise the actual ingestion boundary with isolated resources. CI jobs receive only the settings/credentials they require, never unrelated production access.\nClient builds must reject attempts to import or embed server-only/restricted configuration. Implemented checks include API parser tests, generated-reference freshness, `pnpm env:example:check`, and the web [bundle marker check](../../apps/web/scripts/check-bundle.mjs). The example check compares safe placeholders/defaults with API metadata; it does not validate deployed environments. The bundle check detects known server-only markers, not every possible leak. Direct environment access outside approved modules and full secret/classification metadata coverage remain review responsibilities; no dedicated lint rule or deployed-configuration validator currently proves them. These limits do not relax the policy.\n"
+  },
+  {
+    "id": "repository/docs/architecture/configuration",
+    "title": "Configuration",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "New Configuration Checklist",
+    "anchor": "new-configuration-checklist",
+    "text": "New Configuration Checklist\nBefore adding a setting, establish its concrete variability requirement, owning application, consumers, type/units, required/default behavior, classification/secret/client visibility, environment scope, change/restart behavior, validation, tests, documentation, and compatibility impact. Consider whether the value belongs in application data or can remain fixed. Every option expands the behavior space; keep only justified configuration and update its canonical source and derived representations together.\n"
+  },
+  {
+    "id": "repository/docs/architecture/continuous-integration",
+    "title": "Continuous Integration",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Continuous Integration",
+    "anchor": "continuous-integration",
+    "text": "Continuous Integration\nThis page owns the map from repository CI configuration to the accepted policy in [ADR-0011](../adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy.md). See [validation availability](../validation.md) for local commands. Effective remote settings and completed-run evidence have a separate owner in the repository's human-action checklist (linked from the README's [Current state](../../README.md#current-state)).\n"
+  },
+  {
+    "id": "repository/docs/architecture/continuous-integration",
+    "title": "Continuous Integration",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Current implementation and activation",
+    "anchor": "current-implementation-and-activation",
+    "text": "Current implementation and activation\nThe [repository workflow](../../.github/workflows/ci.yml) validates pull requests to `main`, pushes to `main`, merge-queue commits, and manual dispatches. It uses repository-pinned Node.js/pnpm and frozen installation, installs Playwright Chromium/system libraries, and runs `pnpm validate` on GitHub-hosted Ubuntu. It fetches Git history and supplies the base commit for release-history validation. The stable branch-protection check name is **Orion required gate**; it fails if validation fails or does not finish successfully. Superseded pull-request runs are cancelled; primary-branch runs are not. No diagnostic artifacts are uploaded. Future uploads need bounded retention and must exclude secrets/sensitive data.\nThe workflow passes the PR base SHA, merge-group base SHA, or `github.event.before` unchanged to the release-history validator. That shared validator handles GitHub's first-push zero-SHA sentinel under the [release-history rules](../database/release-evolution.md#record-the-first-durable-migration-boundary), so local and CI checks enforce the same missing-base and append-only protections. Manual dispatches without an explicit base use the validator's local Git-base discovery.\nThe dependency-review job runs on pull requests when `DEPENDENCY_REVIEW_ENABLED=true` and blocks newly introduced high/critical vulnerabilities. The aggregate gate treats an enabled review that fails or skips as a failure. The repository's human actions record dated evidence and how to reverify the variable, security settings, and actual review execution.\nThe [Renovate configuration](../../renovate.json) selects the recommended baseline, Dependency Dashboard, weekly routine cadence, grouped compatible TypeScript/lint updates, majors requiring dashboard approval, SHA-pin maintenance, and no automerge. Vulnerability-remediation pull requests are not held to the routine schedule. The repository's human actions own app activation/Dashboard and effective branch-protection evidence.\nCommitted workflow/configuration does not prove current GitHub activation, entitlement, branch protection, or a successful remote run. Effective settings belong to each repository: a project derived from Orion inherits this configuration but none of Orion's activation evidence, and tracks its own settings in its [project human actions](../project-derivation.md#content-ownership). Reverify effective settings when relying on them; do not turn dated acceptance evidence into an undated live assertion.\n"
+  },
+  {
+    "id": "repository/docs/architecture/continuous-integration",
+    "title": "Continuous Integration",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Read for this change",
+    "anchor": "read-for-this-change",
+    "text": "Read for this change\nChange\nGoverning decision section\nLocal/CI command parity and incremental capabilities\n[Canonical validation contract](../adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy.md#canonical-validation-contract)\nRequired PR gate, primary-branch checks, manual runs\n[Pull-request validation](../adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy.md#pull-request-validation) and [required gate](../adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy.md#required-ci-gate)\nRunner, versions, lockfile, caching, concurrency\n[Execution environment](../adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy.md#ci-execution-environment) through [pull-request concurrency](../adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy.md#pull-request-concurrency)\nIntegration/browser tests and artifacts\n[Integration infrastructure](../adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy.md#integration-test-infrastructure) and [testing strategy](testing-strategy.md)\nPermissions, action pins, untrusted PRs, secrets, OIDC\n[Actions security](../adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy.md#github-actions-security)\nRenovate cadence, grouping, majors, automerge, lockfiles\n[Dependency automation](../adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy.md#dependency-automation)\nDependency review, scanning, feature availability, licenses\n[Dependency security alerts](../adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy.md#dependency-security-alerts) and subsequent security sections\nValidation mutations, reusable workflows, CI versus CD\n[CI-generated modifications](../adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy.md#ci-generated-modifications) and [continuous delivery](../adr/0011-establish-continuous-integration-dependency-automation-and-supply-chain-security-strategy.md#continuous-delivery)\n"
+  },
+  {
+    "id": "repository/docs/architecture/continuous-integration",
+    "title": "Continuous Integration",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Policy boundaries",
+    "anchor": "policy-boundaries",
+    "text": "Policy boundaries\nGitHub Actions uses the same repository validation capabilities as local development. GitHub-hosted Linux is the initial runner, with repository-pinned versions and frozen lockfile installation. The primary branch must require the stable aggregate gate; effective activation is verified separately as described above. Validation must not silently fix tracked sources.\nRenovate owns version-update automation, with routine weekly grouping and automerge disabled initially. Dependabot vulnerability alerts are a separate capability, not a second version-update system. GitHub security features retain the availability and entitlement qualifications in the ADR; paid security features are not a mandatory architectural dependency.\nDeployment, release approvals, rollback environments, and CD remain deferred until concrete deployment requirements exist. Use [secrets management](../security/secrets-management.md), [production access](../security/production-access.md), and [retention](../security/data-retention.md) for those cross-cutting policies. Local validation commands are listed in [validation](../validation.md); remote run results and effective settings must be verified separately.\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Delivery and Side Effects",
+    "anchor": "delivery-and-side-effects",
+    "text": "Delivery and Side Effects\n[Documentation index](../README.md) · [Transactions and concurrency](../database/transactions-and-concurrency.md) · [Compatibility](versioning-and-compatibility.md)\nThis page owns cross-system delivery, idempotency, retry, and crash recovery. Database atomicity, isolation, constraints, locking, and transaction retries belong to [transaction policy](../database/transactions-and-concurrency.md); HTTP representation belongs to [API principles](../api/principles.md). These requirements do not select a broker or require inboxes, outboxes, sagas, or distributed locks without a concrete need.\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Idempotency",
+    "anchor": "idempotency",
+    "text": "Idempotency\nIdempotency means repeated application has no additional unintended effect, not merely an identical HTTP response. Setting a state may be naturally idempotent; incrementing a balance usually is not. Client/proxy/SDK retries and user double submission can repeat requests even when the UI disables a button. The server must protect non-repeatable operations.\nWhen using an idempotency key, define its generator, logical operation, scope (such as actor/tenant/operation), durable storage/uniqueness, concurrent-first-attempt behavior, payload mismatch handling, replay result, and tests. In-memory deduplication cannot survive multiple instances or restarts. A uniqueness constraint is stronger than an unprotected check-then-insert. Reusing a key for a materially different intention should normally fail; a canonical request fingerprint can detect this.\nA replay may return the original result or current resource state according to the operation contract. Define retention from retry windows, business risk, semantics, and storage cost under [retention policy](../security/data-retention.md). Critical idempotency guarantees must not silently expire before supported retries.\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Delivery Guarantees",
+    "anchor": "delivery-guarantees",
+    "text": "Delivery Guarantees\nAt-least-once delivery permits duplicates; consumers must tolerate them. At-most-once delivery permits loss and is appropriate only if the domain accepts it. Exactly-once behavior is an end-to-end claim across delivery, durable writes, and external effects, not merely a broker setting. Claim it only with evidence for the complete workflow.\nAn inbox/processed-message record can deduplicate by atomically recording an event identity with its protected business effect. Producers and consumers need explicit event ownership, canonical schema, ordering, delivery, and compatibility. Webhooks may repeat, arrive concurrently, or arrive out of order.\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Outbox Pattern",
+    "anchor": "outbox-pattern",
+    "text": "Outbox Pattern\nWhen a committed change requires eventual publication, record the state change and publication intent in the same transaction/ownership boundary, then publish that durable intent. The producing capability owns event meaning; the outbox mechanism is infrastructure. Define claiming, bounded retries, ordering, failure recovery, retention, and observability; an outbox must not grow forever without policy.\nAn outbox can publish twice after a lost acknowledgement, so consumers may still need deduplication. Introduce inbox/outbox infrastructure only when reliability requirements justify its complexity.\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Transactions and Domain Events",
+    "anchor": "transactions-and-domain-events",
+    "text": "Transactions and Domain Events\nPublishing before commit can expose a fact whose transaction later fails. Publishing only after commit can lose the event if the process crashes in between. Required durable events need a mechanism that covers this gap, such as transactional recording.\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "After-Commit Work",
+    "anchor": "after-commit-work",
+    "text": "After-Commit Work\nAn `afterCommit` callback is best effort in the current process; it does not guarantee an external effect survives a crash. Persist intent when the effect is required durably.\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Work Claiming",
+    "anchor": "work-claiming",
+    "text": "Work Claiming\nShared workers must coordinate with row locks, conditional updates, queue ownership, or leases where concurrent processing would be unsafe. Leases need explicit expiration, renewal, stale-worker, and reclaim behavior; they do not make external effects safe by themselves.\nPoison jobs must reach a bounded attempt limit and an identifiable failure/dead-letter/manual-recovery state. Distinguish transaction contention from business rejection. Stop accepting/claiming work during shutdown, and finish or safely release in-flight work according to queue semantics. A crash must not silently lose claimed work.\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Queue Visibility Timeout",
+    "anchor": "queue-visibility-timeout",
+    "text": "Queue Visibility Timeout\nA queue can redeliver when processing outlives its visibility timeout or lease. Account for long work, renewal, stale ownership, and duplicate execution.\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Distributed Scheduling",
+    "anchor": "distributed-scheduling",
+    "text": "Distributed Scheduling\nDefine whether each instance runs a schedule or one logical execution runs globally. Schedulers do not necessarily coordinate across instances. Singleton jobs need crash-tolerant claims/ownership; overlapping runs must be explicitly allowed, forbidden, coalesced, or queued.\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Ordering and Versioned Events",
+    "anchor": "ordering-and-versioned-events",
+    "text": "Ordering and Versioned Events\nDo not assume ordering without a guarantee for the relevant partition/scope. Define the ordering key, reordering tolerance, and whether stale events are ignored, reconciled, or rejected. Correctness may require sequence numbers, versions, or state checks.\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Versioned Events",
+    "anchor": "versioned-events",
+    "text": "Versioned Events\nAn aggregate version can help detect duplicate, stale, or out-of-order events; it is not mandatory for every event. Retained event/job schemas also follow [compatibility policy](versioning-and-compatibility.md).\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Unknown Outcome",
+    "anchor": "unknown-outcome",
+    "text": "Unknown Outcome\nA timeout or connection loss after sending a mutation can mean failure or success with a lost response. Preserve an unknown outcome when it affects retry safety. Resolve it through idempotency, status lookup, or reconciliation rather than treating it as a known failure.\nClassify effects as read-only, idempotent writes, non-idempotent writes, or external effects when that clarifies behavior; a formal type system is not required. A transient transport error alone does not make the business operation safe to repeat.\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Application Retry Boundary",
+    "anchor": "application-retry-boundary",
+    "text": "Application Retry Boundary\nRetrying a broad application operation must not repeat payments, notifications, or other external mutations unless protected by appropriate idempotency.\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Retry Ownership",
+    "anchor": "retry-ownership",
+    "text": "Retry Ownership\nNormally one layer owns retries for a given failure. Inspect driver, repository, service, SDK, proxy, and client retry behavior so nested attempts do not multiply unnoticed. Define the transient category, safe repeat conditions, bounded attempt/time budget, telemetry, and final-failure behavior.\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "New Retry Checklist",
+    "anchor": "new-retry-checklist",
+    "text": "New Retry Checklist\nBefore adding retries, establish: why the failure is transient; whether the prior attempt could have succeeded; repeat safety/idempotency; existing retry owners; attempt limit; diagnostic context; and what happens after exhaustion. Retrying must not amplify an outage.\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Distributed Workflows and Recovery",
+    "anchor": "distributed-workflows-and-recovery",
+    "text": "Distributed Workflows and Recovery\nA multi-system workflow must name the authority for each fact, atomic and non-atomic changes, partial failures, duplicate/retry handling, discoverable incomplete state, crash behavior, and operational recovery. Reconciliation detects and repairs divergence according to those authorities; it is a safety net, not an excuse for avoidable inconsistency.\nA saga may coordinate independently committed steps through orchestration or event choreography; neither is the default. Persist long-running workflow state when needed so incomplete work is discoverable. Compensation is a new business action, not a database rollback, and may fail. Define its trigger, idempotency, retries, failure state, and manual recovery.\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Failure Windows",
+    "anchor": "failure-windows",
+    "text": "Failure Windows\nFor important workflows, inspect crashes after a durable write, before acknowledgement, and after an external effect but before local confirmation. Cover each unacceptable loss/duplication window deliberately. Database-commit/publication and external-mutation/local-write gaps are ordinary design cases.\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Verification",
+    "anchor": "verification",
+    "text": "Verification\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Idempotency Tests",
+    "anchor": "idempotency-tests",
+    "text": "Idempotency Tests\nVerify the initial effect, duplicate suppression, compatible replay result, differing-payload conflict where required, and concurrent first attempts. Consumer tests must exercise duplicate delivery and stale/reordered events when relevant.\nRetry tests verify transient retry, permanent-failure rejection, bounded attempts, and no duplicate effects. High-risk workflows should exercise crash recovery, dead letters, replay, and manual recovery procedures where they exist.\n"
+  },
+  {
+    "id": "repository/docs/architecture/delivery-and-side-effects",
+    "title": "Delivery and Side Effects",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Reconciliation Tests",
+    "anchor": "reconciliation-tests",
+    "text": "Reconciliation Tests\nCreate divergent external/internal states deliberately and verify the documented authority and repair behavior. Test failed compensation and incomplete workflows when those mechanisms exist.\n"
+  },
+  {
+    "id": "repository/docs/architecture/dependency-rules",
+    "title": "Dependency Rules",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Dependency Rules",
+    "anchor": "dependency-rules",
+    "text": "Dependency Rules\n[Documentation index](../README.md) · [Application boundaries](application-boundaries.md) · [Validation](../validation.md)\nThis page owns allowed dependency directions and their enforcement. A resolving import or passing build does not grant architectural permission. Dependencies must follow explicit ownership, public contracts, and runtime compatibility. [ADR-0003](../adr/0003-establish-repository-validation-and-architecture-enforcement.md) selects the enforcement tools; the [technology map](technology-decisions.md) routes stack-specific decisions.\n"
+  },
+  {
+    "id": "repository/docs/architecture/dependency-rules",
+    "title": "Dependency Rules",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Dependency Matrix",
+    "anchor": "dependency-matrix",
+    "text": "Dependency Matrix\nFrom\nTo\nDefault\n`apps/*`\nPublic APIs of compatible `packages/*`\nAllowed\nOne application\nAnother application's implementation\nForbidden\n`packages/*`\n`apps/*`\nForbidden\nOne package\nAnother package\nRequires aligned responsibility, public API, and no cycle\n`tooling/*`\nApplication/package source\nAllowed for repository tooling\nApplication/package runtime\n`tooling/*` or `infra/*`\nForbidden\nInfrastructure definitions\nApplication artifacts/configuration requirements\nAllowed when infrastructure exists\nDocumentation\nImplementation references\nAllowed\nOrdinary application behavior\nParsed human-authored policy\nForbidden by default; documentation-as-product is an intentional exception\nDistinguish compile-time imports, runtime communication, development-only dependencies, and generation inputs. An API runtime dependency does not justify importing its implementation. Test/build/generation tools must not leak into production execution. Generated artifacts depend on their canonical input; that input must not depend back on the output except in an explicitly designed pipeline. Rendering generated documentation in the portal does not make it the source of application behavior.\n"
+  },
+  {
+    "id": "repository/docs/architecture/dependency-rules",
+    "title": "Dependency Rules",
+    "group": "Architecture",
+    "kind": "repository",
+    "heading": "Application Internal Dependency Direction",
+    "anchor": "application-internal-dependency-direction",
+    "text": "Application Internal Dependency Direction\nOuter delivery adapters normally depend on application behavior and stable domain concepts. Infrastructure implements capabilities needed by the application; bootstrap selects and wires concrete adapters. Stable business behavior must not become dependent on HTTP, ORM records, application bootstrap, or vendor details without architectural justification.\nDirect imports are suitable for stable pure dependencies. Inject replaceable infrastructure where that clarifies ownership/testing, without introducing a framework or an interface for every class. Pass only the configuration a capability needs. Avoid ambient configuration, global registries, service locators, mutable singletons, and arbitrary initialization of unrelated infrastructure.\nClient pages/features use the SDK/client boundary rather than having generic UI components issue arbitrary backend calls. Persistence interfaces protect meaningful ownership or behavior; do not introduce a repository abstraction for every table. ORM records, domain entities, wire contracts, and view models may share a representation only when their semantics actually align.\nProvider SDKs belong near meaningful integration boundaries. An adapter should express an application capability, not duplicate a vendor API simply to hide its name. Domain telemetry must not unnecessarily couple business behavior to a particular telemetry vendor.\n"
+  },
+  {
     "id": "repository/docs/architecture/dependency-rules",
     "title": "Dependency Rules",
     "group": "Architecture",
@@ -907,158 +1177,5 @@
     "heading": "Test Maintenance and Diagnostics",
     "anchor": "test-maintenance-and-diagnostics",
     "text": "Test Maintenance and Diagnostics\nName tests for behavior, arrange clear inputs/action/outcomes, and assert the actual result/effect/error code. One coherent behavior can need several assertions. A test should fail for a meaningful defect, remain understandable, and add distinct confidence; some cross-layer overlap is justified for critical guarantees.\nFlakiness is a defect. Retries may diagnose environmental instability but must not conceal it. A temporary quarantine needs owner, reason, tracking issue, and removal condition. Skips must be explicit; core correctness cannot disappear because infrastructure is missing. Remove tests only when the protected behavior deliberately changes/disappears, stronger coverage replaces them, or they test obsolete implementation details. Never weaken valid tests to make a change pass.\nTreat a failure as evidence: investigate implementation, expectation, intentional contract change, or environment, and reproduce CI locally when possible. Diagnostics should show behavior, expected/actual result, and safe identifiers without noisy dumps. Reports, screenshots, traces, source maps, and logs follow classification/access/retention rules. Current CI does not upload diagnostic artifacts; future uploads need bounded retention.\nKeep tests near the owning feature/application; system journeys may have dedicated suites. Shared test infrastructure must have genuine reuse. Document complex suite prerequisites, commands, debugging, and limitations; avoid a speculative taxonomy or orchestrator. Measure/optimize slow suites when feedback cost becomes material, without sacrificing isolation or correctness. Any future affected-test selection must preserve complete dependency coverage rather than trading correctness for speed.\n"
-  },
-  {
-    "id": "repository/docs/architecture/testing-strategy",
-    "title": "Testing Strategy",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Canonical Test Commands",
-    "anchor": "canonical-test-commands",
-    "text": "Canonical Test Commands\n[Validation](../validation.md) owns the available script list and prerequisites; [setup](../setup.md) owns reproducible installation/browser/container preparation. Iterate with the relevant owning package command, then run the repository-required `pnpm validate` gate before substantial completion. CI calls the same gate. Runtime tests do not replace TypeScript, architectural checks, or generated-source validation.\nThe repository gate includes API tests, web Node/browser tests, emitted builds/smokes, and full E2E. Release-history tests intentionally use Node's built-in runner for isolated tooling. No generic root `test:integration` or coverage command should be assumed. Report missing prerequisites, failed checks, and unrun remote checks honestly.\nCoverage percentages and branch coverage can reveal missing paths but cannot prove assertions, authorization, or concurrency correct. Use risk-based review instead of arbitrary targets. A complete change preserves meaningful tests, contracts, architecture, and the broader [completion criteria](../contributing.md#change-workflow).\n"
-  },
-  {
-    "id": "repository/docs/architecture/testing-strategy",
-    "title": "Testing Strategy",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Initial Testing Policy",
-    "anchor": "initial-testing-policy",
-    "text": "Initial Testing Policy\nThe implemented baseline above remains the default for new features. Additional suites must serve actual risk; load/stress tests run only in isolated authorized environments, never as accidental production traffic. Never run destructive integration suites against production data. Any production test must be narrowly scoped and safe, such as an authorized synthetic health check. Production synthetic monitoring and deployment validation require separate operational design and authority; this testing strategy does not start deployment work.\n"
-  },
-  {
-    "id": "repository/docs/architecture/versioning-and-compatibility",
-    "title": "Versioning and Compatibility",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Versioning and Compatibility",
-    "anchor": "versioning-and-compatibility",
-    "text": "Versioning and Compatibility\n[Documentation index](../README.md) · [API versioning](../api/versioning.md) · [Database release evolution](../database/release-evolution.md)\nCompatibility protects consumers that cannot change atomically. This page owns cross-boundary evolution; API, database, configuration, and security policies own their specific contracts. Prefer compatible evolution over reflexively adding versions or preserving obsolete internal interfaces forever. Significant support/versioning strategies require an ADR; ordinary compatible changes do not.\n"
-  },
-  {
-    "id": "repository/docs/architecture/versioning-and-compatibility",
-    "title": "Versioning and Compatibility",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Compatibility Boundary",
-    "anchor": "compatibility-boundary",
-    "text": "Compatibility Boundary\nIdentify the producer, consumer, canonical contract, independent deployment/distribution, persisted-state lifetime, release status, support window, and rollback requirements. Internal monorepo code can often change atomically; installed clients, queued jobs, durable database state, published SDKs, external automation, and independently managed configuration cannot necessarily do so.\nCompatibility includes structure, meaning, behavior, wire serialization, source compilation, security, and operational assumptions such as capacity or startup requirements. An additive field can still break a strict consumer; an unchanged string type can conceal changed meaning. Binary compatibility becomes relevant only if compiled/native artifacts are distributed.\nDefine the required combinations explicitly: new provider with old consumer, old reader with new data, and both directions during overlap where necessary. No universal compatibility matrix or global system version is required. Application release, API version, database migration state, SDK/package version, and configuration schema version serve different purposes; a release can identify a compatible set without changing all their versions.\n"
-  },
-  {
-    "id": "repository/docs/architecture/versioning-and-compatibility",
-    "title": "Versioning and Compatibility",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Released vs Unreleased Behavior",
-    "anchor": "released-vs-unreleased-behavior",
-    "text": "Released vs Unreleased Behavior\n“Released” includes behavior deployed, persisted, published, installed, queued, or consumed independently, not only public release. Verified unreleased contracts may be refined when no durable consumer depends on them. Git preserves development history; ADRs preserve decisions; migration history preserves durable database transitions. Released contracts may evolve compatibly, but released migrations retain their distinct immutability requirements.\nCurrent API, SDK, and web code evolve together. The [release registry](../../apps/api/prisma/release-history.json) records durable database releases; absence of an entry is not proof that no persistent environment exists. Verify release status before editing migration history. [Release evolution](../database/release-evolution.md) owns the evidence and upgrade procedure. No published SDK versioning scheme, released API baseline, client-support period, or production rollback window is implied by current scripts.\n"
-  },
-  {
-    "id": "repository/docs/architecture/versioning-and-compatibility",
-    "title": "Versioning and Compatibility",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Expand–Migrate–Contract",
-    "anchor": "expandmigratecontract",
-    "text": "Expand–Migrate–Contract\nFor changes that cannot occur atomically:\n**Expand:** introduce compatible fields, schema capabilities, accepted payloads, configuration, or infrastructure while existing consumers still work.\n**Migrate:** update readers/writers/consumers, backfill durable data, and switch traffic or activation in a safe order.\n**Contract:** remove old behavior only after supported consumers, retained data, and rollback obligations no longer need it.\nSpecify the application/schema/configuration/infrastructure state at each step. Rolling/canary deployment creates mixed versions; blue-green can shorten but does not eliminate compatibility during shared data use, traffic switches, or rollback. Feature flags may separate activation from deployment but do not solve incompatible data formats.\nTemporary adapters, dual reads/writes, legacy config fallbacks, and feature flags need identifiable ownership, purpose, tests, tracking, and removal conditions. Define the canonical representation, failure handling, and reconciliation for dual writes. Fallback reads must not conceal an incomplete migration indefinitely. Preserve durable meaning; compatibility is never a justification for silent data loss.\nChoose and document rollback or forward recovery for a significant transition. Application rollback does not undo a schema migration or recover dropped data. Do not contract schema/configuration while a supported rollback application still needs it. Before activating a new writer, ask whether old readers can understand its output; delaying new writes may be necessary even when new readers understand old data.\n"
-  },
-  {
-    "id": "repository/docs/architecture/versioning-and-compatibility",
-    "title": "Versioning and Compatibility",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Persisted Data Compatibility",
-    "anchor": "persisted-data-compatibility",
-    "text": "Persisted Data Compatibility\nDatabase enums/JSON, cached documents, events, job payloads, sessions, stored files, and encrypted serialization can outlive the code that wrote them. Determine which old shapes actually exist, where they live, their retention/replay lifetime, which versions read them, whether they can be migrated/rebuilt, and how both read/write directions are tested.\nExplicit payload versions are useful when incompatible shapes coexist and parsing needs identification; do not add them to every record preemptively. Shape detection may suffice for simple transitions. Defaults must accurately represent historical meaning, not merely make deserialization succeed. Preserve unknown values or reject unsupported shapes explicitly instead of mapping them to an incorrect known state.\nEvents need an owned type, schema, meaning, producer, and consumers. Prefer compatible evolution when consumers permit it; a different business fact deserves a semantic new event type rather than a misleading version of the old one. Queues, logs, dead letters, archives, and replay extend compatibility obligations; long-lived retries may span several releases. Consumers may ignore additive unknown fields only where the contract permits, never required semantics.\nCaches may be migrated, safely invalidated, or assigned new key namespaces; old namespaces must expire/be removed. Search indexes are derived state and may use reindexing, dual indexes, or alias switches instead of indefinite legacy support. Prefer mature standard serialization formats; custom binary formats need a concrete benefit and explicit compatibility design.\n"
-  },
-  {
-    "id": "repository/docs/architecture/versioning-and-compatibility",
-    "title": "Versioning and Compatibility",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Other Compatibility Surfaces",
-    "anchor": "other-compatibility-surfaces",
-    "text": "Other Compatibility Surfaces\nSurface\nRequired considerations\nPackages and SDK\nInternal atomic changes usually need no compatibility layer. Independently published packages need a deliberate distribution/version policy and intentional exports. SDK programming API compatibility and SDK-to-server compatibility are distinct; generated public interfaces can become commitments even though output is rebuildable.\nAPIs and public errors\nFollow [API versioning](../api/versioning.md). Consumer-visible errors, ordering, defaults, authorization, pagination, idempotency, and side effects can break without a schema diff.\nConfiguration\nNew required keys may need provisioning before code. Renames need deterministic old/new precedence; removal must preserve rollback. Follow [configuration policy](configuration.md).\nCredentials and identity\nIssuer, audience, claim, algorithm, key, token-lifetime, and session-format changes affect existing clients/sessions. Rotation may sign with new keys while accepting previous keys temporarily under security policy. Mass logout must be deliberate.\nAuthorization/classification\nPersisted permission identifiers may need migration. Review both tighter and looser access; apply stricter current data classification to telemetry, exports, analytics, access, and retention. Required security corrections can override compatibility, with impact managed explicitly.\nCLIs and scripts\nPublic command names, arguments, output, and exit codes can be contracts. Internal scripts within one revision may evolve atomically; external CI/operations consumers may not.\nInfrastructure/providers\nCoordinate resources and permissions before dependent consumers and remove them after migration. Provider API versions are dependencies, not this API's versions; test upgrades and track deprecation deadlines near the integration.\nToolchain/dependencies\nRuntime/compiler upgrades can affect output, library compatibility, and behavior. Use repository pins, lockfile, and frozen installation; assess actual breaking impact rather than trusting labels or allowing uncontrolled upgrades.\nGenerated references\nCanonical contract semantics govern compatibility, not incidental formatting. If external automation consumes a machine-readable artifact, its intended schema becomes explicit.\nSecurity takes priority over retaining vulnerable behavior. Safe release metadata should support correlation without conflating release identity with API/schema versions.\n"
-  },
-  {
-    "id": "repository/docs/architecture/versioning-and-compatibility",
-    "title": "Versioning and Compatibility",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Deprecation and Removal",
-    "anchor": "deprecation-and-removal",
-    "text": "Deprecation and Removal\nDeprecation needs a replacement, migration path, support/removal condition, and owner. Remove compatibility complexity once the real consumer is gone, not just because current source no longer uses it. Check installed clients, external users, queued/persisted historical shapes, and rollback; source search alone may be insufficient.\nUse safe runtime usage evidence when available. Telemetry can correlate release, operation, bounded contract/error category, migration, and configuration changes; it must not create unbounded labels for arbitrary consumer/payload identities. Alerts should reflect impact from unsupported clients or deployment ordering failures. Document supported versions only where support exists; metadata such as introduced/deprecated/replacement belongs in canonical contracts only when useful, never a parallel manually duplicated manifest.\n"
-  },
-  {
-    "id": "repository/docs/architecture/versioning-and-compatibility",
-    "title": "Versioning and Compatibility",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Compatibility Testing",
-    "anchor": "compatibility-testing",
-    "text": "Compatibility Testing\nTest actual supported combinations at their boundary: old request/new server, new application/transitional schema, old reader/new message, new worker/retained old job, active/deprecated configuration, or rollback application/current schema. Do not maintain arbitrary historical combinations. Use the real release baseline for migrations; fresh-install checks alone do not prove upgrade safety.\nReleased fixtures/baselines are immutable evidence, not snapshots to silently rewrite when tests fail. Add distinct historical shapes when necessary. Structural API comparisons, canonical event/schema checks, and property-based serializer tests can help where justified; semantic review remains required.\n`pnpm release:check` and its tests protect recorded migration/release history. Current API/SDK/reference freshness checks detect drift from current sources, not released-consumer compatibility. Dedicated historical API diffing, event versioning, and package-publication compatibility tooling are not selected merely by this policy.\nFail before unsafe work when a dependency/schema is unsupported and expose stable safe diagnostics. Prefer capability detection when the real dependency is a capability; numeric comparisons are appropriate only with precise version semantics. Accept supported old forms during transition, then reject removed forms explicitly rather than failing later with unrelated SQL/property errors.\n"
-  },
-  {
-    "id": "repository/docs/architecture/versioning-and-compatibility",
-    "title": "Versioning and Compatibility",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Breaking Change Checklist",
-    "anchor": "breaking-change-checklist",
-    "text": "Breaking Change Checklist\nBefore completing a compatibility-sensitive change, establish:\nConsumers, release evidence, independence, persistence/replay lifetime, and required direction/window.\nStructural, semantic, behavioral, operational, and security impact; whether atomic or additive evolution is possible.\nOrdered application, schema, configuration, infrastructure, credential, and message states, including new-writer/old-reader safety.\nRollback or forward-recovery expectations and any urgent security override.\nCanonical transition state, tests for supported combinations, safe usage evidence, and completion criteria.\nOwnership and removal conditions for every temporary compatibility path.\nDo not introduce `v2`, a package major, or a payload schema version merely to avoid this analysis. Compatibility exists to protect real consumers while keeping the foundation maintainable.\n"
-  },
-  {
-    "id": "repository/docs/architecture/web-components",
-    "title": "React Components and Design Practices",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "React Components and Design Practices",
-    "anchor": "react-components-and-design-practices",
-    "text": "React Components and Design Practices\n[Web application](../../apps/web/README.md) · [Living Documentation](living-documentation.md) · [Component reference](../generated/components/web.md)\nThis policy owns component reuse, classification, documentation and styling in the existing React application. It extends the application-owned UI direction in [ADR-0008](../adr/0008-select-react-vite-and-tanstack-for-web-applications.md) and the source/distribution separation in [ADR-0018](../adr/0018-isolate-internal-documentation-from-product-distribution.md). No separate UI package, framework, component vendor or theme provider is selected.\n"
-  },
-  {
-    "id": "repository/docs/architecture/web-components",
-    "title": "React Components and Design Practices",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Inspect before implementing",
-    "anchor": "inspect-before-implementing",
-    "text": "Inspect before implementing\nBefore implementing equivalent UI, contributors and AI agents must inspect the shared [component entry point](../../apps/web/src/components.tsx), its [metadata](../../apps/web/src/components.docs.json), applicable feature-owned `components.docs.json` files, and the generated reference or local `/docs/components` catalog. Use `rg --files apps/web/src` and targeted searches for the responsibility and existing controls, then read candidate implementation and tests. The catalog is curated; absence from it is not proof that equivalent private UI does not exist.\nCompare responsibility, native semantics, props, states, accessibility, styling hooks and ownership before choosing reuse. Reuse when these genuinely match. Extend an existing component compatibly when the responsibility remains the same. Similar appearance alone does not justify sharing; keep business validation, permissions, credential handling, API calls and workflow state in their feature.\nIf no suitable component exists, start with native HTML or a local feature component. Extract shared presentation only for demonstrated reuse or a concrete stable primitive, with a narrow contract and an owner. Do not create a wrapper for every element, a speculative component for every category, a large configurable component for unrelated workflows, or a second implementation of equivalent behavior. Explain meaningful reuse or extraction decisions in the change; static checks cannot prove that an agent inspected existing UI.\n"
-  },
-  {
-    "id": "repository/docs/architecture/web-components",
-    "title": "React Components and Design Practices",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Responsibility and placement",
-    "anchor": "responsibility-and-placement",
-    "text": "Responsibility and placement\nReuse scope\nResponsibility\nPlacement and documentation\n`shared`\nSmall reusable UI primitives with native semantics and no domain behavior, such as Button.\nThe web application's explicit `components.tsx` public entry point; every named uppercase runtime export needs owned metadata. Extract files only when it improves local reasoning.\n`composed`\nCohesive reusable presentation built from primitives/native controls, such as a labeled TextField or ErrorNotice.\nThe same public entry point when shared across features; document the composition's own responsibility and states rather than duplicating every native prop.\n`feature-specific`\nA component tied to one workflow's terminology, state, permissions or side effects.\nIts feature directory. Catalog notable reusable-within-feature components through local metadata when useful; private helpers and every React export elsewhere do not require catalog entries.\n`owner` names the maintaining boundary or module, not an invented team. Source ownership and reuse scope do not grant new dependency edges: features may consume shared UI; reusable UI and generic portal modules must not depend on feature workflows. Explicit application-specific example registrations follow the preview boundary below. A feature-specific component is not promoted by adding it to the catalog. Keep hooks, domain utilities and type exports outside the curated component export inventory. Type-only exports are exempt; prefer explicit named exports so humans and tools can discover the public surface. The existing generator uses the installed TypeScript parser to verify functions, component values and local re-exports, without executing source modules. Full type checking remains the compiler's responsibility.\n"
-  },
-  {
-    "id": "repository/docs/architecture/web-components",
-    "title": "React Components and Design Practices",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Categories and discovery",
-    "anchor": "categories-and-discovery",
-    "text": "Categories and discovery\nThe default categories are **Actions, Inputs, Forms, Data Display, Feedback, Navigation, Overlays and Layout**. They describe UI responsibility rather than require implementations. A metadata file may add categories through its `categories` string array; additions should represent a useful discovery distinction. Unknown explicit categories fail validation, helping catch typos. Legacy entries without a category use `Uncategorized` until their owner classifies them.\nThe internal catalog offers category links with URL-owned selection, searchable ownership/scope/usage, props, states, accessibility, code examples, optional live previews, and source/metadata links. Existing `/docs/components/<name>` URLs remain stable; optional `id` supports namespaced identifiers when features use the same component name. Changing a name need not change an explicitly recorded ID. The generated manifest indexes category, scope, owner and source; its per-component JSON pages contain the normalized metadata. These files and the generated Markdown reference remain machine-readable for agents even when production builds exclude the portal.\n"
-  },
-  {
-    "id": "repository/docs/architecture/web-components",
-    "title": "React Components and Design Practices",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Owned metadata and compatibility",
-    "anchor": "owned-metadata-and-compatibility",
-    "text": "Owned metadata and compatibility\nThe canonical root [components.docs.json](../../apps/web/src/components.docs.json) remains valid in its existing shape. Additional `components.docs.json` files are discovered under `apps/web/src/` through Git's tracked and non-ignored files. Each uses a `components` array and may declare additional `categories` or a default `source`. Each entry may set:\nField\nContract\n`name`, `summary`, `usage`, `accessibility`, `props`, `states`, `examples`\nExisting required fields remain supported. Props may be empty for a component without props; states and examples must be meaningful and nonempty.\n`source`\nRepository-relative owned source under `apps/web/src/`; defaults to `components.tsx` beside the metadata file. The named export must exist.\n`exportName`\nActual named export when it differs from the displayed name; defaults to `name`.\n`id`\nStable unique catalog identifier using letters, digits, dot, underscore or hyphen; defaults to `name`.\n`category`, `scope`, `owner`\nExplicit discovery and maintenance fields. Legacy defaults are `Uncategorized`, `shared` for a matching public entry-point export or `feature-specific` elsewhere, and the source path as owner. A public re-export retains shared scope when its metadata references the implementation file. New or substantially changed entries should specify all three.\nProp `required`, `default`\nOptional boolean and explanatory string. Existing `name`, `type`, and `meaning` remain canonical authored guidance; native prop inheritance can be described as a rest-props row.\nExample `code`, `live`\nOptional JSX/TSX text and live-preview selection. Code-only examples default to static. Existing examples without code retain their registered live renderer. `live: true` requires the existing explicit renderer in `documentation/examples.tsx`; metadata never instantiates arbitrary code.\nRegister a feature component locally with its actual source, owner, `feature-specific` scope and a code example by default. Existing projects' root-owned entries, extension fields and custom registered live examples remain supported; migration is additive. An explicitly maintained application example renderer may compose a feature's presentation with synthetic props and local state. It must not connect credentials, use production adapters, call domain APIs or cause workflow side effects; cover interactions with browser checks that assert no such requests. Generic catalog/rendering modules do not import features or instantiate metadata as code. Orion's foundation-only feature examples remain static so derivation never leaves a shared import of removed implementation. Only metadata owned by a foundation-only feature is removed with that feature; product-owned metadata and registrations remain the project's responsibility. Resolve canonical sources and preserve product examples before regenerating upgrade conflicts.\nRun `pnpm docs:references:write` after metadata, public exports, examples or relevant documentation changes. `pnpm docs:references:check` and `pnpm docs:references:test` detect missing public metadata, invalid IDs/categories/scopes/props, duplicate entries/examples, broken source/re-export references, unsafe paths and missing live renderers. Source discovery follows only selected component files and their local re-exports, rejects symlinks and ignored sources, and does not index private source bodies. Generated files are never independently edited. These checks do not verify every prop's runtime meaning, visual quality or reuse decision; review and behavior tests remain required.\n"
-  },
-  {
-    "id": "repository/docs/architecture/web-components",
-    "title": "React Components and Design Practices",
-    "group": "Architecture",
-    "kind": "repository",
-    "heading": "Styling, themes and accessibility",
-    "anchor": "styling-themes-and-accessibility",
-    "text": "Styling, themes and accessibility\nThe small [reference stylesheet](../../apps/web/src/ui.css) uses component-scoped classes and inherited semantic CSS variables with neutral fallbacks. `--ui-font-family`, `--ui-font-size` and `--ui-font-weight-semibold` control typography; `--ui-space-2`, `--ui-space-3` and `--ui-space-4` are the implemented spacing hooks; `--ui-radius` controls shape. Semantic `--ui-color-*` values cover surface, text, border, action/on-action, focus, muted text and danger/surface/border. Add a token only for a demonstrated shared visual meaning, and retain one source for each value rather than duplicating unexplained literals across shared controls.\nProducts own token values, typography, theme selection, brand assets, shell and layout. Override tokens on the application root or a scoped theme container; controls inherit them without a React provider or a mandatory light/dark palette. The catalog's token-override example is synthetic, scoped to the preview, and imposes no product identity. Preserve existing class hooks when evolving a shared component compatibly; migrate legacy feature styling incrementally when touched, rather than redesigning the entire application as a side effect.\nUse native semantics and preserve native props/ref forwarding where practical. Define default, hover, focus, disabled, pending, validation and empty/populated states as relevant. Keep focus visible, disabled activation reliable, labels persistent, hint/error relationships explicit and errors understandable without color alone. Preserve keyboard operation and native form behavior; use links for navigation and explicit submit buttons for form submission. Test themes for readable contrast and relevant accessibility at the browser boundary. Features own asynchronous work, validation and live announcements; a visual component never grants authorization or retries an unknown write outcome.\nThe reference set intentionally stays small: **Button**, **TextField**, and **ErrorNotice**, exercised in real composition and local examples. No modal, grid, form engine or general layout library is implied by a taxonomy entry. More complex keyboard/focus patterns require their own concrete requirement and proportional tests before introduction.\n"
   }
 ]

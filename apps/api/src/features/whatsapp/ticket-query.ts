@@ -27,7 +27,7 @@ export function readTicketQuery(
   return undefined;
 }
 
-const statuses: Record<number, string> = {
+export const ticketStatuses: Record<number, string> = {
   1: "Novo",
   2: "Em atendimento",
   3: "Planejado",
@@ -62,7 +62,7 @@ export function ticketQueryReply(
       body: [
         "*Chamado #" + detail.id + "*",
         titleOf(detail),
-        "Situação: " + statuses[detail.status],
+        "Situação: " + ticketStatuses[detail.status],
         ...(updated
           ? [
               "Última atualização: " +
@@ -97,7 +97,7 @@ export function ticketQueryReply(
             " · " +
             titleOf(ticket) +
             " · " +
-            statuses[ticket.status],
+            ticketStatuses[ticket.status],
         ),
         "\nPara ver detalhes, digite *Chamado " + result.tickets[0].id + "*.",
       ].join("\n")

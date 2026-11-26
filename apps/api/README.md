@@ -52,7 +52,7 @@ The server-side [GLPI client](src/integrations/glpi/client.ts) targets the REST 
 
 The user token is sent only to `initSession`. Requests with an established session use the application token and session token. Concurrent calls share session initialization. A directory read refreshes and retries once after GLPI explicitly rejects an expired session. The runtime and reverse proxy should exclude query strings, request bodies and authentication headers from logs because directory queries carry corporate email addresses.
 
-Directory lookup pages through `search/User`, verifies the entire normalized email against returned addresses, and checks the active flag. It accepts exactly one active GLPI user ID. Multiple matching users, incomplete or inconsistent pagination, and provider errors return distinct internal outcomes. The employee identity workflow will use neutral replies and verify mailbox ownership before linking an account.
+Directory lookup pages through `search/User`, verifies the entire normalized email against returned addresses, and checks the active flag. It accepts exactly one active GLPI user ID. A separate lookup checks the signed Brazilian sender number against `phone`, `phone2`, and `mobile`. The employee skips the code only if the complete number matches one active user and that user matches the corporate email. Missing, ambiguous or unreadable contacts use the email challenge. The API queries GLPI's contact directory in read-only mode.
 
 Ticket creation uses the verified GLPI requester ID and escapes the plain-text description for GLPI's HTML field. A confirmed creation includes the positive ticket ID from GLPI. The GLPI adapter uploads documents via multipart form data, then reads the ticket to confirm that it contains the returned document ID. An explicit denial is distinguishable from a timeout, lost response or malformed success after dispatch. Each adapter call sends at most one write.
 
@@ -62,7 +62,7 @@ The adapter is covered by [synthetic contract and transport tests](test/glpi/cli
 
 ## Employee email verification
 
-The [identity service](src/features/whatsapp/identity-service.ts) establishes mailbox control for a WhatsApp sender and one GLPI user. It queries the directory only for configured corporate domains and issues a code only after a unique active match. The sender scope includes the WhatsApp business phone ID and prefers the Meta business-scoped sender ID. Phone-only senders use their phone identifier. A changed sender scope requires verification.
+The [identity service](src/features/whatsapp/identity-service.ts) links a signed WhatsApp sender to a GLPI user. It queries the directory only for configured corporate domains. After the employee enters their email, an exact, unique match between the signed sender number and that GLPI user's contacts opens the menu directly. Other senders verify mailbox control with a code. An administratively revoked link or a link to a different GLPI user requires mailbox verification. The sender scope includes the WhatsApp business phone ID and prefers the Meta business-scoped sender ID. Phone-only senders use their phone identifier.
 
 One reservation permits one SMTP submission. A code has the prefix `MNS-` and expires after ten minutes. Each challenge permits five attempts. The sender and mailbox each allow three reservations in a rolling hour. Repeated inbound message IDs cannot consume another attempt or trigger another email. Reserving a new challenge supersedes the previous one. Consuming a code and creating the verified link commit together. The link expires after thirty days.
 
@@ -72,15 +72,23 @@ Configure the seven `IDENTITY_*` settings as a group with [GLPI](#glpi-integrati
 
 [Identity integration tests](test/whatsapp/identity.test.ts) · [SMTP transport test](test/whatsapp/verification-mail.test.ts) · [Nodemailer SMTP](https://nodemailer.com/smtp)
 
+### WhatsApp identity administration
+
+Employees can verify several WhatsApp accounts against the same GLPI user. Each sender has an independent proof and expiration. The operator panel lists links stored in MNS Suporte. Linking a sender leaves the GLPI user record untouched. When Meta supplies a phone number, administration displays only its last four digits.
+
+The IT panel lists current links by GLPI user ID and revokes one link at a time. The JWT issuer must grant `whatsapp:links:read` for lookup and `whatsapp:links:revoke` for revocation. The routes return 503 while bearer verification is unconfigured. Expose these routes through the authorized internal ingress. The Meta callback continues to use webhook authentication.
+
+Revocation records the operator in the current link, invalidates the pending WhatsApp verification challenge and withdraws the sender's ticket-notice grant. Authorization checks reject the revoked link for new work and protected outgoing messages. Work already sent to a provider can still complete. A new mailbox verification issues a different administrative link ID. For employee offboarding, disable corporate mailbox and GLPI access to prevent re-verification.
+
 ## Guided WhatsApp conversation
 
 Set `WHATSAPP_SUPPORT_CONTACT` to the approved IT mailbox or HTTPS support page to enable guided processing. It requires the [WhatsApp outbound](#reply-dispatch), [GLPI](#glpi-integration), [employee verification](#employee-email-verification), and PostgreSQL settings. With the contact unset, the API can still receive signed events for integration testing. The configured contact is available to an employee before verification and during intake.
 
-The conversation offers ticket intake, ticket consultation, and the IT contact. Intake collects category, unit or department, description, impact, and up to five media references. An employee can review and edit fields, cancel an unconfirmed draft, or return to it via the menu after a restart. Review buttons carry the current draft revision. The stored draft belongs to its verified GLPI user, and a different verified user on the same sender scope does not inherit it.
+The conversation offers ticket intake and consultation. Intake asks for a short title and a description. The employee can send up to five optional media items at review, inspect the title, and edit or cancel the draft before confirming. Category, location and impact use GLPI defaults, business rules and IT triage. Earlier drafts keep their description and attachments and ask for a title when needed. Review buttons carry the current draft revision. A draft belongs to its verified GLPI user and is not inherited by a different user on the same sender scope.
 
 Confirmation enqueues [ticket submission](#glpi-ticket-submission). Verified employees can [consult their tickets](#glpi-ticket-consultation) and opt in to [closure notices](#whatsapp-closure-notices).
 
-Inbound events and replies use PostgreSQL. A short transaction serializes the next inbox event for one business number and commits the conversation move and its outbound reply together. Email requests commit the neutral reply before querying GLPI or submitting mail. Deferred identity and consultation operations can be reclaimed after a 45-second lease. An old claim cannot finalize a newer one. The employee's verified link recovers a successful confirmation when a worker was interrupted after consuming the code. Inbound events outside the customer service window are completed without applying a move or sending a reply.
+Inbound events and replies use PostgreSQL. A short transaction serializes the next inbox event for one business number and commits the conversation move and its outbound reply together. The email step sends either the menu or the neutral code prompt after checking the directory. Deferred identity and consultation operations can be reclaimed after a 45-second lease. An old claim cannot finalize a newer one. The employee's verified link recovers a successful confirmation when a worker was interrupted during onboarding. Inbound events outside the customer service window are completed without applying a move or sending a reply.
 
 [Conversation state and prompts](src/features/whatsapp/conversation.ts) · [Processing and recovery](src/features/whatsapp/conversation-processor.ts) · [Restart and transport tests](test/whatsapp/conversation.test.ts) · [Meta customer service window](https://developers.facebook.com/documentation/business-messaging/whatsapp/messages/send-messages)
 
@@ -116,11 +124,11 @@ Consultation runs outside the database transaction. A deferred request retains i
 
 ### WhatsApp closure notices
 
-Verified employees can send **Avisos** and choose **Ativar avisos** for tickets they confirm after opting in. **Parar avisos** withdraws the grant for that WhatsApp sender, including when email verification has expired. Enabling again issues a new grant for subsequent tickets. Existing tickets first opened through the legacy system are covered by the cutover reconciliation in PJ-18.
+The review explains that confirming a ticket includes opt-in to MNS Suporte WhatsApp notices, so first-time users do not need a separate command. **Parar avisos** withdraws the grant and prevents automatic re-enabling on later submissions. **Ativar avisos** explicitly enables notices again for future confirmed tickets.
 
-After GLPI confirms ticket creation, the worker checks the ticket and its requester every five minutes. GLPI status `6` triggers one notice per submitted draft. GLPI outages and expired identity bindings defer checks for fifteen minutes. The worker retires watches when the grant or ownership disappears. It commits the closure intent and retires the watch in one transaction. Dispatch checks the opt-in and verified binding again on each attempt, reuses the outbound throttle rules and tracks Meta delivery evidence.
+Every five minutes the worker checks ticket ownership, the current status and new public support follow-ups. A public support reply and a newly observed status each produce a distinct notice. A closed ticket includes the title and the accepted GLPI solution for the current resolution when available. Private follow-ups and older solutions are excluded. The activity cursor and the outbox writes commit together to prevent duplicates across polling and restarts. Legacy watches continue to send only closure notices, without replaying old follow-ups. Closed tickets remain under observation for seven days to detect reopening. Intermediate statuses that occur between polls may be coalesced.
 
-The notice uses text during the 24-hour window determined from signed incoming messages. For delivery outside that window, set `WHATSAPP_CLOSURE_TEMPLATE_NAME` after Meta approves the matching utility template. Without a configured template, the watcher defers a closed ticket until an eligible window or template is available. A notice queued with a template has a 48-hour dispatch lifetime. A text-only notice queued without one expires with its service window.
+Rich replies, status notices and full solutions use text inside the signed 24-hour customer service window. For closure outside that window, the approved closure template can send the existing generic notice. Other updates wait for a new customer message. The worker rechecks deferred activity after fifteen minutes. Set `WHATSAPP_CLOSURE_TEMPLATE_NAME` after Meta approves the matching utility template.
 
 Use the utility template `mns_chamado_encerrado_v1`, language `pt_BR`, a single positional body parameter with example `123`, and the following body.
 

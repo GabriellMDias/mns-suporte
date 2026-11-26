@@ -10,6 +10,11 @@ import { createConversationProcessor } from "./conversation-processor.js";
 import { registerWhatsAppDispatchWorker } from "./dispatch-worker.js";
 import { createWhatsAppGraphSender } from "./graph-client.js";
 import { createWhatsAppMediaReader } from "./graph-media.js";
+import {
+  identityAdminErrors,
+  identityAdminOperations,
+  registerIdentityAdministration,
+} from "./identity-admin-routes.js";
 import { protectIdentityCode } from "./identity-code.js";
 import { createPostgresIdentityRepository } from "./identity-repository.js";
 import { createIdentityVerification } from "./identity-service.js";
@@ -24,14 +29,15 @@ export const whatsAppModule: ApiModule = {
   name: "whatsapp",
   tag: "WhatsApp webhook",
   requires: ["database", "whatsappWebhook"],
-  operations: webhookOperations,
-  errors: webhookErrors,
-  activate: ({ database, whatsappWebhook, whatsappConversation }) => {
+  operations: [...webhookOperations, ...identityAdminOperations],
+  errors: { ...webhookErrors, ...identityAdminErrors },
+  activate: ({ database, whatsappWebhook, whatsappConversation, verifier }) => {
     const store = database!;
     const config = whatsappWebhook!;
     return {
       name: "whatsapp",
       register(app) {
+        registerIdentityAdministration(app, store, verifier);
         registerWhatsAppWebhook(app, config, async ({ messages, statuses }) => {
           await store.$transaction(async (transaction) => {
             if (messages.length > 0)
@@ -78,6 +84,8 @@ export const whatsAppModule: ApiModule = {
                 app.log.warn("whatsapp_verification_mail_unconfirmed");
               }
             },
+            undefined,
+            glpi.isUniqueActiveUserPhone,
           );
           const conversationOptions = {
             businessPhoneId: config.phoneNumberId,
@@ -114,6 +122,8 @@ export const whatsAppModule: ApiModule = {
                 templateConfigured: !!config.outbound.closureTemplateName,
               },
               glpi.readOwnedTickets,
+              undefined,
+              glpi.readTicketActivity,
             ),
             "whatsapp_closure_unavailable",
           );

@@ -18,9 +18,11 @@ type DirectoryLookup = (
   | { kind: "not_found" | "ambiguous" | "invalid_email" | "unavailable" }
 >;
 type CodeSender = (email: string, code: string) => Promise<void>;
+type DirectoryPhoneMatch = (phone: string, userId: number) => Promise<boolean>;
 type Confirmation =
   { kind: "verified"; glpiUserId: number } | { kind: "invalid" | "duplicate" };
 type Receipt = { scopeKey: string; eventKey: string; now: Date };
+type LinkProof = Receipt & { linkExpiresAt: Date; phoneLastFour?: string };
 
 export type IdentityRepository = {
   reserve(
@@ -38,9 +40,8 @@ export type IdentityRepository = {
     userId: number;
     digest: string;
   }): Promise<boolean>;
-  confirm(
-    input: Receipt & { digest: string; linkExpiresAt: Date },
-  ): Promise<Confirmation>;
+  linkDirectoryPhone(input: LinkProof & { userId: number }): Promise<boolean>;
+  confirm(input: LinkProof & { digest: string }): Promise<Confirmation>;
   findVerifiedUser(scopeKey: string, now: Date): Promise<number | undefined>;
 };
 
@@ -50,12 +51,20 @@ function identityEventKey(scope: string, eventId: string): string {
     .digest("hex");
 }
 
+function phoneSuffix(messenger: MessengerIdentity) {
+  const phone = messenger.senderPhone;
+  return phone && /^[1-9][0-9]{5,14}$/.test(phone)
+    ? phone.slice(-4)
+    : undefined;
+}
+
 export function createIdentityVerification(
   repository: IdentityRepository,
   config: { codeSecret: string; allowedEmailDomains: readonly string[] },
   findUser: DirectoryLookup,
   sendCode: CodeSender,
   clock = () => new Date(),
+  matchesDirectoryPhone?: DirectoryPhoneMatch,
 ) {
   const domains = new Set(config.allowedEmailDomains);
   return {
@@ -95,6 +104,21 @@ export function createIdentityVerification(
         user.userId <= 0
       )
         return;
+      if (
+        messenger.senderPhone &&
+        (await matchesDirectoryPhone?.(messenger.senderPhone, user.userId))
+      ) {
+        const checkedAt = clock();
+        const linked = await repository.linkDirectoryPhone({
+          scopeKey,
+          eventKey,
+          now: checkedAt,
+          userId: user.userId,
+          linkExpiresAt: new Date(+checkedAt + linkLifetime),
+          phoneLastFour: phoneSuffix(messenger),
+        });
+        if (linked) return;
+      }
       const code = newIdentityCode();
       const prepared = await repository.prepare({
         eventKey,
@@ -122,6 +146,7 @@ export function createIdentityVerification(
         eventKey: identityEventKey(scopeKey, inboundId),
         now,
         digest,
+        phoneLastFour: phoneSuffix(messenger),
         linkExpiresAt: new Date(now.getTime() + linkLifetime),
       });
     },

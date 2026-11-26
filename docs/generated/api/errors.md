@@ -15,3 +15,4 @@
 | `WHATSAPP_WEBHOOK_UNVERIFIED` | 403 | authentication | no | The webhook request could not be verified. |
 | `WHATSAPP_WEBHOOK_TOO_LARGE` | 413 | validation | no | The webhook payload is too large. |
 | `WHATSAPP_WEBHOOK_UNSUPPORTED_MEDIA_TYPE` | 415 | validation | no | The webhook must use JSON. |
+| `WHATSAPP_IDENTITY_ADMIN_FORBIDDEN` | 403 | authorization | no | You do not have permission to manage WhatsApp identity links. |

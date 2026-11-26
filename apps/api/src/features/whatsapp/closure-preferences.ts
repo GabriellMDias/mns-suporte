@@ -13,6 +13,7 @@ export async function saveClosurePreference(
   recipient: WhatsAppRecipient,
   action: ClosurePreferenceAction,
   now: Date,
+  requesterId?: number,
 ): Promise<void> {
   const preferences = tx.whatsAppClosurePreference;
   if (action === "disable") {
@@ -20,6 +21,17 @@ export async function saveClosurePreference(
       where: { scopeKey, revokedAt: null },
       data: { revokedAt: now, recipient: Prisma.DbNull },
     });
+    if (requesterId !== undefined)
+      await preferences.createMany({
+        data: {
+          scopeKey,
+          glpiUserId: requesterId,
+          grantId: randomUUID(),
+          grantedAt: now,
+          revokedAt: now,
+        },
+        skipDuplicates: true,
+      });
     return;
   }
   const active = await preferences.findUnique({

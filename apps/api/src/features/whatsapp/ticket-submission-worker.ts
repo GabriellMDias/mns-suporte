@@ -87,6 +87,12 @@ export function createTicketSubmissionWorker(
     // A reclaimed write could have succeeded before its response was persisted.
     if (claim.mutating) return { kind: "uncertain" };
     if (claim.attempts > retryDelayMs.length + 1) return { kind: "failed" };
+    if (
+      claim.ticketId === null &&
+      (await verifiedUser(store, claim.scopeKey, clock())) !==
+        Number(claim.requesterId)
+    )
+      return { kind: "failed" };
 
     const mediaId = Array.isArray(claim.mediaIds)
       ? claim.mediaIds[claim.nextAttachment]
@@ -174,6 +180,7 @@ export function createTicketSubmissionWorker(
           ...(outcome.kind === "created" && claim.closureConsentId
             ? {
                 closureCheckAt: new Date(now.getTime() + closurePollIntervalMs),
+                noticeCursor: { status: 1, followupId: 0 },
               }
             : {}),
           nextAttachment,
@@ -248,6 +255,7 @@ export function createTicketSubmissionWorker(
           scopeKey: claim.scopeKey,
           recipient: payload.recipient,
           expiresAt: currentUser === draft.ownerId ? claim.replyExpiresAt : now,
+          requiredGlpiUserId: draft.ownerId,
         },
         businessPhoneId,
         move,
