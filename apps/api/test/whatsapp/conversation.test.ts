@@ -467,7 +467,7 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
         "Avisos ativados",
       );
       const consentScope = scopeOf(sender)!;
-      const consent =
+      const previousConsent =
         await database.whatsAppClosurePreference.findUniqueOrThrow({
           where: { scopeKey: consentScope },
         });
@@ -477,12 +477,22 @@ it("continues signed onboarding and intake after restarts, with one reply per pr
           where: { scopeKey: consentScope },
         }),
       ).toMatchObject({
-        grantId: consent.grantId,
+        grantId: previousConsent.grantId,
         glpiUserId: 37n,
         revokedAt: null,
       });
+      await inspector.whatsAppClosurePreference.update({
+        where: { scopeKey: consentScope },
+        data: { glpiUserId: 38n },
+      });
       const confirmed = await send(metaText("Confirmar"));
       expect(confirmed.reply.body).toContain("Rascunho confirmado");
+      const consent =
+        await database.whatsAppClosurePreference.findUniqueOrThrow({
+          where: { scopeKey: consentScope },
+        });
+      expect(consent).toMatchObject({ glpiUserId: 37n, revokedAt: null });
+      expect(consent.grantId).not.toBe(previousConsent.grantId);
       expect((await app.inject(confirmed.request)).statusCode).toBe(200);
       await send(metaText("Confirmar"));
       expect(await database.whatsAppTicketSubmission.findMany()).toMatchObject([

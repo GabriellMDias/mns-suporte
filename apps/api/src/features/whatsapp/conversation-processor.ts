@@ -142,7 +142,11 @@ export async function applyMove(
     const preference = await tx.whatsAppClosurePreference.findUnique({
       where: { scopeKey: address.scopeKey },
     });
-    if (!preference)
+    if (
+      !preference ||
+      (preference.revokedAt === null &&
+        preference.glpiUserId !== BigInt(requesterId))
+    )
       await saveClosurePreference(
         tx,
         address.scopeKey,
